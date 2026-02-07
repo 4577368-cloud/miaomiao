@@ -37,6 +37,12 @@
       }
     },
     {
+      "path": "pages/profile/edit",
+      "style": {
+        "navigationBarTitleText": "编辑资料"
+      }
+    },
+    {
       "path": "pages/pet/index",
       "style": {
         "navigationBarTitleText": "我的爱宠"

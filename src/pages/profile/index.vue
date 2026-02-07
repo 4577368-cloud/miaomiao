@@ -12,16 +12,23 @@
             <view v-else class="avatar"></view>
           </view>
           <view class="info-content">
-            <view class="name-row">
+            <view class="name-row" @click="handleAvatarClick">
               <text class="name">{{ userInfo?.nickname || '未登录' }}</text>
+              <text class="edit-arrow">></text>
+              <view class="gender-icon" v-if="userInfo?.gender">
+                 <text :class="['gender-symbol', userInfo.gender]">{{ userInfo.gender === 'male' ? '♂' : (userInfo.gender === 'female' ? '♀' : '') }}</text>
+              </view>
               <view class="role-badge" :class="currentRole">
                 <text>{{ roleLabel }}</text>
               </view>
             </view>
+            <view class="id-row" v-if="userInfo?.userNo">
+               <text>ID: {{ userInfo.userNo }}</text>
+            </view>
             <view class="join-days" v-if="userInfo?.joinDate">
                <text>已加入 {{ joinedDays }} 天</text>
             </view>
-            <text class="bio">还没有填写个人简介...</text>
+            <text class="bio">{{ userInfo?.bio || '还没有填写个人简介...' }}</text>
           </view>
         </view>
         
@@ -161,6 +168,8 @@ const navigateTo = (url: string) => {
 const handleAvatarClick = () => {
   if (!userStore.isLoggedIn) {
     uni.reLaunch({ url: '/pages/login/index' });
+  } else {
+    uni.navigateTo({ url: '/pages/profile/edit' });
   }
 };
 
@@ -236,7 +245,24 @@ const handleCertificationClick = () => {
           font-size: 40rpx;
           font-weight: 800;
           color: $color-text-main;
-          margin-right: 16rpx;
+          margin-right: 8rpx;
+        }
+        
+        .edit-arrow {
+           font-size: 32rpx;
+           color: #999;
+           margin-right: 16rpx;
+           font-weight: bold;
+        }
+        
+        .gender-icon {
+           margin-right: 16rpx;
+           .gender-symbol {
+             font-size: 28rpx;
+             font-weight: bold;
+             &.male { color: #1890ff; }
+             &.female { color: #eb2f96; }
+           }
         }
         
         .role-badge {
@@ -258,6 +284,13 @@ const handleCertificationClick = () => {
             line-height: 1;
           }
         }
+      }
+      
+      .id-row {
+        font-size: 24rpx;
+        color: $color-text-secondary;
+        margin-bottom: 8rpx;
+        font-family: monospace;
       }
       
       .join-days {

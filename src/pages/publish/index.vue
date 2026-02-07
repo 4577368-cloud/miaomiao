@@ -117,6 +117,40 @@
             <view class="check-mark" v-if="form.serviceType === ServiceType.WALKING">✓</view>
           </view>
         </view>
+        
+        <!-- 服务内容标准说明 -->
+        <view class="service-standards">
+           <view class="std-header" @click="showServiceDesc = !showServiceDesc">
+              <text class="std-title">查看服务内容详情</text>
+              <text class="std-arrow" :class="{ rotated: showServiceDesc }">></text>
+           </view>
+           <view class="std-content" v-if="showServiceDesc">
+              <view class="std-item">
+                <text class="dot">🥣</text>
+                <text class="text">喂食：猫粮/罐头/自制猫饭/生骨肉/商业湿粮/零食</text>
+              </view>
+              <view class="std-item">
+                <text class="dot">💧</text>
+                <text class="text">换水：清洗饮水机/静态水碗，更换新鲜水源</text>
+              </view>
+              <view class="std-item">
+                <text class="dot">🧹</text>
+                <text class="text">清理：铲屎/清理尿团 (单层/双层猫砂盆)</text>
+              </view>
+              <view class="std-item">
+                <text class="dot">👀</text>
+                <text class="text">观察：检查身体情况、精神状态、陪玩陪疯撸猫</text>
+              </view>
+              <view class="std-item">
+                <text class="dot">📸</text>
+                <text class="text">反馈：拍照/拍视频实时发送 (建议安装监控)</text>
+              </view>
+              <view class="std-item highlight">
+                 <text class="dot">💊</text>
+                 <text class="text">喂药/浇花等更多个性化服务，请联系客服或备注</text>
+              </view>
+           </view>
+        </view>
       </view>
 
       <!-- 3. 选择宠托师 (Only if Specific Sitter mode is active) -->
@@ -562,6 +596,7 @@ const BASE_PRICE = 50;
 // OWNER LOGIC
 const selectedPetIds = ref<string[]>([]);
 const showCouponPopup = ref(false);
+const showServiceDesc = ref(false);
 const lastPetCount = ref(0);
 const showSitterSelector = ref(false);
 
@@ -1052,6 +1087,66 @@ onShow(() => {
       font-weight: bold;
     }
   }
+}
+
+.service-standards {
+    margin-top: 24rpx;
+    background: #F9FAFB;
+    border-radius: $radius-md;
+    overflow: hidden;
+    
+    .std-header {
+      padding: 20rpx 24rpx;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      
+      .std-title {
+        font-size: 26rpx;
+        color: $color-text-secondary;
+      }
+      
+      .std-arrow {
+        font-size: 24rpx;
+        color: #999;
+        transition: transform 0.3s;
+        
+        &.rotated {
+          transform: rotate(90deg);
+        }
+      }
+    }
+    
+    .std-content {
+      padding: 0 24rpx 24rpx;
+      border-top: 1px solid rgba(0,0,0,0.03);
+      
+      .std-item {
+        display: flex;
+        align-items: flex-start;
+        margin-top: 16rpx;
+        
+        .dot {
+          font-size: 24rpx;
+          margin-right: 12rpx;
+          line-height: 1.4;
+        }
+        
+        .text {
+          flex: 1;
+          font-size: 24rpx;
+          color: $color-text-secondary;
+          line-height: 1.4;
+        }
+        
+        &.highlight {
+          .text {
+            color: $color-primary;
+            font-weight: bold;
+          }
+        }
+      }
+    }
 }
 
 /* Sitter Scroll */

@@ -331,7 +331,7 @@ const closeModal = () => showModal.value = false;
 
 
 
-const savePet = () => {
+const savePet = async () => {
   if (!form.value.name) return uni.showToast({ title: '请输入昵称', icon: 'none' });
   
   // Construct Care Profile
@@ -342,39 +342,53 @@ const savePet = () => {
     notes: careForm.notes
   };
 
-  const newPet = {
-    ...form.value,
-    id: form.value.id || Date.now().toString(),
-    careProfile
-  } as PetInfo;
-
-  let currentPets = [...pets.value];
-  if (isEditing.value) {
-    const idx = currentPets.findIndex(p => p.id === newPet.id);
-    if (idx > -1) currentPets[idx] = newPet;
-  } else {
-    currentPets.push(newPet);
+  uni.showLoading({ title: '保存中...' });
+  try {
+    if (isEditing.value && form.value.id) {
+       await userStore.updatePet({
+         ...form.value,
+         careProfile
+       } as PetInfo);
+    } else {
+       // Remove id for new pet
+       const { id, ...rest } = form.value;
+       await userStore.addPet({
+         ...rest,
+         careProfile
+       } as any);
+    }
+    
+    uni.hideLoading();
+    showModal.value = false;
+    uni.showToast({ title: '保存成功' });
+    
+    // 优化动线：保存后自动返回上一页
+    setTimeout(() => {
+      uni.navigateBack();
+    }, 800);
+  } catch (e) {
+    uni.hideLoading();
+    uni.showToast({ title: '保存失败', icon: 'none' });
   }
-  
-  userStore.updateUser({ pets: currentPets });
-  showModal.value = false;
-  uni.showToast({ title: '保存成功' });
-  
-  // 优化动线：保存后自动返回上一页
-  setTimeout(() => {
-    uni.navigateBack();
-  }, 800);
 };
 
 const deletePet = () => {
   uni.showModal({
     title: '确认删除',
     content: '确定要删除这个宠物吗？',
-    success: (res) => {
+    success: async (res) => {
       if (res.confirm) {
-        const currentPets = pets.value.filter(p => p.id !== form.value.id);
-        userStore.updateUser({ pets: currentPets });
-        showModal.value = false;
+        uni.showLoading({ title: '删除中...' });
+        try {
+           if (form.value.id) {
+             await userStore.removePet(form.value.id);
+           }
+           uni.hideLoading();
+           showModal.value = false;
+        } catch (e) {
+           uni.hideLoading();
+           uni.showToast({ title: '删除失败', icon: 'none' });
+        }
       }
     }
   });

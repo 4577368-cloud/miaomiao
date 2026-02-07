@@ -103,51 +103,52 @@ const chooseLocation = () => {
   });
 };
 
-const handleSave = () => {
+const handleSave = async () => {
   if (!form.contactName) return uni.showToast({ title: '请填写联系人', icon: 'none' });
   if (!form.contactPhone) return uni.showToast({ title: '请填写手机号', icon: 'none' });
   if (!form.detail) return uni.showToast({ title: '请填写详细地址', icon: 'none' });
   
-  const newAddr = {
-    ...form,
-    id: form.id || Date.now().toString()
-  };
+  uni.showLoading({ title: '保存中...' });
   
-  // Update Store
-  const addresses = userStore.userInfo?.addresses ? [...userStore.userInfo.addresses] : [];
-  
-  if (newAddr.isDefault) {
-    addresses.forEach(a => a.isDefault = false);
+  try {
+    if (isEdit.value) {
+      await userStore.updateAddress({ ...form });
+    } else {
+      // Remove id from form for new address, let backend generate it
+      const { id, ...rest } = form; 
+      await userStore.addAddress(rest);
+    }
+    
+    uni.hideLoading();
+    uni.showToast({
+      title: '保存成功',
+      icon: 'success'
+    });
+    
+    setTimeout(() => {
+      uni.navigateBack();
+    }, 800);
+  } catch (e) {
+    uni.hideLoading();
+    uni.showToast({ title: '保存失败', icon: 'none' });
   }
-  
-  if (isEdit.value) {
-    const idx = addresses.findIndex(a => a.id === newAddr.id);
-    if (idx > -1) addresses[idx] = newAddr;
-  } else {
-    addresses.unshift(newAddr);
-  }
-  
-  userStore.updateUser({ addresses });
-  
-  uni.showToast({
-    title: '保存成功',
-    icon: 'success'
-  });
-  
-  setTimeout(() => {
-    uni.navigateBack();
-  }, 800);
 };
 
 const handleDelete = () => {
   uni.showModal({
     title: '确认删除',
     content: '确定要删除该地址吗？',
-    success: (res) => {
+    success: async (res) => {
       if (res.confirm) {
-        const addresses = userStore.userInfo?.addresses?.filter(a => a.id !== form.id) || [];
-        userStore.updateUser({ addresses });
-        uni.navigateBack();
+        uni.showLoading({ title: '删除中...' });
+        try {
+          await userStore.removeAddress(form.id);
+          uni.hideLoading();
+          uni.navigateBack();
+        } catch (e) {
+          uni.hideLoading();
+          uni.showToast({ title: '删除失败', icon: 'none' });
+        }
       }
     }
   });

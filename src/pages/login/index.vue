@@ -366,10 +366,10 @@ const handleAction = async () => {
           role: userInfo.role
         };
         
-        // 如果是手机注册，保存手机号到 profile
-        if (loginMethod.value === 'phone') {
-          profileData.phone = phone.value;
-        }
+        // 如果是手机注册，原本想保存手机号，但 Schema 可能不支持，先注释掉
+        // if (loginMethod.value === 'phone') {
+        //   profileData.phone = phone.value;
+        // }
 
         const { error: profileError } = await supabase.from('profiles').insert(profileData);
 
@@ -393,23 +393,39 @@ const handleAction = async () => {
       });
 
       if (error) {
+        console.error('Login error:', error);
+        
         if (error.message.includes('Invalid login credentials')) {
            throw new Error('账号或密码错误');
         }
+        
+        // 处理 Supabase 邮箱验证未关闭的情况
         if (error.message.includes('Email not confirmed')) {
-           // 特殊处理邮箱未验证错误
            if (loginMethod.value === 'phone') {
              uni.showModal({
-               title: '登录失败',
-               content: '账号未激活。如果您使用模拟手机号注册，请在 Supabase 后台关闭 "Enable Email Confirmations" 选项。\n\n路径: Authentication -> Providers -> Email',
+               title: '需关闭邮箱验证',
+               content: '手机号注册使用的是虚拟邮箱，无法接收验证邮件。\n\n为了测试手机号登录，请在 Supabase 后台关闭 "Enable Email Confirmations"。\n\n或者手动在 Auth 表中将该用户设为已验证。',
                showCancel: false,
-               confirmText: '好的'
+               confirmText: '我知道了'
              });
              return;
            } else {
-             throw new Error('请先前往邮箱激活您的账号');
+             // 真实邮箱注册，提示去激活
+             uni.showToast({ title: '账号未激活，请前往邮箱查收验证邮件', icon: 'none', duration: 4000 });
+             return;
            }
         }
+        
+        // 检查是否触发了 Captcha (虽然概率小)
+        if (error.message.includes('captcha')) {
+           uni.showModal({
+             title: '安全验证',
+             content: '系统检测到频繁操作，触发了安全验证。请稍后重试，或在 Supabase 后台 Security 设置中关闭 Captcha 保护。',
+             showCancel: false
+           });
+           return;
+        }
+
         throw error;
       }
       

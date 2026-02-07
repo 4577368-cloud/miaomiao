@@ -69,7 +69,12 @@
               </view>
             </view>
             <view class="card-icon">
-              <image src="https://imgus.tangbuy.com/static/images/2026-02-07/1f7527725fb54136931c6bf2919e7e0e-177045402956211314871683841080806.jpeg" mode="aspectFill" class="icon-img" />
+              <!-- 使用混合模式消除背景色，同时使用圆角 -->
+              <image 
+                src="https://imgus.tangbuy.com/static/images/2026-02-07/1f7527725fb54136931c6bf2919e7e0e-177045402956211314871683841080806.jpeg" 
+                mode="aspectFill" 
+                class="icon-img mix-blend" 
+              />
             </view>
           </view>
 
@@ -86,7 +91,11 @@
               </view>
             </view>
             <view class="card-icon">
-              <image src="https://imgus.tangbuy.com/static/images/2026-02-07/6dd4699cc43b4845906dc5911a6f6b11-177045526494810424765923383103569.jpeg" mode="aspectFill" class="icon-img" />
+              <image 
+                src="https://imgus.tangbuy.com/static/images/2026-02-07/6dd4699cc43b4845906dc5911a6f6b11-177045526494810424765923383103569.jpeg" 
+                mode="aspectFill" 
+                class="icon-img" 
+              />
             </view>
           </view>
         </view>
@@ -108,11 +117,7 @@
             <text class="g-title">专业保险</text>
             <text class="g-desc">全程意外保障</text>
           </view>
-          <view class="guarantee-card">
-            <view class="icon-box">🎥</view>
-            <text class="g-title">全程直播</text>
-            <text class="g-desc">服务过程可视化</text>
-          </view>
+
           <view class="guarantee-card">
             <view class="icon-box">🎓</view>
             <text class="g-title">专业培训</text>
@@ -779,6 +784,11 @@ const handleAcceptOrder = (orderId: string) => {
     .icon-img {
       width: 100%;
       height: 100%;
+      
+      &.mix-blend {
+        mix-blend-mode: multiply;
+        border-radius: 50%;
+      }
     }
   }
 }
