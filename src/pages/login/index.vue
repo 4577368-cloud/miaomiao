@@ -4,51 +4,146 @@
       <view class="header">
         <image src="https://imgus.tangbuy.com/static/images/2026-02-07/fb3eeeb726ef43ea9a0020b18da5290e-177045207976112019662246898497843.jpeg" class="brand-logo" mode="heightFix" />
         <text class="title">您的贴心宠托伙伴</text>
-        <text class="subtitle">选择您的身份开始旅程</text>
+        <text class="subtitle">{{ isRegister ? '创建新账号' : '欢迎回来' }}</text>
+      </view>
+
+      <!-- 登录方式切换 (仅在登录模式显示) -->
+      <view class="auth-tabs" v-if="!isRegister">
+        <text 
+          class="tab-item" 
+          :class="{ active: loginMethod === 'phone' }"
+          @click="loginMethod = 'phone'"
+        >手机登录</text>
+        <text class="tab-divider">|</text>
+        <text 
+          class="tab-item" 
+          :class="{ active: loginMethod === 'email' }"
+          @click="loginMethod = 'email'"
+        >邮箱登录</text>
+      </view>
+      
+      <!-- 注册方式切换 (仅在注册模式显示) -->
+      <view class="auth-tabs" v-if="isRegister">
+         <text 
+          class="tab-item" 
+          :class="{ active: loginMethod === 'phone' }"
+          @click="loginMethod = 'phone'"
+        >手机注册</text>
+        <text class="tab-divider">|</text>
+        <text 
+          class="tab-item" 
+          :class="{ active: loginMethod === 'email' }"
+          @click="loginMethod = 'email'"
+        >邮箱注册</text>
       </view>
 
       <view class="form-item">
-        <view class="avatar-wrapper" @click="mockUploadAvatar">
-          <image :src="userInfo.avatar" class="avatar" mode="aspectFill" />
-          <view class="avatar-edit">
-            <text class="icon-camera">📷</text>
-          </view>
-        </view>
-        <input 
-          class="input-nickname" 
-          type="nickname" 
-          v-model="userInfo.nickname" 
-          placeholder="请输入昵称" 
-          placeholder-class="input-placeholder"
-        />
-      </view>
-
-      <view class="role-selection">
-        <text class="section-label">请选择身份</text>
-        <view class="role-cards">
-          <view 
-            class="role-card" 
-            :class="{ active: userInfo.role === 'owner' }"
-            @click="userInfo.role = 'owner'"
-          >
-            <text class="role-icon">🏠</text>
-            <text class="role-name">我是铲屎官</text>
-            <text class="role-desc">发布需求，寻找伙伴</text>
+        <!-- 手机号输入 -->
+        <block v-if="loginMethod === 'phone'">
+          <view class="input-group">
+            <input 
+              class="input-field" 
+              type="number" 
+              v-model="phone" 
+              placeholder="请输入手机号" 
+              placeholder-class="input-placeholder"
+              maxlength="11"
+            />
           </view>
           
-          <view 
-            class="role-card" 
-            :class="{ active: userInfo.role === 'sitter' }"
-            @click="userInfo.role = 'sitter'"
-          >
-            <text class="role-icon">🎒</text>
-            <text class="role-name">我是宠托师</text>
-            <text class="role-desc">接单赚钱，陪伴萌宠</text>
+          <!-- 验证码输入 (仅注册时需要) -->
+          <view class="input-group verify-code-group" v-if="isRegister">
+            <input 
+              class="input-field code-input" 
+              type="number" 
+              v-model="verifyCode" 
+              placeholder="请输入验证码" 
+              placeholder-class="input-placeholder"
+              maxlength="6"
+            />
+            <button 
+              class="btn-code" 
+              :disabled="isCountingDown" 
+              @click="handleSendCode"
+            >
+              {{ isCountingDown ? `${countdown}s后重发` : '获取验证码' }}
+            </button>
           </view>
-        </view>
+        </block>
+
+        <!-- 邮箱输入 -->
+        <block v-else>
+          <input 
+            class="input-field" 
+            type="text" 
+            v-model="email" 
+            placeholder="请输入邮箱" 
+            placeholder-class="input-placeholder"
+          />
+        </block>
+
+        <!-- 密码输入 (通用) -->
+        <input 
+          class="input-field" 
+          type="password" 
+          v-model="password" 
+          placeholder="请输入密码" 
+          placeholder-class="input-placeholder"
+        />
+
+        <!-- 仅注册时显示：昵称、头像、角色选择 -->
+        <block v-if="isRegister">
+          <view class="divider"></view>
+          
+          <view class="avatar-wrapper" @click="mockUploadAvatar">
+            <image :src="userInfo.avatar" class="avatar" mode="aspectFill" />
+            <view class="avatar-edit">
+              <text class="icon-camera">📷</text>
+            </view>
+          </view>
+          
+          <input 
+            class="input-field" 
+            type="nickname" 
+            v-model="userInfo.nickname" 
+            placeholder="请输入昵称" 
+            placeholder-class="input-placeholder"
+          />
+
+          <view class="role-selection">
+            <text class="section-label">请选择身份</text>
+            <view class="role-cards">
+              <view 
+                class="role-card" 
+                :class="{ active: userInfo.role === 'owner' }"
+                @click="userInfo.role = 'owner'"
+              >
+                <text class="role-icon">🏠</text>
+                <text class="role-name">我是铲屎官</text>
+                <text class="role-desc">发布需求</text>
+              </view>
+              
+              <view 
+                class="role-card" 
+                :class="{ active: userInfo.role === 'sitter' }"
+                @click="userInfo.role = 'sitter'"
+              >
+                <text class="role-icon">🎒</text>
+                <text class="role-name">我是宠托师</text>
+                <text class="role-desc">接单赚钱</text>
+              </view>
+            </view>
+          </view>
+        </block>
       </view>
 
-      <button class="btn-primary" @click="handleLogin">进入宠乐世界</button>
+      <button class="btn-primary" :loading="isLoading" @click="handleAction">
+        {{ isRegister ? '立即注册' : '登录' }}
+      </button>
+      
+      <view class="switch-mode" @click="toggleMode">
+        <text>{{ isRegister ? '已有账号？去登录' : '没有账号？去注册' }}</text>
+      </view>
     </view>
 
     <!-- 头像选择弹窗 -->
@@ -79,11 +174,26 @@
 import { reactive, ref } from 'vue';
 import { useUserStore, type UserInfo, type SitterProfile } from '@/stores/user';
 import { getRandomNickname } from '@/utils/nickname';
+import { supabase } from '@/utils/supabase';
+import { sendSmsCode, verifySmsCode } from '@/utils/sms';
 
 const userStore = useUserStore();
 
+const isRegister = ref(false);
+const loginMethod = ref<'phone' | 'email'>('phone'); // 默认手机号
+const email = ref('');
+const phone = ref('');
+const password = ref('');
+const verifyCode = ref('');
+const isLoading = ref(false);
+
+// 倒计时相关
+const isCountingDown = ref(false);
+const countdown = ref(60);
+let timer: any = null;
+
 const userInfo = reactive<UserInfo>({
-  id: 'user_' + Date.now(), // 简单的 mock ID
+  id: '',
   nickname: getRandomNickname(),
   avatar: 'https://img.yzcdn.cn/vant/cat.jpeg',
   role: 'owner'
@@ -134,40 +244,187 @@ const selectAvatar = (avatar: string) => {
   showAvatarPopup.value = false;
 };
 
-const handleLogin = () => {
-  if (!userInfo.nickname) {
-    uni.showToast({ title: '请输入昵称', icon: 'none' });
+const toggleMode = () => {
+  isRegister.value = !isRegister.value;
+  // 切换模式时重置表单
+  verifyCode.value = '';
+  password.value = '';
+  // 默认切回手机
+  loginMethod.value = 'phone';
+};
+
+const handleSendCode = async () => {
+  if (!phone.value) {
+    uni.showToast({ title: '请输入手机号', icon: 'none' });
     return;
   }
-
-  // 如果选择我是宠托师，生成模拟的宠托师档案
-  if (userInfo.role === 'sitter') {
-    const levels: ('GOLD' | 'SILVER' | 'BRONZE')[] = ['GOLD', 'SILVER', 'BRONZE'];
-    const randomLevel = levels[Math.floor(Math.random() * levels.length)];
-    
-    const mockProfile: SitterProfile = {
-      level: randomLevel,
-      completedOrders: Math.floor(Math.random() * 200),
-      rating: Number((4 + Math.random()).toFixed(1)),
-      experienceYears: Math.floor(Math.random() * 5) + 1,
-      tags: ['实名认证', '专业培训', '有爱心'],
-      bio: '我是一名热爱动物的宠托师，拥有丰富的养宠经验，期待为您服务！',
-      isCertified: true
-    };
-    userInfo.sitterProfile = mockProfile;
+  if (!/^1[3-9]\d{9}$/.test(phone.value)) {
+    uni.showToast({ title: '手机号格式错误', icon: 'none' });
+    return;
   }
   
-  userStore.login({ ...userInfo });
+  try {
+    const success = await sendSmsCode(phone.value);
+    if (success) {
+      startCountdown();
+    }
+  } catch (e: any) {
+    uni.showToast({ title: e.message || '发送失败', icon: 'none' });
+  }
+};
+
+const startCountdown = () => {
+  isCountingDown.value = true;
+  countdown.value = 60;
+  timer = setInterval(() => {
+    countdown.value--;
+    if (countdown.value <= 0) {
+      clearInterval(timer);
+      isCountingDown.value = false;
+    }
+  }, 1000);
+};
+
+// 构造虚拟邮箱
+const getVirtualEmail = (phoneNum: string) => {
+  return `${phoneNum}@phone.miaomiao.com`;
+};
+
+const handleAction = async () => {
+  // 1. 基础校验
+  if (loginMethod.value === 'email' && !email.value) {
+    uni.showToast({ title: '请输入邮箱', icon: 'none' });
+    return;
+  }
+  if (loginMethod.value === 'phone' && !phone.value) {
+    uni.showToast({ title: '请输入手机号', icon: 'none' });
+    return;
+  }
+  if (!password.value) {
+    uni.showToast({ title: '请输入密码', icon: 'none' });
+    return;
+  }
   
-  uni.showToast({
-    title: '登录成功',
-    icon: 'success',
-    mask: true
-  });
-  
-  setTimeout(() => {
-    uni.switchTab({ url: '/pages/home/index' });
-  }, 1500);
+  if (isRegister.value) {
+    if (!userInfo.nickname) {
+      uni.showToast({ title: '请输入昵称', icon: 'none' });
+      return;
+    }
+    // 手机号注册需要校验验证码
+    if (loginMethod.value === 'phone') {
+       if (!verifyCode.value) {
+         uni.showToast({ title: '请输入验证码', icon: 'none' });
+         return;
+       }
+       if (!verifySmsCode(phone.value, verifyCode.value)) {
+         uni.showToast({ title: '验证码错误或已过期', icon: 'none' });
+         return;
+       }
+    }
+  }
+
+  isLoading.value = true;
+
+  try {
+    const targetEmail = loginMethod.value === 'phone' ? getVirtualEmail(phone.value) : email.value;
+
+    if (isRegister.value) {
+      // --- 注册流程 ---
+      
+      // 1. Supabase Sign Up
+      const { data, error } = await supabase.auth.signUp({
+        email: targetEmail,
+        password: password.value,
+      });
+
+      if (error) throw error;
+
+      if (data.user) {
+        // Check if session is missing (implies email confirmation is on)
+        if (!data.session && loginMethod.value === 'phone') {
+           uni.showModal({
+             title: '配置提示',
+             content: '检测到 Supabase 开启了邮箱验证。由于当前使用模拟手机号注册（虚拟邮箱），请务必在 Supabase 后台关闭 "Enable Email Confirmations" 选项，否则将无法登录。\n\n路径: Authentication -> Providers -> Email',
+             showCancel: false,
+             confirmText: '我知道了'
+           });
+        } else if (!data.session && loginMethod.value === 'email') {
+           uni.showToast({ title: '注册成功，请前往邮箱激活账号', icon: 'none', duration: 3000 });
+           isRegister.value = false;
+           return;
+        }
+
+        // 2. Create Profile
+        const profileData: any = {
+          id: data.user.id,
+          nickname: userInfo.nickname,
+          avatar: userInfo.avatar,
+          role: userInfo.role
+        };
+        
+        // 如果是手机注册，保存手机号到 profile
+        if (loginMethod.value === 'phone') {
+          profileData.phone = phone.value;
+        }
+
+        const { error: profileError } = await supabase.from('profiles').insert(profileData);
+
+        if (profileError) {
+          console.error('Profile creation failed:', profileError);
+          // 这里可以考虑回滚 Auth 注册，但为了 MVP 简单起见暂时忽略
+        }
+        
+        if (data.session || loginMethod.value === 'phone') {
+           uni.showToast({ title: '注册成功，请登录', icon: 'success' });
+           // 自动切换到登录模式
+           isRegister.value = false; 
+           password.value = ''; 
+        }
+      }
+    } else {
+      // --- 登录流程 ---
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: targetEmail,
+        password: password.value,
+      });
+
+      if (error) {
+        if (error.message.includes('Invalid login credentials')) {
+           throw new Error('账号或密码错误');
+        }
+        if (error.message.includes('Email not confirmed')) {
+           // 特殊处理邮箱未验证错误
+           if (loginMethod.value === 'phone') {
+             uni.showModal({
+               title: '登录失败',
+               content: '账号未激活。如果您使用模拟手机号注册，请在 Supabase 后台关闭 "Enable Email Confirmations" 选项。\n\n路径: Authentication -> Providers -> Email',
+               showCancel: false,
+               confirmText: '好的'
+             });
+             return;
+           } else {
+             throw new Error('请先前往邮箱激活您的账号');
+           }
+        }
+        throw error;
+      }
+      
+      if (data.user) {
+        // Fetch profile and update store
+        await userStore.fetchProfile(data.user.id, data.user.email);
+        
+        uni.showToast({ title: '登录成功', icon: 'success' });
+        setTimeout(() => {
+          uni.switchTab({ url: '/pages/home/index' });
+        }, 1500);
+      }
+    }
+  } catch (e: any) {
+    console.error(e);
+    uni.showToast({ title: e.message || '操作失败', icon: 'none' });
+  } finally {
+    isLoading.value = false;
+  }
 };
 </script>
 
@@ -176,7 +433,10 @@ const handleLogin = () => {
 
 .login-container {
   min-height: 100vh;
-  background: linear-gradient(135deg, #FFFBF5 0%, #FFF0E5 100%);
+  background-color: #FFFBF5;
+  background-image: 
+    radial-gradient(at 10% 10%, rgba(255, 142, 60, 0.1) 0px, transparent 50%),
+    radial-gradient(at 90% 90%, rgba(255, 107, 107, 0.1) 0px, transparent 50%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -185,34 +445,78 @@ const handleLogin = () => {
 
 .glass-card {
   width: 100%;
-  background: rgba(255, 255, 255, 0.65);
-  backdrop-filter: blur(20px);
+  background: #ffffff;
   border-radius: 40rpx;
-  border: 1px solid rgba(255, 255, 255, 0.8);
   padding: 60rpx 40rpx;
-  box-shadow: 0 20rpx 60rpx rgba(0, 0, 0, 0.05);
+  box-shadow: 0 20rpx 60rpx rgba(0, 0, 0, 0.08);
+  position: relative;
+  overflow: hidden;
 }
 
 .header {
   text-align: center;
-  margin-bottom: 60rpx;
+  margin-bottom: 50rpx;
   
   .brand-logo {
-    height: 180rpx;
-    margin-bottom: 24rpx;
+    height: 140rpx;
+    margin-bottom: 30rpx;
+    border-radius: 24rpx;
+    box-shadow: 0 8rpx 20rpx rgba(0,0,0,0.05);
   }
   
   .title {
     display: block;
-    font-size: 48rpx;
-    font-weight: 700;
+    font-size: 44rpx;
+    font-weight: 800;
     color: #333;
     margin-bottom: 16rpx;
+    letter-spacing: 2rpx;
   }
   
   .subtitle {
     font-size: 28rpx;
     color: #999;
+    letter-spacing: 1rpx;
+  }
+}
+
+.auth-tabs {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 50rpx;
+  
+  .tab-item {
+    font-size: 30rpx;
+    color: #999;
+    padding: 10rpx 30rpx;
+    transition: all 0.3s;
+    position: relative;
+    
+    &.active {
+      color: #333;
+      font-weight: 700;
+      font-size: 32rpx;
+      
+      &::after {
+        content: '';
+        position: absolute;
+        bottom: -6rpx;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 32rpx;
+        height: 6rpx;
+        background: $color-primary;
+        border-radius: 6rpx;
+      }
+    }
+  }
+  
+  .tab-divider {
+    color: #eee;
+    margin: 0 10rpx;
+    font-size: 24rpx;
+    font-weight: 300;
   }
 }
 
@@ -220,66 +524,130 @@ const handleLogin = () => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 60rpx;
+  margin-bottom: 50rpx;
+  width: 100%;
+}
+
+.input-group {
+  width: 100%;
+  margin-bottom: 30rpx;
+}
+
+.input-field {
+  width: 100%;
+  height: 100rpx;
+  background: #F7F8FA;
+  border-radius: 50rpx;
+  padding: 0 50rpx;
+  font-size: 30rpx;
+  color: #333;
+  box-sizing: border-box;
+  border: 2rpx solid transparent;
+  transition: all 0.3s;
+  
+  &:focus {
+    background: #fff;
+    border-color: $color-primary;
+    box-shadow: 0 0 0 6rpx rgba(255, 142, 60, 0.1);
+  }
+}
+
+.verify-code-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 30rpx;
+  
+  .code-input {
+    padding-right: 240rpx; // Space for button
+  }
+  
+  .btn-code {
+    position: absolute;
+    right: 12rpx;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 72rpx;
+    line-height: 72rpx;
+    font-size: 26rpx;
+    font-weight: 500;
+    color: $color-primary;
+    background: #FFF0E5;
+    border-radius: 36rpx;
+    padding: 0 30rpx;
+    border: none;
+    z-index: 10;
+    
+    &[disabled] {
+      color: #ccc;
+      background: #f5f5f5;
+    }
+    
+    &::after {
+      border: none;
+    }
+    
+    &:active {
+      opacity: 0.8;
+    }
+  }
+}
+
+.input-placeholder {
+  color: #bbb;
+}
+
+.divider {
+  width: 100%;
+  height: 2rpx;
+  background: #f0f0f0;
+  margin: 30rpx 0 50rpx;
 }
 
 .avatar-wrapper {
   position: relative;
   width: 160rpx;
   height: 160rpx;
-  margin-bottom: 30rpx;
+  margin-bottom: 40rpx;
   
   .avatar {
     width: 100%;
     height: 100%;
     border-radius: 50%;
     border: 6rpx solid #fff;
-    box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.1);
+    box-shadow: 0 12rpx 32rpx rgba(0, 0, 0, 0.1);
   }
   
   .avatar-edit {
     position: absolute;
     bottom: 0;
     right: 0;
-    width: 48rpx;
-    height: 48rpx;
+    width: 56rpx;
+    height: 56rpx;
     background: $color-primary;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     border: 4rpx solid #fff;
+    box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.2);
     
     .icon-camera {
-      font-size: 24rpx;
+      font-size: 28rpx;
     }
   }
 }
 
-.input-nickname {
-  width: 80%;
-  height: 88rpx;
-  background: rgba(255, 255, 255, 0.8);
-  border-radius: 44rpx;
-  padding: 0 40rpx;
-  font-size: 32rpx;
-  text-align: center;
-}
-
-.input-placeholder {
-  color: #999;
-}
-
 .role-selection {
   width: 100%;
-  margin-bottom: 60rpx;
+  margin-top: 10rpx;
   
   .section-label {
     display: block;
-    font-size: 32rpx;
+    font-size: 28rpx;
     font-weight: 600;
-    color: #333;
-    margin-bottom: 30rpx;
+    color: #666;
+    margin-bottom: 24rpx;
     text-align: center;
   }
 }
@@ -292,7 +660,7 @@ const handleLogin = () => {
 
 .role-card {
   flex: 1;
-  background: rgba(255, 255, 255, 0.5);
+  background: #F7F8FA;
   border-radius: 24rpx;
   padding: 30rpx 20rpx;
   display: flex;
@@ -302,45 +670,69 @@ const handleLogin = () => {
   transition: all 0.3s;
   
   &.active {
-    background: #fff;
+    background: #FFF0E5;
     border-color: $color-primary;
-    box-shadow: 0 8rpx 24rpx rgba(255, 142, 60, 0.15);
+    box-shadow: 0 12rpx 24rpx rgba(255, 142, 60, 0.15);
     transform: translateY(-4rpx);
+    
+    .role-name {
+      color: $color-primary;
+    }
   }
   
   .role-icon {
-    font-size: 64rpx;
+    font-size: 56rpx;
     margin-bottom: 16rpx;
   }
   
   .role-name {
-    font-size: 30rpx;
-    font-weight: 600;
-    color: #333;
+    font-size: 28rpx;
+    font-weight: 700;
+    color: #666;
     margin-bottom: 8rpx;
   }
   
   .role-desc {
     font-size: 22rpx;
     color: #999;
-    text-align: center;
   }
 }
 
 .btn-primary {
   width: 100%;
-  height: 96rpx;
-  line-height: 96rpx;
+  height: 100rpx;
+  line-height: 100rpx;
   background: linear-gradient(90deg, #FF8E3C 0%, #FF6B6B 100%);
-  border-radius: 48rpx;
+  border-radius: 50rpx;
   color: #fff;
-  font-size: 36rpx;
+  font-size: 34rpx;
   font-weight: 600;
-  box-shadow: 0 16rpx 32rpx rgba(255, 107, 107, 0.2);
+  letter-spacing: 2rpx;
+  box-shadow: 0 20rpx 40rpx rgba(255, 107, 107, 0.25);
+  margin-bottom: 40rpx;
   
   &:active {
     transform: scale(0.98);
     opacity: 0.9;
+  }
+}
+
+.switch-mode {
+  text-align: center;
+  padding: 20rpx;
+  
+  text {
+    font-size: 28rpx;
+    color: #666;
+    position: relative;
+    padding-bottom: 4rpx;
+    border-bottom: 2rpx solid transparent;
+    transition: all 0.3s;
+    
+    &:active {
+      color: $color-primary;
+      border-bottom-color: $color-primary;
+    }
   }
 }
 
@@ -351,41 +743,43 @@ const handleLogin = () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.6);
   z-index: 999;
   display: flex;
   align-items: center;
   justify-content: center;
+  backdrop-filter: blur(4px);
 }
 
 .avatar-popup-content {
-  width: 600rpx;
-  max-height: 70vh;
+  width: 640rpx;
+  max-height: 75vh;
   background: #fff;
-  border-radius: 32rpx;
+  border-radius: 40rpx;
   display: flex;
   flex-direction: column;
-  padding: 30rpx;
+  padding: 40rpx;
   box-sizing: border-box;
+  box-shadow: 0 20rpx 60rpx rgba(0,0,0,0.2);
   
   .popup-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 30rpx;
+    margin-bottom: 40rpx;
     flex-shrink: 0;
     
     .popup-title {
-      font-size: 34rpx;
-      font-weight: bold;
+      font-size: 36rpx;
+      font-weight: 800;
       color: #333;
     }
     
     .popup-close {
-      font-size: 44rpx;
+      font-size: 50rpx;
       color: #999;
-      padding: 0 10rpx;
-      line-height: 1;
+      padding: 10rpx;
+      line-height: 0.8;
     }
   }
   
@@ -398,17 +792,18 @@ const handleLogin = () => {
   .avatar-grid {
     display: flex;
     flex-wrap: wrap;
-    gap: 24rpx;
+    gap: 30rpx;
     padding: 10rpx 10rpx 30rpx;
     justify-content: center;
     
     .avatar-item {
-      width: 120rpx;
-      height: 120rpx;
+      width: 130rpx;
+      height: 130rpx;
       border-radius: 50%;
       overflow: hidden;
-      border: 4rpx solid #f0f0f0;
+      border: 6rpx solid #F7F8FA;
       position: relative;
+      transition: all 0.2s;
       
       .avatar-img {
         width: 100%;
