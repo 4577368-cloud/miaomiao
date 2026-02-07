@@ -87,6 +87,7 @@ export interface UserInfo {
   pets?: PetInfo[];
   addresses?: Address[];
   balance?: number;
+  points?: number;
   coupons?: Coupon[];
   laborBalance?: number;
 }
@@ -179,6 +180,7 @@ export const useUserStore = defineStore('user', () => {
         userNo: data.user_no ? Number(data.user_no) : undefined,
         role: (data.role as UserRole) || 'owner',
         balance: data.balance || 0,
+        points: data.points || 0,
         laborBalance: data.labor_balance || 0,
         joinDate: data.created_at ? new Date(data.created_at).getTime() : Date.now(),
         pets: [], 
@@ -439,14 +441,61 @@ export const useUserStore = defineStore('user', () => {
       addBalance(amount);
   };
   
-  const deductBalance = (amount: number): boolean => {
-    if (userInfo.value && (userInfo.value.balance || 0) >= amount) {
-      userInfo.value.balance = (userInfo.value.balance || 0) - amount;
-      // TODO: Update DB
+  const deductBalance = async (amount: number): Promise<boolean> => {
+    if (!userInfo.value) return false;
+    
+    // Optimistic UI update
+    const oldBalance = userInfo.value.balance || 0;
+    if (oldBalance < amount) return false;
+    
+    userInfo.value.balance = oldBalance - amount;
+    
+    try {
+      // Call RPC for atomic update
+      const { data, error } = await supabase.rpc('deduct_balance', {
+        user_id: userInfo.value.id,
+        amount: amount
+      });
+      
+      if (error) throw error;
+      if (!data) {
+        // Rollback if failed (returned false)
+        userInfo.value.balance = oldBalance;
+        return false;
+      }
+      
+      uni.setStorageSync('miaomiao_user', JSON.stringify(userInfo.value));
       return true;
+    } catch (e) {
+      console.error('Deduct balance failed:', e);
+      userInfo.value.balance = oldBalance; // Rollback
+      return false;
     }
-    return false;
   };
+
+  const markCouponUsed = async (couponId: string) => {
+    if (!userInfo.value?.coupons) return;
+    
+    const coupon = userInfo.value.coupons.find(c => c.id === couponId);
+    if (coupon) {
+       // Optimistic
+       const oldStatus = coupon.status;
+       coupon.status = 'USED';
+       
+       const { error } = await supabase
+         .from('coupons')
+         .update({ status: 'USED' })
+         .eq('id', couponId);
+         
+       if (error) {
+         console.error('Update coupon failed:', error);
+         coupon.status = oldStatus; // Rollback
+       } else {
+         uni.setStorageSync('miaomiao_user', JSON.stringify(userInfo.value));
+       }
+    }
+  };
+
   
   const calculateSitterLevel = (years: number): SitterLevel => {
     if (years >= 5) return 'GOLD';
@@ -745,6 +794,7 @@ export const useUserStore = defineStore('user', () => {
     withdrawLaborIncome,
     recharge,
     deductBalance,
+    markCouponUsed,
     registerAsSitter,
     fetchProfile,
     // New CRUD exports

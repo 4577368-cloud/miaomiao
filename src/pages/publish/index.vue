@@ -228,14 +228,14 @@
            </picker>
            
            <view v-else class="multi-date-row">
-              <picker mode="date" :start="startDate" :end="endDate" @change="e => handleRangeChange('start', e)">
+              <picker mode="date" :start="startDate" :end="endDate" @change="(e: any) => handleRangeChange('start', e)">
                  <view class="date-box">
                     <text class="lbl">开始</text>
                     <text class="val">{{ dateRange.start || '请选择' }}</text>
                  </view>
               </picker>
               <text class="arrow">→</text>
-              <picker mode="date" :start="dateRange.start || startDate" :end="endDate" @change="e => handleRangeChange('end', e)">
+              <picker mode="date" :start="dateRange.start || startDate" :end="endDate" @change="(e: any) => handleRangeChange('end', e)">
                  <view class="date-box">
                     <text class="lbl">结束</text>
                     <text class="val">{{ dateRange.end || '请选择' }}</text>
@@ -299,9 +299,9 @@
         </view>
 
         <view class="pet-grid" :class="{ disabled: selectedPetIds.length > 0 }">
-          <view class="grid-overlay" v-if="selectedPetIds.length > 0">
-             <text>已选择"我的爱宠"，将自动匹配体型</text>
-          </view>
+          <!-- Overlay to block clicks but keep visual clear -->
+          <view class="grid-overlay" v-if="selectedPetIds.length > 0"></view>
+          
           <view 
             v-for="size in petSizes" 
             :key="size.value"
@@ -603,7 +603,7 @@ const showSitterSelector = ref(false);
 const availableSitters = computed(() => sitterStore.availableSitters);
 
 const form = reactive({
-  targetSitterId: null as string | null,
+  targetSitterId: undefined as string | undefined,
   address: '',
   contactName: '',
   contactPhone: '',
@@ -627,7 +627,7 @@ const sitterForm = reactive({
   availability: {
     time: 'Weekends',
     locations: [],
-    services: [] as string[]
+    services: [] as ('feeding' | 'walking')[]
   }
 });
 
@@ -638,7 +638,7 @@ const initSitterForm = () => {
   }
 };
 
-const toggleSitterService = (svc: string) => {
+const toggleSitterService = (svc: 'feeding' | 'walking') => {
   const list = sitterForm.availability.services;
   const idx = list.indexOf(svc);
   if (idx > -1) list.splice(idx, 1);
@@ -655,9 +655,18 @@ const handleSitterUpdate = () => {
   uni.showToast({ title: '设置已更新', icon: 'success' });
 };
 
+const getLevelLabel = (level?: string) => {
+  switch (level) {
+    case 'GOLD': return '金牌';
+    case 'SILVER': return '银牌';
+    case 'BRONZE': return '铜牌';
+    default: return '普通';
+  }
+};
+
 const selectPublishMode = (mode: 'HALL' | 'SITTER') => {
   if (mode === 'HALL') {
-    form.targetSitterId = null;
+    form.targetSitterId = undefined;
     showSitterSelector.value = false;
   } else {
     showSitterSelector.value = true;
@@ -681,7 +690,8 @@ const isServiceDisabled = (type: ServiceType) => {
   if (!form.targetSitterId) return false;
   const sitter = availableSitters.value.find(s => s.id === form.targetSitterId);
   if (sitter && sitter.sitterProfile?.availability?.services) {
-    return !sitter.sitterProfile.availability.services.includes(type);
+    const lowerType = type === ServiceType.FEEDING ? 'feeding' : 'walking';
+    return !sitter.sitterProfile.availability.services.includes(lowerType);
   }
   return false;
 };
@@ -746,14 +756,38 @@ const selectMyPet = (pet: PetInfo) => {
    const selectedPets = userStore.userInfo?.pets?.filter(p => selectedPetIds.value.includes(p.id)) || [];
    if (selectedPets.length > 0) {
      form.remark = selectedPets.map(p => `${p.name}(${p.breed})`).join(', ');
+     
+     // Determine the largest size among selected pets
+     const sizePriority = {
+       [PetSize.CAT]: 1,
+       [PetSize.SMALL]: 2,
+       [PetSize.MEDIUM]: 3,
+       [PetSize.LARGE]: 4,
+       [PetSize.GIANT]: 5
+     };
+     
+     let maxSize = selectedPets[0].size;
+     let maxPriority = sizePriority[maxSize] || 0;
+     
+     for (let i = 1; i < selectedPets.length; i++) {
+       const p = selectedPets[i];
+       const priority = sizePriority[p.size] || 0;
+       if (priority > maxPriority) {
+         maxPriority = priority;
+         maxSize = p.size;
+       }
+     }
+     form.petSize = maxSize;
    } else {
      form.remark = '';
+     // Reset to default or keep current? Let's reset to CAT as default
+     form.petSize = PetSize.CAT;
    }
 };
 
 const petSizes = [
   { value: PetSize.CAT, label: '猫咪', desc: '不限体重', coeff: PET_SIZE_COEFFICIENTS[PetSize.CAT], image: '/static/avatars/cat-british.jpg' },
-  { value: PetSize.SMALL, label: '小型犬', desc: '<10kg', coeff: PET_SIZE_COEFFICIENTS[PetSize.SMALL], image: '/static/avatars/dog-pomeranian.jpg' },
+  { value: PetSize.SMALL, label: '小型犬', desc: '<10kg', coeff: PET_SIZE_COEFFICIENTS[PetSize.SMALL], image: '/static/avatars/dog-small.jpg' },
   { value: PetSize.MEDIUM, label: '中型犬', desc: '10-25kg', coeff: PET_SIZE_COEFFICIENTS[PetSize.MEDIUM], image: '/static/avatars/dog-corgi.jpg' },
   { value: PetSize.LARGE, label: '大型犬', desc: '>25kg', coeff: PET_SIZE_COEFFICIENTS[PetSize.LARGE], image: '/static/avatars/dog-golden.jpg' }
 ];
@@ -780,7 +814,7 @@ const selectCoupon = (id: string) => {
 const availableCoupons = computed(() => {
    if (!userStore.userInfo?.coupons) return [];
    // Simple logic: filter active
-   return userStore.userInfo.coupons.filter(c => c.status === 'active');
+   return userStore.userInfo.coupons.filter(c => c.status === 'UNUSED');
 });
 
 const availableCouponsCount = computed(() => availableCoupons.value.length);
@@ -838,7 +872,7 @@ const finalPrice = computed(() => {
 });
 
 
-const handleSubmit = () => {
+const handleSubmit = async () => {
   if (!form.address) return uni.showToast({ title: '请选择地址', icon: 'none' });
   if (!form.date) return uni.showToast({ title: '请选择时间', icon: 'none' });
   if (!form.time) return uni.showToast({ title: '请选择时间段', icon: 'none' });
@@ -848,12 +882,15 @@ const handleSubmit = () => {
 
   // Create Order
   const newOrder = {
-    id: Date.now().toString(),
+    // ID will be generated by DB or Store
     creatorId: userStore.userInfo?.id || 'temp',
     sitterId: form.targetSitterId, // Null = Task Hall
     serviceType: form.serviceType,
-    status: 'PENDING',
+    status: 'PENDING' as const,
     totalPrice: finalPrice.value,
+    originalPrice: rawTotalPrice.value,
+    discountAmount: selectedCoupon.value ? selectedCoupon.value.value : 0,
+    couponId: form.couponId,
     address: form.address,
     time: `${form.date} ${form.time}`,
     petSize: selectedPets.length > 0 ? selectedPets[0].size : form.petSize,
@@ -862,15 +899,24 @@ const handleSubmit = () => {
     duration: form.duration,
     remark: form.remark,
     addOns: form.addOns,
-    createdAt: Date.now()
+    // Contact Info (Defaults to user info if not specified)
+    contactName: userStore.userInfo?.nickname || '联系人',
+    contactPhone: userStore.userInfo?.phone || '',
   };
   
-  orderStore.createOrder(newOrder);
-  
-  uni.showToast({ title: '发布成功', icon: 'success' });
-  setTimeout(() => {
-    uni.switchTab({ url: '/pages/orders/index' });
-  }, 1500);
+  try {
+    uni.showLoading({ title: '发布中...' });
+    await orderStore.createOrder(newOrder);
+    uni.hideLoading();
+    uni.showToast({ title: '发布成功', icon: 'success' });
+    setTimeout(() => {
+      uni.switchTab({ url: '/pages/orders/index' });
+    }, 1500);
+  } catch (e) {
+    uni.hideLoading();
+    uni.showToast({ title: '发布失败，请重试', icon: 'none' });
+    console.error(e);
+  }
 };
 
 // Lifecycle
@@ -1932,9 +1978,7 @@ onShow(() => {
 
 .pet-grid {
    position: relative;
-   &.disabled {
-      .pet-card { opacity: 0.5; filter: grayscale(0.5); }
-   }
+   
    .grid-overlay {
       position: absolute;
       top: 0;
@@ -1942,18 +1986,7 @@ onShow(() => {
       width: 100%;
       height: 100%;
       z-index: 10;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(255,255,255,0.6);
-      
-      text {
-         background: rgba(0,0,0,0.7);
-         color: #fff;
-         padding: 10rpx 20rpx;
-         border-radius: 30rpx;
-         font-size: 24rpx;
-      }
+      background: transparent; // Make transparent
    }
 }
 </style>

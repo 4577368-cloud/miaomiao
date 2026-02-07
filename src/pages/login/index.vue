@@ -176,6 +176,7 @@
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue';
+import { onShow, onLoad } from '@dcloudio/uni-app';
 import { useUserStore, type UserInfo, type SitterProfile } from '@/stores/user';
 import { getRandomNickname } from '@/utils/nickname';
 import { supabase } from '@/utils/supabase';
@@ -228,6 +229,7 @@ const defaultAvatars = [
   '/static/avatars/dog-golden.jpg',
   '/static/avatars/dog-husky.jpg',
   '/static/avatars/dog-labrador.jpg',
+  '/static/avatars/dog-small.jpg',
   '/static/avatars/dog-pomeranian.jpg',
   '/static/avatars/dog-poodle.jpg',
   '/static/avatars/dog-pug.jpg',
@@ -446,6 +448,12 @@ const handleAction = async () => {
     isLoading.value = false;
   }
 };
+
+onShow(() => {
+  if (userStore.isLoggedIn) {
+    uni.switchTab({ url: '/pages/home/index' });
+  }
+});
 </script>
 
 <style lang="scss" scoped>

@@ -412,7 +412,7 @@ const selectService = (type: ServiceType | string) => {
   });
 };
 
-const handleAcceptOrder = (orderId: string) => {
+const handleAcceptOrder = async (orderId: string) => {
   if (!userStore.isLoggedIn) {
     uni.navigateTo({ url: '/pages/login/index' });
     return;
@@ -420,7 +420,7 @@ const handleAcceptOrder = (orderId: string) => {
   
   if (!userStore.userInfo) return;
 
-  if (orderStore.acceptOrder(orderId, userStore.userInfo)) {
+  if (await orderStore.acceptOrder(orderId, userStore.userInfo)) {
     uni.showToast({
       title: '抢单成功！',
       icon: 'success'

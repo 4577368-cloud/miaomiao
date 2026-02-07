@@ -3,7 +3,6 @@
     <view class="form-card">
       <view class="avatar-section" @click="chooseAvatar">
         <image :src="form.avatar || defaultAvatar" class="avatar" mode="aspectFill" />
-        <view class="camera-icon">📷</view>
       </view>
       <text class="hint">点击修改头像</text>
       
