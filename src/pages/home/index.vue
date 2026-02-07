@@ -68,7 +68,9 @@
                 <text>小宠</text>
               </view>
             </view>
-            <view class="card-icon">🐱</view>
+            <view class="card-icon">
+              <image src="https://imgus.tangbuy.com/static/images/2026-02-07/1f7527725fb54136931c6bf2919e7e0e-177045402956211314871683841080806.jpeg" mode="aspectFill" class="icon-img" />
+            </view>
           </view>
 
           <!-- 上门遛宠 -->
@@ -83,7 +85,9 @@
                 <text>狗狗</text>
               </view>
             </view>
-            <view class="card-icon">🐕</view>
+            <view class="card-icon">
+              <image src="https://imgus.tangbuy.com/static/images/2026-02-07/6dd4699cc43b4845906dc5911a6f6b11-177045526494810424765923383103569.jpeg" mode="aspectFill" class="icon-img" />
+            </view>
           </view>
         </view>
       </view>
@@ -724,6 +728,12 @@ const handleAcceptOrder = (orderId: string) => {
     font-size: 60rpx;
     margin-left: 24rpx;
     z-index: 1;
+    overflow: hidden;
+    
+    .icon-img {
+      width: 100%;
+      height: 100%;
+    }
   }
 }
 

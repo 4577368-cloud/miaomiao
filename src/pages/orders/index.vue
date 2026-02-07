@@ -21,181 +21,97 @@
       <view v-if="filteredOrders.length > 0" class="list-content">
         <view class="order-card" v-for="order in filteredOrders" :key="order.id" @click="goToDetail(order.id)">
           <!-- 卡片头部：状态与服务类型 -->
-          <view class="card-header" @click.stop="toggleFold(order.id)">
-            <view class="service-info">
-              <view class="service-badge" :class="order.serviceType">
+          <view class="card-header">
+            <view class="header-left">
+              <view class="service-tag" :class="order.serviceType">
                 {{ formatServiceType(order.serviceType) }}
               </view>
-              <text class="order-id">#{{ order.id.slice(-6) }}</text>
+              <text class="order-time">{{ formatTime(order.time) }}</text>
             </view>
-            <view class="status-wrapper">
-              <text class="countdown-text" v-if="countdowns[order.id]">⏱ {{ countdowns[order.id] }}</text>
-              <view class="status-badge" :class="order.status.toLowerCase()">
+            <view class="header-right">
+              <text class="status-text" :class="order.status.toLowerCase()">
                 {{ formatStatus(order.status) }}
-              </view>
-              <text class="fold-icon">{{ isFolded(order.id) ? '▼' : '▲' }}</text>
-            </view>
-          </view>
-          
-          <!-- 折叠摘要 -->
-          <view class="summary-view" v-if="isFolded(order.id)">
-            <view class="summary-item">
-                <text class="icon">🕒</text>
-                <text class="text">{{ order.time }}</text>
-            </view>
-            <view class="summary-item">
-                <text class="price-symbol">¥</text>
-                <text class="price-val">{{ order.totalPrice }}</text>
-            </view>
-          </view>
-
-          <!-- 接单人信息 (仅当有人接单时显示) -->
-          <view class="sitter-info-bar" v-if="!isFolded(order.id) && isOwner && order.sitterId && order.status !== 'PENDING'" @click.stop="showSitterProfile(order)">
-            <view class="sitter-left">
-              <view class="avatar-placeholder">{{ getSitterName(order)[0] }}</view>
-              <view class="sitter-details">
-                <view class="name-row">
-                  <text class="name">{{ getSitterName(order) }}</text>
-                  <view class="level-badge" :class="getSitterLevelClass(order)">{{ getSitterLevelText(order) }}</view>
-                </view>
-                <text class="sub-text">点击查看详情</text>
-              </view>
-            </view>
-            <text class="arrow">></text>
-          </view>
-
-          <!-- 卡片内容：核心信息 -->
-          <view class="card-body" v-if="!isFolded(order.id)">
-            <!-- 1. 宠物信息 -->
-            <view class="info-section pet-section" v-if="order.petName">
-              <view class="pet-header-row">
-                 <text class="pet-name">{{ order.petName }}</text>
-                 <text class="pet-breed">{{ order.petBreed }}</text>
-                 <view class="pet-tags" v-if="order.petSnapshot">
-                    <text class="tag" v-if="order.petSnapshot.sterilized">已绝育</text>
-                    <text class="tag" v-if="order.petSnapshot.vaccine">已免疫</text>
-                 </view>
-              </view>
-              <view class="pet-details-row">
-                 <text>{{ order.petGender === 'male' ? '弟弟' : '妹妹' }}</text>
-                 <text class="divider">|</text>
-                 <text>{{ order.petAge }}岁</text>
-                 <text class="divider">|</text>
-                 <text>{{ order.petWeight }}kg</text>
-              </view>
-              <view class="pet-pref-row" v-if="order.petSnapshot?.description">
-                 <text class="label">偏好：</text>
-                 <text class="val">{{ order.petSnapshot.description }}</text>
-              </view>
-            </view>
-            
-            <!-- 2. 服务信息 -->
-            <view class="info-section service-section">
-               <!-- 基础服务内容 -->
-               <view class="info-row content-row">
-                  <text class="icon">📋</text>
-                  <view class="content-list">
-                     <text class="content-label">包含服务：</text>
-                     <view class="content-tags">
-                        <text class="content-tag" v-for="item in getServiceItems(order.serviceType)" :key="item">{{ item }}</text>
-                     </view>
-                  </view>
-               </view>
-
-               <view class="info-row">
-                  <text class="icon">🕒</text>
-                  <text class="text highlight">{{ order.time }}</text>
-                  <text class="sub-text">({{ order.duration }}分钟)</text>
-               </view>
-               <view class="info-row">
-                  <text class="icon">📍</text>
-                  <text class="text address">{{ order.address }}</text>
-               </view>
-               <!-- Add-ons -->
-               <view class="info-row" v-if="hasAddOns(order.addOns)">
-                  <text class="icon">✨</text>
-                  <view class="addons-list">
-                     <text class="content-label">附加服务：</text>
-                     <view class="addons-tags">
-                        <text class="addon-tag" v-if="order.addOns.play">陪玩</text>
-                        <text class="addon-tag" v-if="order.addOns.deepClean">深度清洁</text>
-                        <text class="addon-tag" v-if="order.addOns.medicine">喂药</text>
-                     </view>
-                  </view>
-               </view>
-            </view>
-
-            <!-- 3. 联系人信息 -->
-            <!-- 场景A: 铲屎官查看接单人 (新增) -->
-            <view class="info-section contact-section" v-if="isOwner && ['ACCEPTED', 'IN_SERVICE', 'COMPLETED', 'REVIEWED'].includes(order.status)">
-                <view class="contact-box">
-                    <view class="contact-left">
-                        <text class="label">服务宠托师</text>
-                        <view class="person">
-                            <text class="name">{{ getSitterName(order) }}</text>
-                            <text class="phone-link" @click.stop="makeCall(getSitterPhone(order))">{{ getSitterPhone(order) }}</text>
-                        </view>
-                    </view>
-                    <view class="call-btn" @click.stop="makeCall(getSitterPhone(order))">
-                        <text class="icon">📞</text>
-                        <text>联系TA</text>
-                    </view>
-                </view>
-            </view>
-
-            <!-- 场景B: 宠托师查看发布人 (现有) -->
-            <view class="info-section contact-section" v-if="!isOwner && ['ACCEPTED', 'IN_SERVICE', 'COMPLETED'].includes(order.status) && order.contactPhone">
-                <view class="contact-box">
-                    <view class="contact-left">
-                        <text class="label">联系人</text>
-                        <view class="person">
-                            <text class="name">{{ order.contactName }}</text>
-                            <text class="phone-link" @click.stop="makeCall(order.contactPhone)">{{ order.contactPhone }}</text>
-                        </view>
-                    </view>
-                    <view class="call-btn" @click.stop="makeCall(order.contactPhone)">
-                        <text class="icon">📞</text>
-                        <text>拨打</text>
-                    </view>
-                </view>
-            </view>
-            
-            <view class="info-section evidence-section" v-if="order.serviceEvidence">
-               <text class="section-label">服务实拍</text>
-               <view class="evidence-photos">
-                  <image v-for="(photo, idx) in order.serviceEvidence.photos" :key="idx" :src="photo" class="evidence-img" mode="aspectFill" @click.stop="previewImage(order.serviceEvidence.photos, idx)"></image>
-               </view>
+              </text>
             </view>
           </view>
           
           <!-- 分割线 -->
-          <view class="card-divider" v-if="!isFolded(order.id)"></view>
+          <view class="divider"></view>
+
+          <!-- 卡片内容 -->
+          <view class="card-body">
+            <!-- 宠物信息 -->
+            <view class="info-row">
+              <view class="label-box">
+                <text class="icon">🐾</text>
+                <text class="label">宠物</text>
+              </view>
+              <view class="content-box">
+                <text class="main-text">{{ order.petName }}</text>
+                <text class="sub-text">{{ order.petBreed }} · {{ order.petAge }}岁 · {{ order.petGender === 'male' ? '弟弟' : '妹妹' }}</text>
+              </view>
+            </view>
+
+            <!-- 服务内容 (新增) -->
+            <view class="info-row">
+              <view class="label-box">
+                <text class="icon">🏷️</text>
+                <text class="label">服务</text>
+              </view>
+              <view class="content-box">
+                <text class="main-text">{{ getServiceSummary(order) }}</text>
+              </view>
+            </view>
+
+            <!-- 地址信息 -->
+            <view class="info-row">
+              <view class="label-box">
+                <text class="icon">📍</text>
+                <text class="label">地址</text>
+              </view>
+              <view class="content-box">
+                <text class="main-text address">{{ order.address }}</text>
+              </view>
+            </view>
+
+            <!-- 服务人员 (仅显示) -->
+            <view class="info-row" v-if="isOwner && order.sitterId && order.status !== 'PENDING'">
+               <view class="label-box">
+                <text class="icon">👤</text>
+                <text class="label">宠托师</text>
+              </view>
+              <view class="content-box sitter-row" @click.stop="showSitterProfile(order)">
+                <text class="main-text">{{ getSitterName(order) }}</text>
+                <view class="level-tag" :class="getSitterLevelClass(order)">{{ getSitterLevelText(order) }}</view>
+                <text class="arrow">></text>
+              </view>
+            </view>
+          </view>
           
           <!-- 卡片底部：价格与操作 -->
-          <view class="card-footer" v-if="!isFolded(order.id)">
-            <view class="price-box">
-              <text class="label">实付</text>
-              <text class="symbol">¥</text>
-              <text class="amount">{{ order.totalPrice }}</text>
+          <view class="card-footer">
+            <view class="price-section">
+              <text class="currency">¥</text>
+              <text class="amount">{{ formatPrice(order.totalPrice) }}</text>
             </view>
-            <view class="action-box">
+            <view class="action-group">
               <!-- 铲屎官视角 -->
               <template v-if="isOwner">
-                <button class="btn ghost" v-if="order.status === 'PENDING'" @click.stop="handleCancel(order)">取消</button>
-                <button class="btn primary" v-if="order.status === 'UNPAID'" @click.stop="handlePay(order)">去支付</button>
-                <button class="btn primary" v-if="order.status === 'ACCEPTED'" @click.stop="handleConfirmStart(order)">确认开始</button>
-                <button class="btn primary" v-if="order.status === 'IN_SERVICE'" @click.stop="handleConfirmComplete(order)">确认完成</button>
-                <button class="btn primary" v-if="order.status === 'COMPLETED'" @click.stop="handleReview(order)">评价</button>
-                <button class="btn ghost" v-if="['COMPLETED', 'REVIEWED'].includes(order.status)" @click.stop="handleReorder(order)">再来一单</button>
+                <button class="action-btn outline" v-if="order.status === 'PENDING'" @click.stop="handleCancel(order)">取消订单</button>
+                <button class="action-btn primary" v-if="order.status === 'UNPAID'" @click.stop="handlePay(order)">去支付</button>
+                <button class="action-btn primary" v-if="order.status === 'ACCEPTED'" @click.stop="handleConfirmStart(order)">确认开始</button>
+                <button class="action-btn primary" v-if="order.status === 'IN_SERVICE'" @click.stop="handleConfirmComplete(order)">确认完成</button>
+                <button class="action-btn outline" v-if="order.status === 'COMPLETED'" @click.stop="openReviewModal(order)">去评价</button>
+                <button class="action-btn outline" v-if="['COMPLETED', 'REVIEWED'].includes(order.status)" @click.stop="handleReorder(order)">再来一单</button>
               </template>
               
               <!-- 宠托师视角 -->
               <template v-else>
-                <button class="btn primary" v-if="order.status === 'PENDING_ACCEPTANCE'" @click.stop="handleSitterAccept(order)">确认接单</button>
-                <button class="btn ghost" v-if="order.status === 'PENDING_ACCEPTANCE'" @click.stop="handleSitterReject(order)">婉拒</button>
-                <button class="btn primary" v-if="order.status === 'ACCEPTED'" @click.stop="handleStartService(order)">开始服务</button>
-                <button class="btn primary" v-if="order.status === 'IN_SERVICE'" @click.stop="handleCompleteService(order)">完成服务</button>
-                <button class="btn ghost" v-if="order.status === 'COMPLETED'" @click.stop="handleInviteReview(order)">邀请评价</button>
+                <button class="action-btn primary" v-if="order.status === 'PENDING_ACCEPTANCE'" @click.stop="handleSitterAccept(order)">确认接单</button>
+                <button class="action-btn outline" v-if="order.status === 'PENDING_ACCEPTANCE'" @click.stop="handleSitterReject(order)">婉拒</button>
+                <button class="action-btn primary" v-if="order.status === 'ACCEPTED'" @click.stop="handleStartService(order)">开始服务</button>
+                <button class="action-btn primary" v-if="order.status === 'IN_SERVICE'" @click.stop="handleCompleteService(order)">完成服务</button>
+                <button class="action-btn outline" v-if="order.status === 'COMPLETED'" @click.stop="handleInviteReview(order)">邀请评价</button>
               </template>
             </view>
           </view>
@@ -204,7 +120,7 @@
       
       <!-- 空状态 -->
       <view v-else class="empty-state">
-        <view class="empty-icon">📦</view>
+        <image src="https://imgus.tangbuy.com/static/images/2026-02-07/94f7112020e543b5a7538a79851752b9-17704586455008540825701783472049.jpeg" class="empty-img" mode="widthFix" />
         <text class="empty-text">暂无相关订单</text>
         <button class="btn-publish" @click="goToPublish" v-if="isOwner">去发布任务</button>
         <button class="btn-publish" @click="goToHall" v-else>去接单</button>
@@ -213,51 +129,78 @@
 
     <!-- 宠托师详情弹窗 -->
     <view class="modal-overlay" v-if="showModal" @click="closeModal">
-      <view class="modal-content" @click.stop>
+      <view class="modal-content profile-modal" @click.stop>
         <view class="modal-header">
           <text class="title">宠托师档案</text>
-          <text class="close" @click="closeModal">×</text>
+          <text class="close-btn" @click="closeModal">×</text>
         </view>
         <view class="sitter-profile" v-if="currentSitter">
-          <view class="profile-header">
-            <view class="avatar-lg">{{ currentSitter.nickname[0] }}</view>
-            <view class="profile-main">
-              <text class="name">{{ currentSitter.nickname }}</text>
-              <view class="badges">
-                <view class="level-badge" :class="getModalLevelClass()">{{ getModalLevelText() }}</view>
-                <view class="verify-badge">实名认证</view>
-              </view>
-            </view>
+          <view class="profile-header-card">
+             <view class="avatar-box">{{ currentSitter.nickname[0] }}</view>
+             <text class="name">{{ currentSitter.nickname }}</text>
+             <view class="tags-row">
+                <view class="tag level">{{ getModalLevelText() }}</view>
+                <view class="tag verify">实名认证</view>
+             </view>
           </view>
           
-          <view class="stats-row">
-            <view class="stat-item">
+          <view class="stats-grid">
+            <view class="stat-box">
               <text class="num">{{ currentSitter.sitterProfile?.completedOrders || 0 }}</text>
               <text class="label">已完成</text>
             </view>
-            <view class="stat-item">
+            <view class="stat-box">
               <text class="num">{{ currentSitter.sitterProfile?.rating || 5.0 }}</text>
               <text class="label">评分</text>
             </view>
-            <view class="stat-item">
+            <view class="stat-box">
               <text class="num">{{ currentSitter.sitterProfile?.experienceYears || 1 }}年</text>
               <text class="label">经验</text>
             </view>
           </view>
 
-          <view class="section">
-            <text class="section-title">个人简介</text>
-            <text class="bio">{{ currentSitter.sitterProfile?.bio || '这位宠托师很懒，还没写简介~' }}</text>
-          </view>
-
-          <view class="section">
-            <text class="section-title">专业技能</text>
-            <view class="tags">
-              <text class="tag" v-for="tag in (currentSitter.sitterProfile?.tags || ['擅长撸猫', '狗狗陪玩'])" :key="tag">{{ tag }}</text>
-            </view>
+          <view class="info-block">
+            <text class="block-title">个人简介</text>
+            <text class="block-content">{{ currentSitter.sitterProfile?.bio || '这位宠托师很懒，还没写简介~' }}</text>
           </view>
         </view>
       </view>
+    </view>
+
+    <!-- 评价弹窗 (全新设计) -->
+    <view class="modal-overlay" v-if="showReviewModal" @click="closeReviewModal">
+       <view class="modal-content review-modal" @click.stop>
+          <view class="review-header">
+             <text class="title">服务评价</text>
+             <text class="sub">请对本次服务进行打分</text>
+          </view>
+          
+          <view class="rating-stars">
+             <view 
+               class="star-item" 
+               v-for="i in 5" 
+               :key="i"
+               @click="setRating(i)"
+             >
+                <text class="star-icon" :class="{ active: i <= reviewRating }">★</text>
+             </view>
+          </view>
+          <text class="rating-desc">{{ getRatingText(reviewRating) }}</text>
+          
+          <view class="input-wrapper">
+             <textarea 
+               class="review-textarea" 
+               placeholder="服务周到吗？宠物开心吗？写点什么吧..." 
+               placeholder-class="placeholder"
+               v-model="reviewContent"
+             />
+          </view>
+          
+          <view class="modal-actions">
+             <button class="btn-cancel" @click="closeReviewModal">暂不评价</button>
+             <button class="btn-submit" @click="submitReview">提交评价</button>
+          </view>
+       </view>
     </view>
 
     <!-- 完成服务弹窗 -->
@@ -265,7 +208,7 @@
       <view class="modal-content" @click.stop>
         <view class="modal-header">
           <text class="title">完成服务确认</text>
-          <text class="close" @click="closeCompleteModal">×</text>
+          <text class="close-btn" @click="closeCompleteModal">×</text>
         </view>
         <view class="complete-form">
            <view class="form-item">
@@ -285,7 +228,7 @@
                <view class="add-btn" @click="choosePhoto">+</view>
              </view>
            </view>
-           <button class="btn primary block" @click="submitComplete">确认提交</button>
+           <button class="btn-primary block" @click="submitComplete">确认提交</button>
         </view>
       </view>
     </view>
@@ -419,6 +362,15 @@ const getServiceItems = (type: ServiceType) => {
   return ['遛狗', '陪玩', '清洁', '拍摄反馈'];
 };
 
+const getServiceSummary = (order: Order) => {
+  const parts = [];
+  parts.push(order.serviceType === ServiceType.FEEDING ? '上门喂养' : '上门遛狗');
+  if (order.addOns?.play) parts.push('陪玩');
+  if (order.addOns?.deepClean) parts.push('深度清洁');
+  if (order.addOns?.medicine) parts.push('喂药');
+  return parts.join(' · ');
+};
+
 const formatPetSize = (size: PetSize) => {
   const map: Record<string, string> = {
     [PetSize.SMALL]: '小型',
@@ -429,6 +381,21 @@ const formatPetSize = (size: PetSize) => {
   };
   return map[size] || size;
 };
+
+const formatTime = (time: number | string) => {
+  if (!time) return '';
+  const date = new Date(time);
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  const hour = date.getHours().toString().padStart(2, '0');
+  const minute = date.getMinutes().toString().padStart(2, '0');
+  return `${year}-${month}-${day} ${hour}:${minute}`;
+}
+
+const formatPrice = (price: number) => {
+  return price.toFixed(2);
+}
 
 const formatStatus = (status: string) => {
   const map: Record<string, string> = {
@@ -458,8 +425,7 @@ const goToHall = () => {
 };
 
 const goToDetail = (id: string) => {
-  // uni.navigateTo({ url: `/pages/order-detail/index?id=${id}` });
-  console.log('Go to detail', id);
+  uni.navigateTo({ url: `/pages/order-detail/index?id=${id}` });
 };
 
 // --- Sitter Data & Logic ---
@@ -704,14 +670,45 @@ const handleInviteReview = (order: Order) => {
     uni.showToast({ title: '已发送评价邀请', icon: 'success' });
 };
 
-const handleReview = (order: Order) => {
-    uni.showActionSheet({
-        itemList: ['非常满意', '满意', '一般'],
-        success: (res) => {
-            orderStore.updateOrderStatus(order.id, 'REVIEWED');
-            uni.showToast({ title: '评价成功' });
-        }
-    });
+// Review Logic
+const showReviewModal = ref(false);
+const reviewRating = ref(5);
+const reviewContent = ref('');
+const reviewingOrder = ref<Order | null>(null);
+
+const openReviewModal = (order: Order) => {
+    reviewingOrder.value = order;
+    reviewRating.value = 5;
+    reviewContent.value = '';
+    showReviewModal.value = true;
+};
+
+const closeReviewModal = () => {
+    showReviewModal.value = false;
+    reviewingOrder.value = null;
+};
+
+const setRating = (rating: number) => {
+    reviewRating.value = rating;
+};
+
+const getRatingText = (rating: number) => {
+    const map = ['差评', '较差', '一般', '满意', '非常满意'];
+    return map[rating - 1] || '满意';
+};
+
+const submitReview = () => {
+    if (reviewingOrder.value) {
+        orderStore.updateOrderStatus(reviewingOrder.value.id, 'REVIEWED');
+        uni.showToast({ title: '评价成功' });
+        // Optionally save review content to store/backend
+        console.log('Review submitted:', {
+            orderId: reviewingOrder.value.id,
+            rating: reviewRating.value,
+            content: reviewContent.value
+        });
+    }
+    closeReviewModal();
 };
 
 const handleReorder = (order: Order) => {
@@ -743,6 +740,7 @@ const makeCall = (phone: string) => {
   padding-bottom: 40rpx;
 }
 
+/* Tabs */
 .tabs-wrapper {
   position: sticky;
   top: 0;
@@ -752,130 +750,62 @@ const makeCall = (phone: string) => {
   box-shadow: $shadow-sm;
   
   .tabs {
-  display: flex;
-  padding: 0 $spacing-lg;
-  height: 88rpx;
-  align-items: center;
-  
-  .tab-item {
-    flex: 1;
     display: flex;
-    flex-direction: column;
+    height: 88rpx;
     align-items: center;
-    justify-content: center;
-    height: 100%;
-    position: relative;
+    justify-content: space-around;
     
-    .tab-text {
-      font-size: 28rpx;
-      color: $color-text-secondary;
-      font-weight: 500;
-      transition: all 0.3s;
-    }
-    
-    &.active {
+    .tab-item {
+      position: relative;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      
       .tab-text {
-        color: $color-text-main;
-        font-weight: 600;
-        font-size: 30rpx;
+        font-size: 28rpx;
+        color: $color-text-regular;
+        transition: all 0.3s;
       }
-    }
-    
-    .tab-line {
-      position: absolute;
-      bottom: 10rpx;
-      width: 32rpx;
-      height: 6rpx;
-      background: linear-gradient(90deg, #FF8E3C 0%, #FF6B6B 100%);
-      border-radius: $radius-full;
+      
+      &.active {
+        .tab-text {
+          color: $color-text-main;
+          font-weight: 600;
+          font-size: 30rpx;
+          transform: scale(1.05);
+        }
+        
+        .tab-line {
+          position: absolute;
+          bottom: 12rpx;
+          width: 32rpx;
+          height: 6rpx;
+          background: $color-primary-gradient;
+          border-radius: 4rpx;
+          box-shadow: 0 2rpx 6rpx rgba(255, 142, 60, 0.4);
+        }
+      }
     }
   }
 }
 
 .order-list {
-    padding: $spacing-md $spacing-lg;
-  }
-  
-  .evidence-photos {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10rpx;
-    margin-top: 10rpx;
-    
-    .evidence-img {
-      width: 140rpx;
-      height: 140rpx;
-      border-radius: 8rpx;
-      background: #f5f5f5;
-    }
-  }
+  padding: $spacing-md;
+}
 
-  .complete-form {
-    padding: 20rpx;
-    
-    .form-item {
-      margin-bottom: 30rpx;
-      
-      .label {
-        display: block;
-        font-size: 28rpx;
-        font-weight: 600;
-        margin-bottom: 20rpx;
-        color: $color-text-main;
-      }
-      
-      .checkbox-item {
-        display: flex;
-        align-items: center;
-        margin-bottom: 16rpx;
-        font-size: 26rpx;
-        color: $color-text-regular;
-        
-        checkbox {
-          transform: scale(0.8);
-        }
-      }
-      
-      .photo-uploader {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 20rpx;
-        
-        .photo-item, .add-btn {
-          width: 160rpx;
-          height: 160rpx;
-          border-radius: 12rpx;
-          overflow: hidden;
-        }
-        
-        .photo-item image {
-          width: 100%;
-          height: 100%;
-        }
-        
-        .add-btn {
-          background: #F5F5F5;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 60rpx;
-          color: #999;
-          border: 2rpx dashed #DDD;
-        }
-      }
-    }
-  }
-
+/* Order Card */
 .order-card {
-  background: #FFFFFF;
-  border-radius: $radius-lg;
-  padding: $spacing-lg;
+  background: $color-bg-card;
+  border-radius: $radius-md;
+  padding: 30rpx;
   margin-bottom: $spacing-md;
   box-shadow: $shadow-card;
-  transition: transform 0.2s;
+  transition: all 0.3s;
   
   &:active {
-    transform: scale(0.99);
+    transform: scale(0.995);
   }
   
   .card-header {
@@ -884,576 +814,506 @@ const makeCall = (phone: string) => {
     align-items: center;
     margin-bottom: $spacing-md;
     
-    .service-info {
+    .header-left {
       display: flex;
       align-items: center;
       
-      .service-badge {
-        padding: 6rpx 16rpx;
-        border-radius: $radius-sm;
+      .service-tag {
         font-size: 22rpx;
-        font-weight: 600;
-        margin-right: 12rpx;
+        padding: 4rpx 12rpx;
+        border-radius: 8rpx;
+        margin-right: 16rpx;
+        font-weight: 500;
         
-        &.FEEDING {
-          background: #FFF0E5;
-          color: #FF8E3C;
-        }
-        &.WALKING {
-          background: #E6F7FF;
-          color: #1890FF;
-        }
+        &.FEEDING { background: $color-primary-light; color: $color-primary; }
+        &.WALKING { background: #E6F7FF; color: $color-blue; }
       }
       
-      .order-id {
+      .order-time {
         font-size: 24rpx;
-        color: $color-text-placeholder;
+        color: $color-text-secondary;
       }
     }
     
-    .status-badge {
+    .status-text {
       font-size: 26rpx;
       font-weight: 600;
       
-      &.pending { color: $color-warning; }
+      &.pending { color: $color-primary; }
       &.accepted { color: $color-blue; }
-      &.in_service { color: $color-primary; }
-      &.completed { color: $color-success; }
+      &.in_service { color: $color-success; }
+      &.completed { color: $color-text-main; }
       &.reviewed { color: $color-text-secondary; }
-      &.cancelled { color: $color-text-placeholder; }
+      &.cancelled { color: $color-text-secondary; }
     }
   }
   
-  .sitter-info-bar {
-    background: #F9FAFB;
-    border-radius: $radius-md;
-    padding: $spacing-sm $spacing-md;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: $spacing-md;
-    
-    .sitter-left {
+  .divider {
+    height: 1rpx;
+    background: #F5F5F5;
+    margin: 0 -30rpx $spacing-md;
+  }
+  
+  .card-body {
+    .info-row {
       display: flex;
-      align-items: center;
+      margin-bottom: 20rpx;
       
-      .avatar-placeholder {
-        width: 64rpx;
-        height: 64rpx;
-        background: #FFD1DC;
-        border-radius: 50%;
+      &:last-child { margin-bottom: 0; }
+      
+      .label-box {
         display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #FFF;
-        font-weight: 600;
+        align-items: flex-start;
+        width: 120rpx;
         margin-right: 16rpx;
+        
+        .icon { font-size: 28rpx; margin-right: 8rpx; }
+        .label { font-size: 26rpx; color: $color-text-secondary; }
       }
       
-      .sitter-details {
-        .name-row {
-          display: flex;
-          align-items: center;
-          margin-bottom: 4rpx;
+      .content-box {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        
+        .main-text {
+          font-size: 28rpx;
+          color: $color-text-main;
+          font-weight: 500;
+          line-height: 1.4;
           
-          .name {
-            font-size: 26rpx;
-            font-weight: 600;
-            margin-right: 12rpx;
-          }
-          
-          .level-badge {
-            font-size: 18rpx;
-            padding: 2rpx 8rpx;
-            border-radius: 4rpx;
-            &.gold {
-              background: linear-gradient(90deg, #FFD700, #FFA500);
-              color: #FFF;
-            }
-            &.silver {
-              background: linear-gradient(90deg, #C0C0C0, #A9A9A9);
-              color: #FFF;
-            }
-            &.bronze {
-              background: linear-gradient(90deg, #CD7F32, #8B4513);
-              color: #FFF;
-            }
+          &.address {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
           }
         }
         
         .sub-text {
-          font-size: 22rpx;
-          color: $color-text-secondary;
-        }
-      }
-    }
-    
-    .arrow {
-      color: $color-text-placeholder;
-      font-size: 24rpx;
-    }
-  }
-  
-  .card-body {
-    display: flex;
-    flex-direction: column;
-    gap: 24rpx;
-    
-    .info-section {
-      background: #F7F8FA;
-      border-radius: 16rpx;
-      padding: 24rpx;
-      
-      &.pet-section {
-        background: #FFFBF5; // Light orange bg
-        border: 1px solid rgba(255, 142, 60, 0.1);
-        
-        .pet-header-row {
-          display: flex;
-          align-items: center;
-          margin-bottom: 12rpx;
-          
-          .pet-name { font-size: 30rpx; font-weight: 700; color: #333; margin-right: 12rpx; }
-          .pet-breed { font-size: 24rpx; color: #666; margin-right: 12rpx; }
-          .pet-tags { 
-            display: flex; gap: 8rpx;
-            .tag { font-size: 20rpx; color: #FF8E3C; border: 1px solid #FF8E3C; padding: 0 8rpx; border-radius: 4rpx; }
-          }
-        }
-        
-        .pet-details-row {
           font-size: 24rpx;
-          color: #666;
-          margin-bottom: 12rpx;
-          display: flex;
-          align-items: center;
-          .divider { color: #DDD; margin: 0 12rpx; }
+          color: $color-text-secondary;
+          margin-top: 4rpx;
         }
         
-        .pet-pref-row {
-           font-size: 24rpx;
-           color: #666;
-           background: rgba(255,255,255,0.8);
-           padding: 12rpx;
-           border-radius: 8rpx;
-           .label { color: #999; }
-           .val { color: #333; }
+        &.sitter-row {
+            flex-direction: row;
+            align-items: center;
+            
+            .level-tag {
+                font-size: 20rpx;
+                padding: 2rpx 8rpx;
+                border-radius: 4rpx;
+                margin-left: 12rpx;
+                
+                &.gold { background: #FFF7E6; color: #FA8C16; border: 1px solid #FFD591; }
+                &.silver { background: #F5F5F5; color: #666; border: 1px solid #D9D9D9; }
+                &.bronze { background: #FFF1F0; color: #CF1322; border: 1px solid #FFA39E; }
+            }
+            
+            .arrow {
+                margin-left: auto;
+                color: #CCC;
+                font-size: 24rpx;
+            }
         }
       }
-      
-      &.service-section {
-         .info-row {
-            display: flex;
-            align-items: center;
-            margin-bottom: 16rpx;
-            &:last-child { margin-bottom: 0; }
-            
-            &.content-row {
-               align-items: flex-start;
-               .icon { margin-top: 4rpx; }
-            }
-            
-            .icon { font-size: 30rpx; margin-right: 16rpx; }
-            .text { font-size: 28rpx; color: #333; }
-            .sub-text { font-size: 24rpx; color: #999; margin-left: 8rpx; }
-            .address { 
-              flex: 1; 
-              overflow: hidden; 
-              text-overflow: ellipsis; 
-              white-space: nowrap; 
-              color: #333;
-            }
-            .highlight { font-weight: 500; }
-            
-            .content-list, .addons-list {
-               flex: 1;
-               
-               .content-label {
-                  font-size: 24rpx;
-                  color: #999;
-                  margin-bottom: 8rpx;
-                  display: block;
-               }
-               
-               .content-tags, .addons-tags {
-                  display: flex;
-                  flex-wrap: wrap;
-                  gap: 12rpx;
-               }
-               
-               .content-tag {
-                  font-size: 22rpx;
-                  color: #666;
-                  background: #F0F0F0;
-                  padding: 4rpx 12rpx;
-                  border-radius: 6rpx;
-               }
-               
-               .addon-tag {
-                  font-size: 22rpx; 
-                  background: #E6F7FF; 
-                  color: #1890FF; 
-                  padding: 4rpx 12rpx; 
-                  border-radius: 6rpx; 
-               }
-            }
-         }
-      }
-      
-      &.contact-section {
-         background: #F0F9FF;
-         border: 1px solid #E6F7FF;
-         
-         .contact-box {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            
-            .contact-left {
-               display: flex;
-               flex-direction: column;
-               
-               .label { font-size: 20rpx; color: #1890FF; opacity: 0.8; margin-bottom: 6rpx; }
-               .person {
-                  display: flex;
-                  align-items: center;
-                  gap: 16rpx;
-                  
-                  .name { font-size: 28rpx; font-weight: 600; color: #333; }
-                  .phone-link { 
-                    font-size: 28rpx; 
-                    color: #1890FF; 
-                    text-decoration: underline; 
-                    font-weight: 500;
-                  }
-               }
-            }
-            
-            .call-btn {
-               display: flex;
-               align-items: center;
-               gap: 8rpx;
-               background: #1890FF;
-               color: #FFF;
-               padding: 12rpx 28rpx;
-               border-radius: 100rpx;
-               font-size: 24rpx;
-               font-weight: 500;
-               box-shadow: 0 4rpx 12rpx rgba(24, 144, 255, 0.3);
-               
-               .icon { font-size: 24rpx; }
-               
-               &:active { opacity: 0.9; transform: scale(0.98); }
-            }
-         }
-      }
-      
-      &.evidence-section {
-         .section-label { font-size: 24rpx; color: #999; margin-bottom: 12rpx; display: block; }
-      }
     }
-  }
-  
-  .card-divider {
-    height: 1px;
-    background: #F5F6F8;
-    margin: $spacing-md 0;
   }
   
   .card-footer {
+    margin-top: 30rpx;
+    padding-top: $spacing-md;
+    border-top: 1rpx dashed #eee;
     display: flex;
     justify-content: space-between;
     align-items: center;
     
-    .price-box {
-      display: flex;
-      align-items: baseline;
-      
-      .label {
-        font-size: 24rpx;
-        color: $color-text-secondary;
-        margin-right: 8rpx;
-      }
-      
-      .symbol {
-        font-size: 24rpx;
-        color: $color-text-main;
-        font-weight: 600;
-      }
-      
-      .amount {
-        font-size: 36rpx;
-        color: $color-text-main;
-        font-weight: 800;
-      }
+    .price-section {
+      .currency { font-size: 24rpx; color: $color-price; font-weight: 600; }
+      .amount { font-size: 36rpx; color: $color-price; font-weight: bold; }
     }
     
-    .action-box {
+    .action-group {
       display: flex;
       gap: 16rpx;
       
-      .btn {
+      .action-btn {
         margin: 0;
         padding: 0 24rpx;
-        height: 56rpx;
-        line-height: 56rpx;
-        border-radius: $radius-full;
+        height: 60rpx;
+        line-height: 58rpx;
         font-size: 24rpx;
+        border-radius: 30rpx;
         
-        &.ghost {
-          background: #F5F6F8;
+        &.outline {
+          background: #fff;
+          border: 1rpx solid #ddd;
           color: $color-text-regular;
-          &::after { border: none; }
         }
         
         &.primary {
-          background: $color-primary-gradient;
-          color: #FFFFFF;
-          box-shadow: $shadow-primary;
+          background: $color-primary;
+          border: 1rpx solid $color-primary;
+          color: #fff;
+          box-shadow: 0 4rpx 10rpx rgba(255, 142, 60, 0.2);
         }
+        
+        &::after { border: none; }
       }
     }
   }
 }
-}
 
+/* Empty State */
 .empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   padding-top: 120rpx;
   
-  .empty-icon {
-    font-size: 80rpx;
-    margin-bottom: $spacing-md;
-    opacity: 0.5;
+  .empty-img {
+    width: 320rpx;
+    margin-bottom: 30rpx;
   }
   
   .empty-text {
     font-size: 28rpx;
     color: $color-text-secondary;
-    margin-bottom: $spacing-xl;
+    margin-bottom: 40rpx;
   }
   
   .btn-publish {
     width: 240rpx;
     height: 80rpx;
     line-height: 80rpx;
-    border-radius: $radius-full;
     background: $color-primary-gradient;
-    color: #FFFFFF;
+    color: #fff;
     font-size: 28rpx;
-    font-weight: 600;
+    border-radius: 40rpx;
     box-shadow: $shadow-primary;
+    &::after { border: none; }
   }
 }
 
-// Modal Styles
+/* Modals */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
   z-index: 999;
   display: flex;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(4px);
-}
-
-.modal-content {
-  width: 600rpx;
-  background: #FFF;
-  border-radius: 24rpx;
-  padding: 32rpx;
-  animation: popIn 0.3s ease;
+  opacity: 0;
+  animation: fadeIn 0.2s forwards;
   
-  .modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 32rpx;
+  .modal-content {
+    width: 600rpx;
+    background: #fff;
+    border-radius: $radius-lg;
+    overflow: hidden;
+    transform: scale(0.9);
+    animation: scaleIn 0.2s forwards;
+    box-shadow: $shadow-lg;
     
-    .title {
-      font-size: 32rpx;
-      font-weight: 600;
+    &.review-modal {
+       padding: 40rpx 30rpx;
+       display: flex;
+       flex-direction: column;
+       align-items: center;
+       
+       .review-header {
+           text-align: center;
+           margin-bottom: 40rpx;
+           .title { display: block; font-size: 34rpx; font-weight: bold; color: $color-text-main; margin-bottom: 12rpx; }
+           .sub { font-size: 24rpx; color: $color-text-secondary; }
+       }
+       
+       .rating-stars {
+           display: flex;
+           gap: 20rpx;
+           margin-bottom: 20rpx;
+           
+           .star-item {
+               padding: 10rpx;
+               .star-icon {
+                   font-size: 64rpx;
+                   color: #E0E0E0;
+                   transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                   &.active { 
+                       color: #FFC107; 
+                       transform: scale(1.15); 
+                       text-shadow: 0 4rpx 10rpx rgba(255, 193, 7, 0.4);
+                   }
+               }
+           }
+       }
+       
+       .rating-desc {
+           font-size: 30rpx;
+           color: $color-primary;
+           font-weight: 600;
+           margin-bottom: 40rpx;
+           height: 40rpx;
+           opacity: 0.9;
+       }
+       
+       .input-wrapper {
+           width: 100%;
+           background: #F8F9FA;
+           border-radius: $radius-md;
+           padding: 24rpx;
+           margin-bottom: 40rpx;
+           border: 1px solid transparent;
+           transition: all 0.3s;
+           
+           &:focus-within {
+             background: #fff;
+             border-color: $color-primary;
+             box-shadow: 0 0 0 4rpx rgba(255, 142, 60, 0.1);
+           }
+           
+           .review-textarea {
+               width: 100%;
+               height: 160rpx;
+               font-size: 28rpx;
+               color: $color-text-main;
+               line-height: 1.5;
+           }
+           
+           .placeholder { color: $color-text-placeholder; }
+       }
+       
+       .modal-actions {
+           width: 100%;
+           display: flex;
+           gap: 24rpx;
+           
+           button {
+               flex: 1;
+               height: 80rpx;
+               line-height: 80rpx;
+               border-radius: 40rpx;
+               font-size: 28rpx;
+               font-weight: 500;
+               &::after { border: none; }
+           }
+           
+           .btn-cancel { background: #F5F5F5; color: $color-text-regular; }
+           .btn-submit { 
+             background: $color-primary-gradient; 
+             color: #fff; 
+             box-shadow: $shadow-primary; 
+             
+             &:active { opacity: 0.9; transform: scale(0.98); }
+           }
+       }
     }
     
-    .close {
-      font-size: 40rpx;
-      color: $color-text-secondary;
-      line-height: 1;
-      padding: 10rpx;
+    &.profile-modal {
+       padding: 0;
+       background: #F8F9FA;
+       
+       .modal-header {
+           padding: 24rpx 30rpx;
+           background: #fff;
+           display: flex;
+           justify-content: space-between;
+           align-items: center;
+           border-bottom: 1rpx solid #eee;
+           
+           .title { font-size: 32rpx; font-weight: 600; color: $color-text-main; }
+           .close-btn { font-size: 40rpx; color: $color-text-secondary; line-height: 1; padding: 10rpx; }
+       }
+       
+       .sitter-profile {
+           padding: 30rpx;
+           
+           .profile-header-card {
+               background: #fff;
+               border-radius: $radius-md;
+               padding: 40rpx 30rpx;
+               display: flex;
+               flex-direction: column;
+               align-items: center;
+               margin-bottom: 24rpx;
+               box-shadow: $shadow-sm;
+               
+               .avatar-box {
+                   width: 140rpx;
+                   height: 140rpx;
+                   background: $color-secondary;
+                   border-radius: 50%;
+                   display: flex;
+                   align-items: center;
+                   justify-content: center;
+                   font-size: 60rpx;
+                   color: #fff;
+                   font-weight: 600;
+                   margin-bottom: 24rpx;
+                   box-shadow: 0 8rpx 20rpx rgba(255, 209, 220, 0.6);
+                   border: 4rpx solid #fff;
+               }
+               
+               .name { font-size: 36rpx; font-weight: bold; color: $color-text-main; margin-bottom: 16rpx; }
+               
+               .tags-row {
+                   display: flex;
+                   gap: 16rpx;
+                   
+                   .tag {
+                       font-size: 22rpx;
+                       padding: 6rpx 20rpx;
+                       border-radius: 100rpx;
+                       font-weight: 500;
+                       
+                       &.level { background: linear-gradient(135deg, #FFD700, #FFA500); color: #fff; box-shadow: 0 4rpx 10rpx rgba(255, 165, 0, 0.3); }
+                       &.verify { background: #E6F7FF; color: $color-blue; }
+                   }
+               }
+           }
+           
+           .stats-grid {
+               display: flex;
+               justify-content: space-between;
+               background: #fff;
+               border-radius: $radius-md;
+               padding: 30rpx;
+               margin-bottom: 24rpx;
+               box-shadow: $shadow-sm;
+               
+               .stat-box {
+                   flex: 1;
+                   display: flex;
+                   flex-direction: column;
+                   align-items: center;
+                   position: relative;
+                   
+                   &:not(:last-child)::after {
+                       content: '';
+                       position: absolute;
+                       right: 0;
+                       top: 15%;
+                       height: 70%;
+                       width: 1rpx;
+                       background: #eee;
+                   }
+                   
+                   .num { font-size: 32rpx; font-weight: bold; color: $color-text-main; margin-bottom: 8rpx; }
+                   .label { font-size: 24rpx; color: $color-text-secondary; }
+               }
+           }
+           
+           .info-block {
+               background: #fff;
+               border-radius: $radius-md;
+               padding: 30rpx;
+               box-shadow: $shadow-sm;
+               
+               .block-title { font-size: 28rpx; font-weight: 600; color: $color-text-main; margin-bottom: 16rpx; display: block; }
+               .block-content { font-size: 26rpx; color: $color-text-regular; line-height: 1.6; text-align: justify; }
+           }
+       }
+    }
+    
+    .modal-header {
+      padding: 30rpx;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1rpx solid #f5f5f5;
+      
+      .title { font-size: 32rpx; font-weight: 600; color: $color-text-main; }
+      .close-btn { font-size: 44rpx; color: $color-text-secondary; line-height: 1; padding: 10rpx; }
+    }
+    
+    .complete-form {
+        padding: 0 30rpx 40rpx;
+        
+        .form-item {
+          margin-bottom: 30rpx;
+          
+          .label {
+            display: block;
+            font-size: 28rpx;
+            font-weight: 600;
+            margin-bottom: 20rpx;
+            color: $color-text-main;
+          }
+          
+          .checkbox-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 16rpx;
+            font-size: 26rpx;
+            color: $color-text-regular;
+            
+            checkbox {
+              transform: scale(0.8);
+            }
+          }
+          
+          .photo-uploader {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20rpx;
+            
+            .photo-item, .add-btn {
+              width: 160rpx;
+              height: 160rpx;
+              border-radius: $radius-sm;
+              overflow: hidden;
+            }
+            
+            .photo-item image {
+              width: 100%;
+              height: 100%;
+            }
+            
+            .add-btn {
+              background: #F5F5F5;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 60rpx;
+              color: $color-text-placeholder;
+              border: 2rpx dashed #DDD;
+              transition: all 0.3s;
+              
+              &:active { background: #eee; }
+            }
+          }
+        }
     }
   }
 }
 
-@keyframes popIn {
+.btn-primary {
+  background: $color-primary-gradient;
+  color: #fff;
+  border-radius: 40rpx;
+  height: 80rpx;
+  line-height: 80rpx;
+  font-size: 28rpx;
+  font-weight: 500;
+  box-shadow: $shadow-primary;
+  &.block { width: 100%; display: block; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
   from { transform: scale(0.9); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
 }
 
-.sitter-profile {
-  .profile-header {
-    display: flex;
-    align-items: center;
-    margin-bottom: 32rpx;
-    
-    .avatar-lg {
-      width: 100rpx;
-      height: 100rpx;
-      border-radius: 50%;
-      background: #FFD1DC;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 40rpx;
-      color: #FFF;
-      font-weight: 600;
-      margin-right: 24rpx;
-    }
-    
-    .profile-main {
-      .name {
-        font-size: 32rpx;
-        font-weight: 600;
-        margin-bottom: 8rpx;
-        display: block;
-      }
-      
-      .badges {
-        display: flex;
-        gap: 12rpx;
-        
-        .level-badge {
-          font-size: 20rpx;
-          padding: 4rpx 12rpx;
-          border-radius: 6rpx;
-          &.gold {
-            background: linear-gradient(90deg, #FFD700, #FFA500);
-            color: #FFF;
-          }
-          &.silver {
-            background: linear-gradient(90deg, #C0C0C0, #A9A9A9);
-            color: #FFF;
-          }
-          &.bronze {
-            background: linear-gradient(90deg, #CD7F32, #8B4513);
-            color: #FFF;
-          }
-        }
-        
-        .verify-badge {
-          font-size: 20rpx;
-          padding: 4rpx 12rpx;
-          border-radius: 6rpx;
-          background: #E6F7FF;
-          color: #1890FF;
-        }
-      }
-    }
-  }
-  
-  .stats-row {
-    display: flex;
-    justify-content: space-between;
-    background: #F9FAFB;
-    padding: 24rpx;
-    border-radius: 16rpx;
-    margin-bottom: 32rpx;
-    
-    .stat-item {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      
-      .num {
-        font-size: 32rpx;
-        font-weight: 700;
-        color: $color-text-main;
-        margin-bottom: 4rpx;
-      }
-      
-      .label {
-        font-size: 22rpx;
-        color: $color-text-secondary;
-      }
-    }
-  }
-  
-  .section {
-    margin-bottom: 32rpx;
-    
-    .section-title {
-      font-size: 28rpx;
-      font-weight: 600;
-      margin-bottom: 16rpx;
-      display: block;
-    }
-    
-    .bio {
-      font-size: 26rpx;
-      color: $color-text-regular;
-      line-height: 1.5;
-    }
-    
-    .tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 16rpx;
-      
-      .tag {
-        background: #F0F2F5;
-        color: $color-text-secondary;
-        font-size: 24rpx;
-        padding: 8rpx 20rpx;
-        border-radius: 100rpx;
-      }
-    }
-  }
-}
-
-.status-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-
-  .countdown-text {
-    font-size: 24rpx;
-    color: $color-primary;
-    font-weight: 600;
-    background: #FFF0E5;
-    padding: 2rpx 10rpx;
-    border-radius: 8rpx;
-  }
-
-  .fold-icon {
-    font-size: 24rpx;
-    color: $color-text-placeholder;
-    margin-left: 8rpx;
-  }
-}
-
-.summary-view {
-  background: #F9FAFB;
-  border-radius: 12rpx;
-  padding: 16rpx 24rpx;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-
-  .summary-item {
-    display: flex;
-    align-items: center;
-    gap: 8rpx;
-
-    .icon { font-size: 24rpx; }
-    .text { font-size: 26rpx; color: $color-text-regular; }
-    
-    .price-symbol { font-size: 24rpx; color: $color-text-main; font-weight: 600; }
-    .price-val { font-size: 32rpx; color: $color-text-main; font-weight: 700; }
-  }
-}
 </style>

@@ -163,6 +163,8 @@ const handleSubmit = () => {
   background: #fff;
   border-radius: 16px;
   padding: 20px;
+  position: relative;
+  z-index: 1;
   
   .form-item {
     margin-bottom: 20px;
@@ -177,9 +179,14 @@ const handleSubmit = () => {
     
     .input {
       background: #f9f9f9;
-      padding: 12px;
+      padding: 0 24rpx;
+      height: 88rpx;
+      line-height: 88rpx;
       border-radius: 8px;
       font-size: 14px;
+      color: #333;
+      width: 100%;
+      box-sizing: border-box;
     }
   }
 }

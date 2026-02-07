@@ -1,0 +1,21 @@
+{
+  "name": "宠乐到家",
+  "short_name": "宠乐到家",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#FFFBF5",
+  "theme_color": "#FF8E3C",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "static/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "static/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

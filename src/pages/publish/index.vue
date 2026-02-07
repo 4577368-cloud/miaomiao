@@ -711,7 +711,8 @@ const handleSubmit = () => {
   
   // Create Order
   const newOrder = {
-    userId: userStore.userInfo?.id || 'temp',
+    id: Date.now().toString(),
+    creatorId: userStore.userInfo?.id || 'temp',
     sitterId: form.targetSitterId, // Null = Task Hall
     serviceType: form.serviceType,
     status: 'PENDING',
