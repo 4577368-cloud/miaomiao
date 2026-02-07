@@ -21,20 +21,36 @@
       <view v-if="filteredOrders.length > 0" class="list-content">
         <view class="order-card" v-for="order in filteredOrders" :key="order.id" @click="goToDetail(order.id)">
           <!-- 卡片头部：状态与服务类型 -->
-          <view class="card-header">
+          <view class="card-header" @click.stop="toggleFold(order.id)">
             <view class="service-info">
               <view class="service-badge" :class="order.serviceType">
                 {{ formatServiceType(order.serviceType) }}
               </view>
               <text class="order-id">#{{ order.id.slice(-6) }}</text>
             </view>
-            <view class="status-badge" :class="order.status.toLowerCase()">
-              {{ formatStatus(order.status) }}
+            <view class="status-wrapper">
+              <text class="countdown-text" v-if="countdowns[order.id]">⏱ {{ countdowns[order.id] }}</text>
+              <view class="status-badge" :class="order.status.toLowerCase()">
+                {{ formatStatus(order.status) }}
+              </view>
+              <text class="fold-icon">{{ isFolded(order.id) ? '▼' : '▲' }}</text>
             </view>
           </view>
           
+          <!-- 折叠摘要 -->
+          <view class="summary-view" v-if="isFolded(order.id)">
+            <view class="summary-item">
+                <text class="icon">🕒</text>
+                <text class="text">{{ order.time }}</text>
+            </view>
+            <view class="summary-item">
+                <text class="price-symbol">¥</text>
+                <text class="price-val">{{ order.totalPrice }}</text>
+            </view>
+          </view>
+
           <!-- 接单人信息 (仅当有人接单时显示) -->
-          <view class="sitter-info-bar" v-if="order.sitterId && order.status !== 'PENDING'" @click.stop="showSitterProfile(order)">
+          <view class="sitter-info-bar" v-if="!isFolded(order.id) && isOwner && order.sitterId && order.status !== 'PENDING'" @click.stop="showSitterProfile(order)">
             <view class="sitter-left">
               <view class="avatar-placeholder">{{ getSitterName(order)[0] }}</view>
               <view class="sitter-details">
@@ -49,7 +65,7 @@
           </view>
 
           <!-- 卡片内容：核心信息 -->
-          <view class="card-body">
+          <view class="card-body" v-if="!isFolded(order.id)">
             <!-- 1. 宠物信息 -->
             <view class="info-section pet-section" v-if="order.petName">
               <view class="pet-header-row">
@@ -153,10 +169,10 @@
           </view>
           
           <!-- 分割线 -->
-          <view class="card-divider"></view>
+          <view class="card-divider" v-if="!isFolded(order.id)"></view>
           
           <!-- 卡片底部：价格与操作 -->
-          <view class="card-footer">
+          <view class="card-footer" v-if="!isFolded(order.id)">
             <view class="price-box">
               <text class="label">实付</text>
               <text class="symbol">¥</text>
@@ -175,6 +191,8 @@
               
               <!-- 宠托师视角 -->
               <template v-else>
+                <button class="btn primary" v-if="order.status === 'PENDING_ACCEPTANCE'" @click.stop="handleSitterAccept(order)">确认接单</button>
+                <button class="btn ghost" v-if="order.status === 'PENDING_ACCEPTANCE'" @click.stop="handleSitterReject(order)">婉拒</button>
                 <button class="btn primary" v-if="order.status === 'ACCEPTED'" @click.stop="handleStartService(order)">开始服务</button>
                 <button class="btn primary" v-if="order.status === 'IN_SERVICE'" @click.stop="handleCompleteService(order)">完成服务</button>
                 <button class="btn ghost" v-if="order.status === 'COMPLETED'" @click.stop="handleInviteReview(order)">邀请评价</button>
@@ -275,8 +293,9 @@
 </template>
 
 <script setup lang="ts">
+// Force rebuild
 import { ref, computed } from 'vue';
-import { onShow } from '@dcloudio/uni-app';
+import { onShow, onHide, onUnload } from '@dcloudio/uni-app';
 import { useOrderStore, type Order } from '@/stores/order';
 import { useUserStore, type UserInfo } from '@/stores/user';
 import { ServiceType, PetSize } from '@/constants/pet';
@@ -290,8 +309,38 @@ const currentSitter = ref<UserInfo | null>(null);
 const processingOrder = ref<Order | null>(null);
 const tempPhotos = ref<string[]>([]);
 const tempTasks = ref<string[]>(['feed', 'clean']);
+const foldedOrders = ref<Record<string, boolean>>({});
+const countdowns = ref<Record<string, string>>({});
+let timer: number | null = null;
 
 const isOwner = computed(() => userStore.userInfo?.role === 'owner');
+
+const isFolded = (id: string) => {
+  return foldedOrders.value[id] !== false; // Default to true (folded)
+};
+
+const toggleFold = (id: string) => {
+  foldedOrders.value[id] = !isFolded(id);
+};
+
+const updateCountdowns = () => {
+  const now = Date.now();
+  orderStore.orders.forEach(order => {
+    if (order.status === 'IN_SERVICE' && order.actualStartTime) {
+      const elapsed = now - order.actualStartTime;
+      const totalDuration = order.duration * 60 * 1000;
+      const remaining = totalDuration - elapsed;
+      
+      if (remaining > 0) {
+        const m = Math.floor(remaining / 60000);
+        const s = Math.floor((remaining % 60000) / 1000);
+        countdowns.value[order.id] = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+      } else {
+        countdowns.value[order.id] = '服务时间已到';
+      }
+    }
+  });
+};
 
 const currentTabs = computed(() => {
   if (isOwner.value) {
@@ -300,20 +349,34 @@ const currentTabs = computed(() => {
       { label: '待接单', value: 'PENDING' },
       { label: '待服务', value: 'ACCEPTED' },
       { label: '服务中', value: 'IN_SERVICE' },
-      { label: '待评价', value: 'COMPLETED' }
+      { label: '待评价', value: 'COMPLETED' },
+      { label: '已评价', value: 'REVIEWED' }
     ];
   } else {
     return [
       { label: '全部', value: 'ALL' },
+      { label: '待确认', value: 'PENDING_ACCEPTANCE' },
       { label: '待服务', value: 'ACCEPTED' },
       { label: '服务中', value: 'IN_SERVICE' },
-      { label: '已完成', value: 'COMPLETED' }
+      { label: '已完成', value: 'COMPLETED_ALL' }
     ];
   }
 });
 
 onShow(() => {
   orderStore.loadOrders();
+  // Start countdown timer
+  if (timer) clearInterval(timer);
+  timer = setInterval(updateCountdowns, 1000);
+  updateCountdowns();
+});
+
+onHide(() => {
+  if (timer) clearInterval(timer);
+});
+
+onUnload(() => {
+  if (timer) clearInterval(timer);
 });
 
 const filteredOrders = computed(() => {
@@ -332,9 +395,13 @@ const filteredOrders = computed(() => {
   const tab = currentTabs.value[currentTab.value];
   if (tab.value === 'ALL') return all;
   
-  // 特殊处理：待服务包含了 ACCEPTED
-  // 特殊处理：已完成包含了 COMPLETED 和 REVIEWED
-  if (tab.value === 'COMPLETED') {
+  if (tab.value === 'PENDING') {
+    // Owner sees both PENDING and PENDING_ACCEPTANCE under "待接单"
+    return all.filter(o => o.status === 'PENDING' || o.status === 'PENDING_ACCEPTANCE');
+  }
+
+  // Sitter's "Completed" includes both COMPLETED and REVIEWED
+  if (tab.value === 'COMPLETED_ALL') {
     return all.filter(o => ['COMPLETED', 'REVIEWED'].includes(o.status));
   }
   
@@ -366,6 +433,7 @@ const formatPetSize = (size: PetSize) => {
 const formatStatus = (status: string) => {
   const map: Record<string, string> = {
     'PENDING': '待接单',
+    'PENDING_ACCEPTANCE': '待确认',
     'ACCEPTED': '待服务',
     'IN_SERVICE': '服务中',
     'COMPLETED': '待评价',
@@ -504,6 +572,29 @@ const handleConfirmStart = (order: Order) => {
     switchToTab('IN_SERVICE');
 };
 
+const handleSitterAccept = (order: Order) => {
+  if (!userStore.userInfo) return;
+  const success = orderStore.acceptOrder(order.id, userStore.userInfo);
+  if (success) {
+    uni.showToast({ title: '接单成功', icon: 'success' });
+  } else {
+    uni.showToast({ title: '接单失败', icon: 'none' });
+  }
+};
+
+const handleSitterReject = (order: Order) => {
+  uni.showModal({
+    title: '提示',
+    content: '确定要婉拒这个订单吗？',
+    success: (res) => {
+      if (res.confirm) {
+        orderStore.updateOrderStatus(order.id, 'CANCELLED');
+        uni.showToast({ title: '已婉拒', icon: 'none' });
+      }
+    }
+  });
+};
+
 const handleStartService = (order: Order) => {
     uni.showModal({
         title: '开始服务',
@@ -518,6 +609,29 @@ const handleStartService = (order: Order) => {
 };
 
 const handleCompleteService = (order: Order) => {
+    // Check duration
+    if (order.actualStartTime) {
+        const elapsed = Date.now() - order.actualStartTime;
+        const minDuration = order.duration * 60 * 1000;
+        if (elapsed < minDuration) {
+            uni.showModal({
+                title: '服务未达标',
+                content: `服务时长未满${order.duration}分钟，确定要提前结束吗？`,
+                confirmText: '确认结束',
+                cancelText: '继续服务',
+                success: (res) => {
+                    if (res.confirm) {
+                        showCompleteServiceModal(order);
+                    }
+                }
+            });
+            return;
+        }
+    }
+    showCompleteServiceModal(order);
+};
+
+const showCompleteServiceModal = (order: Order) => {
     processingOrder.value = order;
     tempPhotos.value = [];
     showCompleteModal.value = true;
@@ -622,6 +736,7 @@ const makeCall = (phone: string) => {
 </script>
 
 <style lang="scss" scoped>
+
 .container {
   min-height: 100vh;
   background-color: $color-bg-page;
@@ -635,9 +750,8 @@ const makeCall = (phone: string) => {
   background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(10px);
   box-shadow: $shadow-sm;
-}
-
-.tabs {
+  
+  .tabs {
   display: flex;
   padding: 0 $spacing-lg;
   height: 88rpx;
@@ -1101,6 +1215,7 @@ const makeCall = (phone: string) => {
     }
   }
 }
+}
 
 .empty-state {
   display: flex;
@@ -1297,6 +1412,48 @@ const makeCall = (phone: string) => {
         border-radius: 100rpx;
       }
     }
+  }
+}
+
+.status-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+
+  .countdown-text {
+    font-size: 24rpx;
+    color: $color-primary;
+    font-weight: 600;
+    background: #FFF0E5;
+    padding: 2rpx 10rpx;
+    border-radius: 8rpx;
+  }
+
+  .fold-icon {
+    font-size: 24rpx;
+    color: $color-text-placeholder;
+    margin-left: 8rpx;
+  }
+}
+
+.summary-view {
+  background: #F9FAFB;
+  border-radius: 12rpx;
+  padding: 16rpx 24rpx;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  .summary-item {
+    display: flex;
+    align-items: center;
+    gap: 8rpx;
+
+    .icon { font-size: 24rpx; }
+    .text { font-size: 26rpx; color: $color-text-regular; }
+    
+    .price-symbol { font-size: 24rpx; color: $color-text-main; font-weight: 600; }
+    .price-val { font-size: 32rpx; color: $color-text-main; font-weight: 700; }
   }
 }
 </style>

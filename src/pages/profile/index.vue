@@ -97,6 +97,17 @@
     
     <view class="section-title">更多功能</view>
     <view class="menu-list">
+      <view class="menu-item" @click="navigateTo('/pages/profile/certification')">
+        <view class="left">
+          <text class="icon">🎓</text>
+          <text class="label">宠托师认证</text>
+        </view>
+        <view class="right-content">
+          <text class="status-text" v-if="userInfo?.sitterProfile?.isCertified">已认证</text>
+          <text class="arrow">></text>
+        </view>
+      </view>
+
       <view class="menu-item" @click="handleSwitchRole">
         <view class="left">
           <text class="icon">🔄</text>
@@ -118,6 +129,12 @@
         </view>
         <text class="arrow">></text>
       </view>
+    </view>
+
+    <!-- Brand Footer -->
+    <view class="brand-footer">
+       <image src="https://imgus.tangbuy.com/static/images/2026-02-07/fb3eeeb726ef43ea9a0020b18da5290e-177045207976112019662246898497843.jpeg" class="footer-logo" mode="heightFix" />
+       <text class="footer-text">宠乐到家 · 您的贴心宠托伙伴</text>
     </view>
   </view>
 </template>
@@ -189,7 +206,7 @@ const handleSwitchRole = () => {
 }
 
 .header-section {
-  padding: 100rpx $spacing-lg $spacing-lg;
+  padding: 40rpx $spacing-lg $spacing-lg;
 }
 
 .user-card {
@@ -206,37 +223,20 @@ const handleSwitchRole = () => {
     margin-bottom: $spacing-xl;
     
     .avatar-box {
+      width: 160rpx;
+      height: 160rpx;
+      margin-right: 24rpx;
+      border-radius: 50%;
+      background: #fff;
+      padding: 4rpx;
+      box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.08);
       position: relative;
-      margin-right: $spacing-md;
       
-      .avatar, .avatar-img {
-        width: 120rpx;
-        height: 120rpx;
-        background: linear-gradient(135deg, #FFD1DC 0%, #FFF0E5 100%);
+      .avatar-img, .avatar {
+        width: 100%;
+        height: 100%;
         border-radius: 50%;
-        border: 4rpx solid #FFFFFF;
-        box-shadow: $shadow-sm;
-      }
-
-      .edit-hint {
-        position: absolute;
-        top: 0;
-        right: 0;
-        font-size: 24rpx;
-        background: rgba(0,0,0,0.3);
-        border-radius: 50%;
-        padding: 4rpx;
-      }
-      
-      .status-dot {
-        position: absolute;
-        bottom: 4rpx;
-        right: 4rpx;
-        width: 24rpx;
-        height: 24rpx;
-        background: $color-success;
-        border: 2rpx solid #FFFFFF;
-        border-radius: 50%;
+        background-color: #eee;
       }
     }
     
@@ -256,6 +256,9 @@ const handleSwitchRole = () => {
         }
         
         .role-badge {
+          display: flex;
+          align-items: center;
+          justify-content: center;
           background: linear-gradient(90deg, #FF8E3C 0%, #FF6B6B 100%);
           padding: 4rpx 16rpx;
           border-radius: $radius-full;
@@ -268,6 +271,7 @@ const handleSwitchRole = () => {
             color: #FFFFFF;
             font-size: 20rpx;
             font-weight: 600;
+            line-height: 1;
           }
         }
       }
@@ -277,7 +281,8 @@ const handleSwitchRole = () => {
         color: #999;
         margin-bottom: 12rpx;
         background: rgba(0,0,0,0.03);
-        display: inline-block;
+        display: inline-flex;
+        align-items: center;
         padding: 4rpx 12rpx;
         border-radius: 8rpx;
       }
@@ -416,8 +421,8 @@ const handleSwitchRole = () => {
       position: relative;
       
       .pet-avatar {
-        width: 100rpx;
-        height: 100rpx;
+        width: 120rpx;
+        height: 120rpx;
         border-radius: 50%;
         margin-right: $spacing-md;
         background: #F5F6F8;
@@ -528,6 +533,39 @@ const handleSwitchRole = () => {
       color: #BFBFBF;
       font-size: 24rpx;
     }
+    
+    .right-content {
+      display: flex;
+      align-items: center;
+      
+      .status-text {
+        font-size: 24rpx;
+        color: $color-success;
+        margin-right: 12rpx;
+        background: rgba($color-success, 0.1);
+        padding: 2rpx 12rpx;
+        border-radius: 20rpx;
+      }
+    }
+  }
+}
+
+.brand-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60rpx 0 40rpx;
+  opacity: 0.6;
+  
+  .footer-logo {
+    height: 60rpx;
+    margin-bottom: 12rpx;
+  }
+  
+  .footer-text {
+    font-size: 20rpx;
+    color: $color-text-secondary;
   }
 }
 </style>

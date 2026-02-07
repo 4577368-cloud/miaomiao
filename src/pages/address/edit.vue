@@ -11,7 +11,13 @@
       </view>
       <view class="form-item">
         <text class="label">详细地址</text>
-        <textarea class="textarea" v-model="form.detail" placeholder="街道门牌、楼层房间号等信息" auto-height />
+        <view class="address-input-wrapper">
+          <textarea class="textarea" v-model="form.detail" placeholder="街道门牌、楼层房间号等信息" auto-height />
+          <view class="location-btn" @click="chooseLocation">
+            <text class="icon">📍</text>
+            <text>定位</text>
+          </view>
+        </view>
       </view>
       <view class="form-item">
         <text class="label">标签</text>
@@ -78,6 +84,25 @@ onLoad((options: any) => {
   }
 });
 
+const chooseLocation = () => {
+  uni.chooseLocation({
+    success: (res) => {
+      // res.name is the place name (e.g. "Sanlitun SOHO")
+      // res.address is the full address
+      if (res.name) {
+        form.detail = res.name;
+      } else if (res.address) {
+        form.detail = res.address;
+      }
+    },
+    fail: (err) => {
+      console.error('Choose location failed', err);
+      // Fallback for H5/Testing without map key working properly
+      uni.showToast({ title: '无法打开地图，请手动输入', icon: 'none' });
+    }
+  });
+};
+
 const handleSave = () => {
   if (!form.contactName) return uni.showToast({ title: '请填写联系人', icon: 'none' });
   if (!form.contactPhone) return uni.showToast({ title: '请填写手机号', icon: 'none' });
@@ -103,7 +128,15 @@ const handleSave = () => {
   }
   
   userStore.updateUser({ addresses });
-  uni.navigateBack();
+  
+  uni.showToast({
+    title: '保存成功',
+    icon: 'success'
+  });
+  
+  setTimeout(() => {
+    uni.navigateBack();
+  }, 800);
 };
 
 const handleDelete = () => {
@@ -154,11 +187,37 @@ const handleDelete = () => {
       color: $color-text-main;
     }
     
-    .textarea {
+    .address-input-wrapper {
       flex: 1;
-      font-size: 28rpx;
-      color: $color-text-main;
-      min-height: 40rpx;
+      display: flex;
+      align-items: center;
+      gap: 16rpx;
+
+      .textarea {
+        flex: 1;
+        font-size: 28rpx;
+        color: $color-text-main;
+        min-height: 40rpx;
+      }
+
+      .location-btn {
+        display: flex;
+        align-items: center;
+        gap: 4rpx;
+        padding: 8rpx 16rpx;
+        background-color: rgba($color-primary, 0.1);
+        border-radius: 24rpx;
+        
+        .icon {
+          font-size: 28rpx;
+        }
+        
+        text {
+          font-size: 24rpx;
+          color: $color-primary;
+          white-space: nowrap;
+        }
+      }
     }
     
     .tags {
@@ -192,6 +251,11 @@ const handleDelete = () => {
     
     &.switch-item {
       justify-content: space-between;
+      
+      .label {
+        width: auto;
+        white-space: nowrap;
+      }
     }
   }
 }

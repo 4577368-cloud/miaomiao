@@ -3,353 +3,481 @@
     <!-- 顶部导航栏占位 -->
     <view class="nav-placeholder"></view>
 
-    <view class="page-header">
-      <text class="title">发布需求</text>
-      <text class="subtitle">定制您的专属服务</text>
-    </view>
+    <!-- SITTER MODE: Update Availability -->
+    <block v-if="userStore.userInfo?.role === 'sitter'">
+      <view class="page-header">
+        <text class="title">服务管理</text>
+        <text class="subtitle">管理您的接单时间与服务内容</text>
+      </view>
 
-    <!-- 1. 服务类型 (Enhanced UI) -->
-    <view class="service-type-switch">
-      <view 
-        class="switch-item feeding"
-        :class="{ active: form.serviceType === ServiceType.FEEDING }"
-        @click="form.serviceType = ServiceType.FEEDING"
-      >
-        <text class="icon">🥣</text>
-        <view class="info">
-          <text class="label">上门喂养</text>
-          <text class="desc">喂食 · 换水 · 铲屎</text>
+      <view class="card-section">
+        <view class="section-header">
+          <text class="section-title">可服务时间</text>
         </view>
-        <view class="check-mark" v-if="form.serviceType === ServiceType.FEEDING">✓</view>
-      </view>
-      
-      <view 
-        class="switch-item walking"
-        :class="{ active: form.serviceType === ServiceType.WALKING }"
-        @click="form.serviceType = ServiceType.WALKING"
-      >
-        <text class="icon">🦮</text>
-        <view class="info">
-          <text class="label">上门遛宠</text>
-          <text class="desc">遛狗 · 陪玩 · 清洁</text>
+        <view class="time-options">
+          <view 
+            class="time-opt" 
+            :class="{ active: sitterForm.availability.time === 'Weekends' }"
+            @click="sitterForm.availability.time = 'Weekends'"
+          >仅周末</view>
+          <view 
+            class="time-opt" 
+            :class="{ active: sitterForm.availability.time === 'Weekdays' }"
+            @click="sitterForm.availability.time = 'Weekdays'"
+          >仅工作日</view>
+          <view 
+            class="time-opt" 
+            :class="{ active: sitterForm.availability.time === 'All' }"
+            @click="sitterForm.availability.time = 'All'"
+          >全周</view>
         </view>
-        <view class="check-mark" v-if="form.serviceType === ServiceType.WALKING">✓</view>
       </view>
-    </view>
 
-    <!-- 2. 地址与时间 (Refactored) -->
-    <view class="section card-section address-time-card">
-      <view class="form-row" @click="handleAddressSelect">
-        <view class="icon-box location">📍</view>
-        <view class="row-content">
-          <text class="row-label">服务地址</text>
-          <text class="row-value" :class="{ placeholder: !form.address }">
-            {{ form.address || '点击选择服务地址' }}
-          </text>
+      <view class="card-section">
+        <view class="section-header">
+          <text class="section-title">服务项目</text>
         </view>
-        <text class="arrow">></text>
+        <view class="checkbox-group">
+          <label class="checkbox-item" @click="toggleSitterService('feeding')">
+            <view class="checkbox" :class="{ checked: sitterForm.availability.services.includes('feeding') }">✓</view>
+            <text>上门喂养</text>
+          </label>
+          <label class="checkbox-item" @click="toggleSitterService('walking')">
+            <view class="checkbox" :class="{ checked: sitterForm.availability.services.includes('walking') }">✓</view>
+            <text>上门遛宠</text>
+          </label>
+        </view>
       </view>
-      
-      <view class="divider"></view>
-      
-      <!-- Date Range & Time Selection -->
-      <view class="time-selection-area">
-         <view class="time-header">
-            <text class="row-label">服务时间</text>
-            <view class="mode-switch">
-               <text 
-                  :class="{active: !isMultiDay}" 
-                  @click="isMultiDay = false"
-               >单次</text>
-               <text class="sep">|</text>
-               <text 
-                  :class="{active: isMultiDay}" 
-                  @click="isMultiDay = true"
-               >连续多天</text>
+
+      <button class="btn-submit" @click="handleSitterUpdate">保存设置</button>
+    </block>
+
+    <!-- OWNER MODE: Publish Task -->
+    <block v-else>
+      <!-- 1. 发布模式选择 (Task Hall vs Specific Sitter) -->
+      <view class="section card-section mode-selection">
+        <view class="section-header">
+          <text class="section-title">发布方式</text>
+        </view>
+        <view class="mode-grid">
+          <view 
+            class="mode-card mode-hall"
+            :class="{ active: !form.targetSitterId }"
+            @click="selectPublishMode('HALL')"
+          >
+            <view class="mode-info">
+              <text class="mode-title">任务大厅</text>
+              <text class="mode-desc">系统派单 / 多人抢单</text>
             </view>
-         </view>
-         
-         <!-- Single Date Picker -->
-         <picker 
-            v-if="!isMultiDay" 
-            mode="date" 
-            :start="startDate" 
-            :end="endDate" 
-            @change="handleDateChange"
-         >
-            <view class="date-display">
-               <text class="date-val">{{ form.date || '选择日期' }}</text>
-               <text class="icon">📅</text>
+            <view class="check-mark" v-if="!form.targetSitterId">✓</view>
+          </view>
+          
+          <view 
+            class="mode-card mode-sitter"
+            :class="{ active: form.targetSitterId, disabled: availableSitters.length === 0 }"
+            @click="availableSitters.length > 0 && selectPublishMode('SITTER')"
+          >
+            <view class="mode-info">
+              <text class="mode-title">指定宠托师</text>
+              <text class="mode-desc" v-if="availableSitters.length > 0">{{ availableSitters.length }}位宠托师在线</text>
+              <text class="mode-desc" v-else>暂无在线宠托师</text>
             </view>
-         </picker>
-         
-         <!-- Multi Date Picker (Mock with Start/End) -->
-         <view v-else class="multi-date-row">
-            <picker mode="date" :start="startDate" :end="endDate" @change="e => handleRangeChange('start', e)">
-               <view class="date-box">
-                  <text class="lbl">开始</text>
-                  <text class="val">{{ dateRange.start || '请选择' }}</text>
-               </view>
-            </picker>
-            <text class="arrow">→</text>
-            <picker mode="date" :start="dateRange.start || startDate" :end="endDate" @change="e => handleRangeChange('end', e)">
-               <view class="date-box">
-                  <text class="lbl">结束</text>
-                  <text class="val">{{ dateRange.end || '请选择' }}</text>
-               </view>
-            </picker>
-         </view>
-         
-         <!-- Time Slots -->
-         <view class="slots-container">
-            <scroll-view scroll-x class="slots-scroll">
-               <view class="slots-row">
-                  <view 
-                     v-for="t in timeSlots" 
-                     :key="t" 
-                     class="time-slot"
-                     :class="{active: form.time === t}"
-                     @click="form.time = t"
-                  >
-                     {{ t }}
-                  </view>
-               </view>
-            </scroll-view>
-         </view>
+            <view class="check-mark" v-if="form.targetSitterId">✓</view>
+          </view>
+        </view>
       </view>
-    </view>
 
-    <!-- 3. 宠物类型 -->
-    <view class="section card-section">
-      <view class="section-header">
-        <text class="section-title">宠物类型</text>
-        <text class="section-sub">选择体型以匹配合适的服务人员</text>
-      </view>
-      
-      <!-- My Pets Selection -->
-      <view class="my-pets">
-         <view class="section-header-row">
-            <text class="sub-label">从我的爱宠中选择：</text>
-            <view class="add-pet-link" @click="goToPetPage">
-               <text class="plus">+</text>
-               <text>管理/添加</text>
+      <!-- 2. 服务类型 -->
+      <view class="section card-section">
+        <view class="section-header">
+          <text class="section-title">服务类型</text>
+        </view>
+        <view class="service-type-switch">
+          <view 
+            class="switch-item feeding"
+            :class="{ active: form.serviceType === ServiceType.FEEDING, disabled: isServiceDisabled(ServiceType.FEEDING) }"
+            @click="selectServiceType(ServiceType.FEEDING)"
+          >
+            <view class="info">
+              <text class="label">上门喂养</text>
+              <text class="desc">喂食 · 换水 · 铲屎</text>
             </view>
-         </view>
-         
-         <scroll-view scroll-x class="pets-scroll">
-            <view class="pets-row">
-               <view 
-                  class="my-pet-item" 
-                  v-for="pet in userStore.userInfo?.pets" 
-                  :key="pet.id"
-                  :class="{ active: selectedPetId === pet.id }"
-                  @click="selectMyPet(pet)"
-               >
-                  <image :src="pet.avatar || '/static/default-pet.png'" mode="aspectFill" class="pet-avatar" />
-                  <text class="pet-name">{{ pet.name }}</text>
-               </view>
-               
-               <!-- Add Pet Card (Visible when list is empty or always at end) -->
-               <view class="my-pet-item add-item" @click="goToPetPage">
-                  <view class="add-icon">+</view>
-                  <text class="pet-name">添加爱宠</text>
-               </view>
+            <view class="check-mark" v-if="form.serviceType === ServiceType.FEEDING">✓</view>
+          </view>
+          
+          <view 
+            class="switch-item walking"
+            :class="{ active: form.serviceType === ServiceType.WALKING, disabled: isServiceDisabled(ServiceType.WALKING) }"
+            @click="selectServiceType(ServiceType.WALKING)"
+          >
+            <view class="info">
+              <text class="label">上门遛宠</text>
+              <text class="desc">遛狗 · 陪玩 · 清洁</text>
             </view>
-         </scroll-view>
-      </view>
-
-      <view class="pet-grid">
-        <view 
-          v-for="size in petSizes" 
-          :key="size.value"
-          :class="['pet-card', { active: form.petSize === size.value }]"
-          @click="form.petSize = size.value"
-        >
-          <text class="pet-icon">{{ size.value === PetSize.CAT ? '🐱' : '🐕' }}</text>
-          <text class="pet-name">{{ size.label }}</text>
-          <text class="pet-desc">{{ size.desc }}</text>
-          <view class="pet-badge" v-if="size.coeff > 1">+{{ Math.round((size.coeff - 1) * 100) }}%</view>
-        </view>
-      </view>
-    </view>
-
-    <!-- 4. 服务时长 (Refactored) -->
-    <view class="section card-section">
-      <view class="section-header">
-        <text class="section-title">服务时长</text>
-        <text class="section-sub">时长越长，陪伴越久</text>
-      </view>
-      <view class="duration-selector">
-        <view 
-          v-for="d in durations" 
-          :key="d.value"
-          class="duration-item"
-          :class="{ active: form.duration === d.value }"
-          @click="form.duration = d.value"
-        >
-          <view class="d-val">
-            <text class="num">{{ d.value }}</text>
-            <text class="unit">分钟</text>
+            <view class="check-mark" v-if="form.serviceType === ServiceType.WALKING">✓</view>
           </view>
-          <view class="d-price-tag" :class="{ 'has-markup': d.markup > 0 }">
-            {{ d.markup > 0 ? `+${Math.round(d.markup * 100)}%` : '标准价' }}
-          </view>
-          <view class="check-icon" v-if="form.duration === d.value">✓</view>
         </view>
       </view>
-    </view>
 
-    <!-- 5. 附加服务 -->
-    <view class="section card-section">
-      <view class="section-header">
-        <text class="section-title">附加服务</text>
-      </view>
-      <view class="addon-list">
-        <view 
-          class="addon-item" 
-          :class="{ active: form.addOns.play }"
-          @click="form.addOns.play = !form.addOns.play"
-        >
-          <view class="addon-info">
-            <text class="addon-name">陪玩15分钟</text>
-            <text class="addon-price">+¥{{ ADD_ON_PRICES.PLAY_15_MIN }}</text>
-          </view>
-          <view class="checkbox" :class="{ checked: form.addOns.play }"></view>
-        </view>
-        <view 
-          class="addon-item" 
-          :class="{ active: form.addOns.deepClean }"
-          @click="form.addOns.deepClean = !form.addOns.deepClean"
-        >
-          <view class="addon-info">
-            <text class="addon-name">深度清洁</text>
-            <text class="addon-price">+¥{{ ADD_ON_PRICES.DEEP_CLEAN }}</text>
-          </view>
-          <view class="checkbox" :class="{ checked: form.addOns.deepClean }"></view>
-        </view>
-        <view 
-          class="addon-item" 
-          :class="{ active: form.addOns.medicine }"
-          @click="form.addOns.medicine = !form.addOns.medicine"
-        >
-          <view class="addon-info">
-            <text class="addon-name">喂药服务</text>
-            <text class="addon-price">+¥{{ ADD_ON_PRICES.MEDICINE }}</text>
-          </view>
-          <view class="checkbox" :class="{ checked: form.addOns.medicine }"></view>
-        </view>
-      </view>
-    </view>
-    
-    <!-- 6. 优惠券 -->
-    <view class="section card-section" @click="openCouponSelector">
-      <view class="form-row">
-        <view class="icon-box coupon-icon">🎟️</view>
-        <view class="row-content">
-          <text class="row-label">优惠券</text>
-          <text class="row-value highlight" v-if="selectedCoupon">
-            -¥{{ selectedCoupon.value }}
-          </text>
-          <text class="row-value placeholder" v-else>
-            {{ availableCouponsCount > 0 ? `${availableCouponsCount}张可用` : '无可用优惠券' }}
-          </text>
-        </view>
-        <text class="arrow">></text>
-      </view>
-    </view>
-
-    <!-- 7. 备注 -->
-    <view class="section card-section">
-      <view class="section-header">
-        <text class="section-title">订单备注</text>
-      </view>
-      <view class="remark-box">
-        <textarea 
-          v-model="form.remark" 
-          placeholder="请填写宠物的特殊习惯、性格或注意事项..." 
-          class="remark-input" 
-          placeholder-style="color: #BFBFBF"
-          auto-height
-        />
-      </view>
-    </view>
-
-    <!-- 底部提示 -->
-    <view class="notice-section">
-      <view class="notice-item">🛡️ 宠托师已通过实名认证与专业培训</view>
-      <view class="notice-item">🏥 平台赠送全程意外保险</view>
-      <view class="notice-item">⏰ 服务前2小时可免费取消</view>
-    </view>
-
-    <!-- 底部价格栏 -->
-    <view class="footer-bar-placeholder"></view>
-    <view class="footer-bar">
-      <view class="price-container">
-        <text class="price-label">预估总价</text>
-        <view class="price-col">
-          <view class="price-val">
-            <text class="symbol">¥</text>
-            <text class="amount">{{ finalPrice }}</text>
-          </view>
-          <text class="original-price" v-if="finalPrice < rawTotalPrice">¥{{ rawTotalPrice }}</text>
-        </view>
-      </view>
-      <button class="btn-submit" @click="handleSubmit">立即发布</button>
-    </view>
-
-    <!-- 优惠券选择弹窗 -->
-    <view class="coupon-popup-mask" v-if="showCouponPopup" @click="closeCouponPopup">
-      <view class="coupon-popup-content" @click.stop>
-        <view class="popup-header">
-          <text class="popup-title">选择优惠券</text>
-          <text class="popup-close" @click="closeCouponPopup">×</text>
+      <!-- 3. 选择宠托师 (Only if Specific Sitter mode is active) -->
+      <view class="section card-section sitter-select-card" v-if="form.targetSitterId || showSitterSelector">
+        <view class="section-header">
+          <text class="section-title">选择宠托师</text>
         </view>
         
-        <scroll-view scroll-y class="coupon-scroll">
-          <view class="coupon-list">
-             <!-- 不使用优惠券选项 -->
+        <scroll-view scroll-x class="sitter-scroll">
+          <view class="sitter-list">
             <view 
-              class="no-coupon-item" 
-              :class="{ active: !form.couponId }"
-              @click="selectCoupon('')"
+              v-for="sitter in availableSitters" 
+              :key="sitter.id"
+              class="sitter-card"
+              :class="{ active: form.targetSitterId === sitter.id }"
+              @click="selectSitter(sitter)"
             >
-              <text>不使用优惠券</text>
-              <view class="radio-circle" :class="{ checked: !form.couponId }"></view>
-            </view>
-
-            <!-- 优惠券列表 -->
-            <view 
-              class="coupon-card-item" 
-              v-for="coupon in availableCoupons" 
-              :key="coupon.id"
-              @click="selectCoupon(coupon.id)"
-            >
-              <view class="card-left">
-                <view class="amount-box">
-                  <text class="symbol">¥</text>
-                  <text class="num">{{ coupon.value }}</text>
+              <image :src="sitter.avatar" class="avatar" mode="aspectFill" />
+              <view class="name-row">
+                <text class="name">{{ sitter.nickname }}</text>
+                <view :class="['level-badge', sitter.sitterProfile?.level.toLowerCase()]">
+                  {{ getLevelLabel(sitter.sitterProfile?.level) }}
                 </view>
-                <text class="condition">{{ coupon.threshold > 0 ? `满${coupon.threshold}可用` : '无门槛' }}</text>
               </view>
-              <view class="card-right">
-                <view class="info">
-                  <text class="name">{{ coupon.name }}</text>
-                  <text class="date">有效期至 {{ new Date(coupon.expiresAt).toLocaleDateString() }}</text>
-                </view>
-                <view class="radio-circle" :class="{ checked: form.couponId === coupon.id }"></view>
-              </view>
-              <!-- 锯齿装饰 -->
-              <view class="sawtooth-left"></view>
-              <view class="sawtooth-right"></view>
-            </view>
-            
-            <view v-if="availableCoupons.length === 0" class="empty-coupons">
-              <text>暂无可用优惠券</text>
+              <text class="desc">{{ sitter.sitterProfile?.experienceYears }}年经验 | {{ sitter.sitterProfile?.tags[0] }}</text>
+              <view class="check-mark" v-if="form.targetSitterId === sitter.id">✓</view>
             </view>
           </view>
         </scroll-view>
       </view>
-    </view>
+
+      <!-- 4. 地址与时间 -->
+      <view class="section card-section address-time-card">
+        <view class="form-row" @click="handleAddressSelect">
+          <view class="icon-box location">📍</view>
+          <view class="row-content">
+            <text class="row-label">服务地址</text>
+            <text class="row-value" :class="{ placeholder: !form.address }">
+              {{ form.address || '点击选择服务地址' }}
+            </text>
+          </view>
+          <text class="arrow">></text>
+        </view>
+        
+        <view class="divider"></view>
+        
+        <!-- Date Range & Time Selection -->
+        <view class="time-selection-area">
+           <view class="time-header">
+              <text class="row-label">服务时间</text>
+              <view class="mode-switch">
+                 <text 
+                    :class="{active: !isMultiDay}" 
+                    @click="isMultiDay = false"
+                 >单次</text>
+                 <text class="sep">|</text>
+                 <text 
+                    :class="{active: isMultiDay}" 
+                    @click="isMultiDay = true"
+                 >连续多天</text>
+              </view>
+           </view>
+           
+           <picker 
+              v-if="!isMultiDay" 
+              mode="date" 
+              :start="startDate" 
+              :end="endDate" 
+              @change="handleDateChange"
+           >
+              <view class="date-display">
+                 <text class="date-val">{{ form.date || '选择日期' }}</text>
+                 <text class="icon">📅</text>
+              </view>
+           </picker>
+           
+           <view v-else class="multi-date-row">
+              <picker mode="date" :start="startDate" :end="endDate" @change="e => handleRangeChange('start', e)">
+                 <view class="date-box">
+                    <text class="lbl">开始</text>
+                    <text class="val">{{ dateRange.start || '请选择' }}</text>
+                 </view>
+              </picker>
+              <text class="arrow">→</text>
+              <picker mode="date" :start="dateRange.start || startDate" :end="endDate" @change="e => handleRangeChange('end', e)">
+                 <view class="date-box">
+                    <text class="lbl">结束</text>
+                    <text class="val">{{ dateRange.end || '请选择' }}</text>
+                 </view>
+              </picker>
+           </view>
+           
+           <view class="slots-container">
+              <scroll-view scroll-x class="slots-scroll">
+                 <view class="slots-row">
+                    <view 
+                       v-for="t in timeSlots" 
+                       :key="t" 
+                       class="time-slot"
+                       :class="{active: form.time === t}"
+                       @click="form.time = t"
+                    >
+                       {{ t }}
+                    </view>
+                 </view>
+              </scroll-view>
+           </view>
+        </view>
+      </view>
+
+      <!-- 4. 宠物类型 -->
+      <view class="section card-section">
+        <view class="section-header">
+          <text class="section-title">宠物类型</text>
+          <text class="section-sub">选择体型以匹配合适的服务人员</text>
+        </view>
+        
+        <view class="my-pets">
+           <view class="section-header-row">
+              <text class="sub-label">从我的爱宠中选择：</text>
+              <view class="add-pet-link" @click="goToPetPage">
+                 <text class="plus">+</text>
+                 <text>管理/添加</text>
+              </view>
+           </view>
+           
+           <scroll-view scroll-x class="pets-scroll">
+              <view class="pets-row">
+                 <view 
+                    class="my-pet-item" 
+                    v-for="pet in userStore.userInfo?.pets" 
+                    :key="pet.id"
+                    :class="{ active: selectedPetId === pet.id }"
+                    @click="selectMyPet(pet)"
+                 >
+                    <image :src="pet.avatar || '/static/default-pet.png'" mode="aspectFill" class="pet-avatar" />
+                    <text class="pet-name">{{ pet.name }}</text>
+                 </view>
+                 
+                 <view class="my-pet-item add-item" @click="goToPetPage">
+                    <view class="add-icon">+</view>
+                    <text class="pet-name">添加爱宠</text>
+                 </view>
+              </view>
+           </scroll-view>
+        </view>
+
+        <view class="pet-grid">
+          <view 
+            v-for="size in petSizes" 
+            :key="size.value"
+            :class="['pet-card', { active: form.petSize === size.value }]"
+            @click="form.petSize = size.value"
+          >
+            <image :src="size.image" mode="aspectFill" class="pet-icon-img" />
+            <text class="pet-name">{{ size.label }}</text>
+            <text class="pet-desc">{{ size.desc }}</text>
+            <view class="pet-badge" v-if="size.coeff > 1">+{{ Math.round((size.coeff - 1) * 100) }}%</view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 5. 服务时长 -->
+      <view class="section card-section">
+        <view class="section-header">
+          <text class="section-title">服务时长</text>
+          <text class="section-sub">时长越长，陪伴越久</text>
+        </view>
+        <view class="duration-selector">
+          <view 
+            v-for="d in durations" 
+            :key="d.value"
+            class="duration-item"
+            :class="{ active: form.duration === d.value }"
+            @click="form.duration = d.value"
+          >
+            <view class="d-val">
+              <text class="num">{{ d.value }}</text>
+              <text class="unit">分钟</text>
+            </view>
+            <view class="d-price-tag" :class="{ 'has-markup': d.markup > 0 }">
+              {{ d.markup > 0 ? `+${Math.round(d.markup * 100)}%` : '标准价' }}
+            </view>
+            <view class="check-icon" v-if="form.duration === d.value">✓</view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 6. 附加服务 -->
+      <view class="section card-section">
+        <view class="section-header">
+          <text class="section-title">附加服务</text>
+        </view>
+        <view class="addon-list">
+          <view 
+            class="addon-item" 
+            :class="{ active: form.addOns.play }"
+            @click="form.addOns.play = !form.addOns.play"
+          >
+            <view class="addon-info">
+              <text class="addon-name">陪玩15分钟</text>
+              <text class="addon-price">+¥{{ ADD_ON_PRICES.PLAY_15_MIN }}</text>
+            </view>
+            <view class="checkbox" :class="{ checked: form.addOns.play }"></view>
+          </view>
+          <view 
+            class="addon-item" 
+            :class="{ active: form.addOns.deepClean }"
+            @click="form.addOns.deepClean = !form.addOns.deepClean"
+          >
+            <view class="addon-info">
+              <text class="addon-name">深度清洁</text>
+              <text class="addon-price">+¥{{ ADD_ON_PRICES.DEEP_CLEAN }}</text>
+            </view>
+            <view class="checkbox" :class="{ checked: form.addOns.deepClean }"></view>
+          </view>
+          <view 
+            class="addon-item" 
+            :class="{ active: form.addOns.medicine }"
+            @click="form.addOns.medicine = !form.addOns.medicine"
+          >
+            <view class="addon-info">
+              <text class="addon-name">喂药服务</text>
+              <text class="addon-price">+¥{{ ADD_ON_PRICES.MEDICINE }}</text>
+            </view>
+            <view class="checkbox" :class="{ checked: form.addOns.medicine }"></view>
+          </view>
+        </view>
+      </view>
+      
+      <!-- 7. 优惠券 -->
+      <view class="section card-section" @click="openCouponSelector">
+        <view class="form-row">
+          <view class="icon-box coupon-icon">🎟️</view>
+          <view class="row-content">
+            <text class="row-label">优惠券</text>
+            <text class="row-value highlight" v-if="selectedCoupon">
+              -¥{{ selectedCoupon.value }}
+            </text>
+            <text class="row-value placeholder" v-else>
+              {{ availableCouponsCount > 0 ? `${availableCouponsCount}张可用` : '无可用优惠券' }}
+            </text>
+          </view>
+          <text class="arrow">></text>
+        </view>
+      </view>
+
+      <!-- 8. 备注 -->
+      <view class="section card-section">
+        <view class="section-header">
+          <text class="section-title">订单备注</text>
+        </view>
+        <view class="remark-box">
+          <textarea 
+            v-model="form.remark" 
+            placeholder="请填写宠物的特殊习惯、性格或注意事项..." 
+            class="remark-input" 
+            placeholder-style="color: #BFBFBF"
+            auto-height
+          />
+        </view>
+      </view>
+
+      <!-- 底部保障 -->
+      <view class="service-guarantee">
+        <view class="guarantee-header">
+           <text class="line"></text>
+           <text class="title">平台服务保障</text>
+           <text class="line"></text>
+        </view>
+        <view class="guarantee-grid">
+           <view class="g-item">
+              <view class="icon-box">🛡️</view>
+              <text class="g-title">实名认证</text>
+              <text class="g-desc">专业培训上岗</text>
+           </view>
+           <view class="g-item">
+              <view class="icon-box">🏥</view>
+              <text class="g-title">意外保险</text>
+              <text class="g-desc">全程赠送保险</text>
+           </view>
+           <view class="g-item">
+              <view class="icon-box">⏰</view>
+              <text class="g-title">免费取消</text>
+              <text class="g-desc">服务前2小时</text>
+           </view>
+        </view>
+      </view>
+
+      <!-- 底部价格栏 -->
+      <view class="footer-bar-placeholder"></view>
+      <view class="footer-bar">
+        <view class="price-container">
+          <text class="price-label">预估总价</text>
+          <view class="price-col">
+            <view class="price-val">
+              <text class="symbol">¥</text>
+              <text class="amount">{{ finalPrice }}</text>
+            </view>
+            <text class="original-price" v-if="finalPrice < rawTotalPrice">¥{{ rawTotalPrice }}</text>
+          </view>
+        </view>
+        <button class="btn-submit" @click="handleSubmit">
+          {{ form.targetSitterId ? '立即预约' : '发布需求' }}
+        </button>
+      </view>
+
+      <!-- 优惠券选择弹窗 -->
+      <view class="coupon-popup-mask" v-if="showCouponPopup" @click="closeCouponPopup">
+        <view class="coupon-popup-content" @click.stop>
+          <view class="popup-header">
+            <text class="popup-title">选择优惠券</text>
+            <text class="popup-close" @click="closeCouponPopup">×</text>
+          </view>
+          
+          <scroll-view scroll-y class="coupon-scroll">
+            <view class="coupon-list">
+               <!-- 不使用优惠券选项 -->
+              <view 
+                class="no-coupon-item" 
+                :class="{ active: !form.couponId }"
+                @click="selectCoupon('')"
+              >
+                <text>不使用优惠券</text>
+                <view class="radio-circle" :class="{ checked: !form.couponId }"></view>
+              </view>
+
+              <!-- 优惠券列表 -->
+              <view 
+                class="coupon-card-item" 
+                v-for="coupon in availableCoupons" 
+                :key="coupon.id"
+                @click="selectCoupon(coupon.id)"
+              >
+                <view class="card-left">
+                  <view class="amount-box">
+                    <text class="symbol">¥</text>
+                    <text class="num">{{ coupon.value }}</text>
+                  </view>
+                  <text class="condition">{{ coupon.threshold > 0 ? `满${coupon.threshold}可用` : '无门槛' }}</text>
+                </view>
+                <view class="card-right">
+                  <view class="info">
+                    <text class="name">{{ coupon.name }}</text>
+                    <text class="date">有效期至 {{ new Date(coupon.expiresAt).toLocaleDateString() }}</text>
+                  </view>
+                  <view class="radio-circle" :class="{ checked: form.couponId === coupon.id }"></view>
+                </view>
+                <!-- 锯齿装饰 -->
+                <view class="sawtooth-left"></view>
+                <view class="sawtooth-right"></view>
+              </view>
+              
+              <view v-if="availableCoupons.length === 0" class="empty-coupons">
+                <text>暂无可用优惠券</text>
+              </view>
+            </view>
+          </scroll-view>
+        </view>
+      </view>
+    </block>
   </view>
 </template>
 
@@ -360,32 +488,23 @@ import { PetSize, ServiceType, ADD_ON_PRICES, PET_SIZE_COEFFICIENTS } from '@/co
 import { calculateTotalPrice } from '@/utils/pricing';
 import { useOrderStore } from '@/stores/order';
 import { useUserStore, type PetInfo, type Address } from '@/stores/user';
+import { useSitterStore } from '@/stores/sitter';
 
 const orderStore = useOrderStore();
 const userStore = useUserStore();
+const sitterStore = useSitterStore();
 const BASE_PRICE = 50; 
 
+// OWNER LOGIC
 const selectedPetId = ref<string>('');
 const showCouponPopup = ref(false);
 const lastPetCount = ref(0);
+const showSitterSelector = ref(false);
 
-const selectMyPet = (pet: PetInfo) => {
-  if (selectedPetId.value === pet.id) {
-    selectedPetId.value = '';
-    form.remark = '';
-    return;
-  }
-  
-  selectedPetId.value = pet.id;
-  form.petSize = pet.size;
-  
-  // Auto-fill remark with pet info if available
-  if (pet.description) {
-    form.remark = `[${pet.name}] ${pet.description}`;
-  }
-}; 
+const availableSitters = computed(() => sitterStore.availableSitters);
 
 const form = reactive({
+  targetSitterId: null as string | null,
   address: '',
   contactName: '',
   contactPhone: '',
@@ -404,1096 +523,1111 @@ const form = reactive({
   }
 });
 
-const goToPetPage = () => {
-  uni.navigateTo({ url: '/pages/pet/index' });
+// SITTER LOGIC
+const sitterForm = reactive({
+  availability: {
+    time: 'Weekends',
+    locations: [],
+    services: [] as string[]
+  }
+});
+
+// Initialize Sitter Form
+const initSitterForm = () => {
+  if (userStore.userInfo?.sitterProfile?.availability) {
+    sitterForm.availability = JSON.parse(JSON.stringify(userStore.userInfo.sitterProfile.availability));
+  }
 };
 
-// 日期范围: 今天 ~ 30天后
-const today = new Date();
-const startDate = today.toISOString().split('T')[0];
-const maxDate = new Date();
-maxDate.setDate(today.getDate() + 30);
-const endDate = maxDate.toISOString().split('T')[0];
+const toggleSitterService = (svc: string) => {
+  const list = sitterForm.availability.services;
+  const idx = list.indexOf(svc);
+  if (idx > -1) list.splice(idx, 1);
+  else list.push(svc);
+};
 
-const serviceTypes = [
-  { label: '上门喂养', value: ServiceType.FEEDING },
-  { label: '上门遛宠', value: ServiceType.WALKING },
-];
+const handleSitterUpdate = () => {
+  userStore.updateUser({
+    sitterProfile: {
+      ...userStore.userInfo!.sitterProfile!,
+      availability: sitterForm.availability
+    }
+  });
+  uni.showToast({ title: '设置已更新', icon: 'success' });
+};
+
+const selectPublishMode = (mode: 'HALL' | 'SITTER') => {
+  if (mode === 'HALL') {
+    form.targetSitterId = null;
+    showSitterSelector.value = false;
+  } else {
+    showSitterSelector.value = true;
+    // Auto-select first sitter if none selected
+    if (!form.targetSitterId && availableSitters.value.length > 0) {
+      form.targetSitterId = availableSitters.value[0].id;
+    }
+  }
+};
+
+// OWNER ACTIONS
+const selectSitter = (sitter: any) => {
+  if (!sitter) {
+    // Should not happen in new UI logic for sitter card click
+    return;
+  }
+  form.targetSitterId = sitter.id;
+};
+
+const isServiceDisabled = (type: ServiceType) => {
+  if (!form.targetSitterId) return false;
+  const sitter = availableSitters.value.find(s => s.id === form.targetSitterId);
+  if (sitter && sitter.sitterProfile?.availability?.services) {
+    return !sitter.sitterProfile.availability.services.includes(type);
+  }
+  return false;
+};
+
+const selectServiceType = (type: ServiceType) => {
+  if (isServiceDisabled(type)) {
+     uni.showToast({ title: '当前宠托师不支持该服务', icon: 'none' });
+     return;
+  }
+  form.serviceType = type;
+};
+
+// Date/Time Logic
+const today = new Date();
+const startDate = ref(today.toISOString().split('T')[0]);
+const endDate = ref(new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+const isMultiDay = ref(false);
+const dateRange = reactive({ start: '', end: '' });
+
+const timeSlots = ['08:00', '09:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00', '19:00', '20:00'];
+
+const handleDateChange = (e: any) => {
+  form.date = e.detail.value;
+};
+
+const handleRangeChange = (type: 'start' | 'end', e: any) => {
+   if (type === 'start') dateRange.start = e.detail.value;
+   else dateRange.end = e.detail.value;
+   
+   if (dateRange.start && dateRange.end) {
+      form.date = `${dateRange.start} 至 ${dateRange.end}`;
+   }
+};
+
+// Address
+const handleAddressSelect = () => {
+  uni.chooseLocation({
+    success: (res) => {
+      form.address = res.address + (res.name ? ` (${res.name})` : '');
+    },
+    fail: () => {
+       // Mock for dev
+       form.address = '北京市朝阳区三里屯SOHO';
+    }
+  });
+};
+
+// Pet
+const goToPetPage = () => {
+   uni.navigateTo({ url: '/pages/pet/index' });
+};
+
+const selectMyPet = (pet: PetInfo) => {
+   selectedPetId.value = pet.id;
+   form.petSize = pet.size; // Auto-select size
+   form.remark = `${pet.breed} - ${pet.age}岁`;
+};
 
 const petSizes = [
-  { label: '猫咪', value: PetSize.CAT, desc: '1-15kg', coeff: PET_SIZE_COEFFICIENTS[PetSize.CAT] },
-  { label: '小型犬', value: PetSize.SMALL, desc: '1-10kg', coeff: PET_SIZE_COEFFICIENTS[PetSize.SMALL] },
-  { label: '中型犬', value: PetSize.MEDIUM, desc: '10-25kg', coeff: PET_SIZE_COEFFICIENTS[PetSize.MEDIUM] },
-  { label: '大型犬', value: PetSize.LARGE, desc: '25-40kg', coeff: PET_SIZE_COEFFICIENTS[PetSize.LARGE] },
-  { label: '巨型犬', value: PetSize.GIANT, desc: '40kg+', coeff: PET_SIZE_COEFFICIENTS[PetSize.GIANT] },
+  { value: PetSize.CAT, label: '猫咪', desc: '不限体重', coeff: PET_SIZE_COEFFICIENTS[PetSize.CAT], image: '/static/avatars/cat-british.jpg' },
+  { value: PetSize.SMALL, label: '小型犬', desc: '<10kg', coeff: PET_SIZE_COEFFICIENTS[PetSize.SMALL], image: '/static/avatars/dog-pomeranian.jpg' },
+  { value: PetSize.MEDIUM, label: '中型犬', desc: '10-25kg', coeff: PET_SIZE_COEFFICIENTS[PetSize.MEDIUM], image: '/static/avatars/dog-corgi.jpg' },
+  { value: PetSize.LARGE, label: '大型犬', desc: '>25kg', coeff: PET_SIZE_COEFFICIENTS[PetSize.LARGE], image: '/static/avatars/dog-golden.jpg' }
 ];
 
+// Duration
 const durations = [
-  { label: '30分钟', value: 30, markup: 0 },
-  { label: '45分钟', value: 45, markup: 0.15 },
-  { label: '60分钟', value: 60, markup: 0.30 },
-  { label: '90分钟', value: 90, markup: 0.50 },
+  { value: 30, markup: 0 },
+  { value: 45, markup: 0.2 },
+  { value: 60, markup: 0.4 },
+  { value: 90, markup: 0.7 }
 ];
 
+// Coupons
+const openCouponSelector = () => {
+   showCouponPopup.value = true;
+};
+const closeCouponPopup = () => {
+   showCouponPopup.value = false;
+};
+const selectCoupon = (id: string) => {
+   form.couponId = id;
+};
+
+const availableCoupons = computed(() => {
+   if (!userStore.userInfo?.coupons) return [];
+   // Simple logic: filter active
+   return userStore.userInfo.coupons.filter(c => c.status === 'active');
+});
+
+const availableCouponsCount = computed(() => availableCoupons.value.length);
+const selectedCoupon = computed(() => {
+   if (!form.couponId) return null;
+   return availableCoupons.value.find(c => c.id === form.couponId);
+});
+
+
+// Price Calculation
 const rawTotalPrice = computed(() => {
   return calculateTotalPrice({
     basePrice: BASE_PRICE,
+    serviceType: form.serviceType,
     petSize: form.petSize,
     durationMarkup: durations.find(d => d.value === form.duration)?.markup || 0,
     addOns: form.addOns
   });
 });
 
-const selectedCoupon = computed(() => {
-  if (!form.couponId) return null;
-  return userStore.userInfo?.coupons?.find(c => c.id === form.couponId) || null;
-});
-
-const availableCoupons = computed(() => {
-  return userStore.userInfo?.coupons?.filter(c => 
-    c.status === 'UNUSED' && 
-    c.expiresAt > Date.now() && 
-    (c.threshold === 0 || c.threshold <= rawTotalPrice.value)
-  ) || [];
-});
-
-const availableCouponsCount = computed(() => availableCoupons.value.length);
-
 const finalPrice = computed(() => {
   let price = rawTotalPrice.value;
   if (selectedCoupon.value) {
-    if (selectedCoupon.value.threshold > 0 && price < selectedCoupon.value.threshold) {
-      // Coupon no longer valid due to price change
-      return price;
-    }
-    price = Math.max(0, price - selectedCoupon.value.value);
+     if (selectedCoupon.value.threshold > 0 && price < selectedCoupon.value.threshold) {
+        // threshold not met
+     } else {
+        price -= selectedCoupon.value.value;
+     }
   }
-  return price;
+  return Math.max(0.01, price); // Minimum price
 });
 
-// Alias for template compatibility
-const totalPrice = finalPrice;
 
+const handleSubmit = () => {
+  if (!form.address) return uni.showToast({ title: '请选择地址', icon: 'none' });
+  if (!form.date) return uni.showToast({ title: '请选择时间', icon: 'none' });
+  if (!form.time) return uni.showToast({ title: '请选择时间段', icon: 'none' });
+  
+  // Create Order
+  const newOrder = {
+    userId: userStore.userInfo?.id || 'temp',
+    sitterId: form.targetSitterId, // Null = Task Hall
+    serviceType: form.serviceType,
+    status: 'PENDING',
+    totalPrice: finalPrice.value,
+    address: form.address,
+    time: `${form.date} ${form.time}`,
+    petSize: form.petSize,
+    duration: form.duration,
+    remark: form.remark,
+    addOns: form.addOns,
+    createdAt: Date.now()
+  };
+  
+  orderStore.createOrder(newOrder);
+  
+  uni.showToast({ title: '发布成功', icon: 'success' });
+  setTimeout(() => {
+    uni.switchTab({ url: '/pages/orders/index' });
+  }, 1500);
+};
+
+// Lifecycle
 onLoad((options: any) => {
-  // Initialize lastPetCount
-  lastPetCount.value = userStore.userInfo?.pets?.length || 0;
-
-  if (options.serviceType) {
-    // Ensure the service type is valid before setting
-    const type = options.serviceType as ServiceType;
-    if (Object.values(ServiceType).includes(type)) {
-      form.serviceType = type;
+  if (options && options.serviceType) {
+    if (Object.values(ServiceType).includes(options.serviceType)) {
+      form.serviceType = options.serviceType as ServiceType;
     }
   }
-  if (options.couponId) {
-    form.couponId = options.couponId;
-  }
-  
-  // Listen for address selection
-  uni.$on('addressSelected', (addr: Address) => {
-    // form.address = `${addr.name ? addr.name + ' ' : ''}${addr.detail} (${addr.contactName} ${addr.contactPhone})`;
-    // User requested to remove the label (e.g. "Home") and just show detail + contact
-    form.address = `${addr.detail} (${addr.contactName} ${addr.contactPhone})`;
-    form.contactName = addr.contactName;
-    form.contactPhone = addr.contactPhone;
-  });
 });
 
 onShow(() => {
-  const currentPets = userStore.userInfo?.pets || [];
-  
-  // If selectedPetId is set but pet no longer exists (deleted), clear it
-  if (selectedPetId.value && !currentPets.find(p => p.id === selectedPetId.value)) {
-     selectedPetId.value = '';
-     form.remark = '';
-  }
-  
-  // Auto-select logic
-  if (currentPets.length > 0) {
-      // Case 1: First pet added or Single pet default selection
-      if (!selectedPetId.value && currentPets.length === 1) {
-          // Only select if we didn't explicitly deselect (hard to track "explicit deselect", so just auto-select for now)
-          selectMyPet(currentPets[0]);
-      }
-      // Case 2: New pet added (count increased)
-      else if (currentPets.length > lastPetCount.value) {
-          // Select the last added pet
-          const newPet = currentPets[currentPets.length - 1];
-          if (newPet.id !== selectedPetId.value) {
-             selectMyPet(newPet);
-          }
-      }
-  }
-  
-  lastPetCount.value = currentPets.length;
-});
-
-onUnmounted(() => {
-  uni.$off('addressSelected');
-});
-
-const isMultiDay = ref(false);
-const dateRange = reactive({ start: '', end: '' });
-const timeSlots = computed(() => {
-  const slots = [];
-  for (let h = 8; h <= 22; h++) {
-    slots.push(`${h.toString().padStart(2, '0')}:00`);
-    if (h < 22) slots.push(`${h.toString().padStart(2, '0')}:30`);
-  }
-  return slots;
-});
-
-const handleRangeChange = (type: 'start' | 'end', e: any) => {
-  const val = e.detail.value;
-  if (type === 'start') {
-    dateRange.start = val;
-    if (dateRange.end && val > dateRange.end) dateRange.end = '';
-  } else {
-    dateRange.end = val;
-  }
-  if (dateRange.start && dateRange.end) {
-    form.date = `${dateRange.start} 至 ${dateRange.end}`;
-  } else if (dateRange.start) {
-    form.date = dateRange.start;
-  }
-};
-
-const handleAddressSelect = () => {
-  uni.navigateTo({
-    url: '/pages/address/index?action=select'
-  });
-};
-
-const openCouponSelector = () => {
-  showCouponPopup.value = true;
-};
-
-const closeCouponPopup = () => {
-  showCouponPopup.value = false;
-};
-
-const selectCoupon = (id: string) => {
-  form.couponId = id;
-  closeCouponPopup();
-};
-
-const handleDateChange = (e: any) => {
-  form.date = e.detail.value;
-};
-
-const handleTimeChange = (e: any) => {
-  form.time = e.detail.value;
-};
-
-const handleSubmit = () => {
-  if (!selectedPetId.value) {
-    uni.showModal({
-      title: '温馨提示',
-      content: '请先选择需要服务的爱宠，以便宠托师了解详情',
-      confirmText: '去添加',
-      cancelText: '再看看',
-      success: (res) => {
-        if (res.confirm) {
-          goToPetPage();
-        }
-      }
-    });
+  if (!userStore.isLoggedIn) {
+    uni.reLaunch({ url: '/pages/login/index' });
     return;
   }
-
-  if (!form.address) return uni.showToast({ title: '请选择地址', icon: 'none' });
-  if (!form.date || !form.time) return uni.showToast({ title: '请选择时间', icon: 'none' });
-
-  uni.showLoading({ title: '创建订单中...' });
-
-  setTimeout(() => {
-    uni.hideLoading();
-    
-    // Check balance
-    const currentBalance = userStore.userInfo?.balance || 0;
-    const price = finalPrice.value;
-    
-    if (currentBalance < price) {
-        uni.showModal({
-            title: '余额不足',
-            content: `当前余额 ¥${currentBalance.toFixed(2)}，需支付 ¥${price}。\n请先充值。`,
-            confirmText: '去充值',
-            cancelText: '取消',
-            success: (res) => {
-                if (res.confirm) {
-                    uni.navigateTo({ url: '/pages/wallet/index' });
-                }
-            }
-        });
-        return;
-    }
-
-    uni.showModal({
-      title: '确认支付',
-      content: `需支付 ¥${finalPrice.value} 元\n(当前余额 ¥${currentBalance.toFixed(2)})`,
-      confirmText: '立即支付',
-      cancelText: '取消',
-      success: (res) => {
-        if (res.confirm) {
-          if (userStore.deductBalance(price)) {
-              uni.showToast({ title: '支付成功', icon: 'success' });
-              
-              const pet = userStore.userInfo?.pets?.find(p => p.id === selectedPetId.value);
-              
-              orderStore.addOrder({
-                id: Date.now().toString(),
-                creatorId: userStore.userInfo?.id || 'anonymous',
-                serviceType: form.serviceType,
-                petSize: form.petSize,
-                duration: form.duration,
-                totalPrice: finalPrice.value,
-                address: form.address,
-                time: `${form.date} ${form.time}`,
-                status: 'PENDING',
-                isPaid: true,
-                createdAt: Date.now(),
-                remark: form.remark,
-                addOns: form.addOns,
-                // Enhanced fields
-                petName: pet?.name,
-                petBreed: pet?.type === 'cat' ? '猫咪' : '狗狗',
-                petGender: pet?.gender,
-                petAge: pet?.age,
-                petWeight: pet?.weight,
-                petSnapshot: pet,
-                contactName: form.contactName,
-                contactPhone: form.contactPhone
-              });
-              
-              // Use coupon if selected
-              if (form.couponId) {
-                userStore.useCoupon(form.couponId);
-              }
-              
-              setTimeout(() => {
-                uni.switchTab({ url: '/pages/orders/index' });
-              }, 1500);
-          } else {
-             uni.showToast({ title: '扣款失败', icon: 'none' });
-          }
-        }
-      }
-    });
-  }, 500);
-};
+  
+  // Sitter Mode Check
+  if (userStore.userInfo?.role === 'sitter') {
+    initSitterForm();
+  }
+  
+  // Refresh Pets
+  if (userStore.userInfo?.pets?.length) {
+     const currentCount = userStore.userInfo.pets.length;
+     if (currentCount > lastPetCount.value) {
+        // New pet added, select it
+        const newPet = userStore.userInfo.pets[userStore.userInfo.pets.length - 1];
+        selectMyPet(newPet);
+     }
+     lastPetCount.value = currentCount;
+  }
+});
 </script>
 
 <style lang="scss" scoped>
-.my-pets {
-  margin-bottom: 20px;
-  
-  .section-header-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12rpx;
-    
-    .sub-label {
-      font-size: 26rpx;
-      color: #666;
-      margin-bottom: 0;
-    }
-    
-    .add-pet-link {
-      display: flex;
-      align-items: center;
-      font-size: 26rpx;
-      color: #FF8E3C;
-      font-weight: 500;
-      
-      .plus {
-        font-size: 32rpx;
-        margin-right: 4rpx;
-        line-height: 1;
-      }
-    }
-  }
-  
-  .pets-scroll {
-    width: 100%;
-    white-space: nowrap;
-  }
-  
-  .pets-row {
-    display: flex;
-    padding-bottom: 4px;
-  }
-  
-  .my-pet-item {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: center;
-    margin-right: 16px;
-    opacity: 0.6;
-    transition: all 0.3s;
-    
-    &.active {
-      opacity: 1;
-      transform: scale(1.05);
-      
-      .pet-avatar {
-        border: 2px solid #FF8E3C;
-      }
-      
-      .pet-name {
-        color: #FF8E3C;
-        font-weight: bold;
-      }
-    }
-    
-    &.add-item {
-      opacity: 1;
-      
-      .add-icon {
-        width: 50px;
-        height: 50px;
-        border-radius: 25px;
-        background: #FFF0E5;
-        border: 2px dashed #FF8E3C;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        color: #FF8E3C;
-        font-size: 24px;
-        margin-bottom: 6px;
-        box-sizing: border-box;
-      }
-      
-      .pet-name {
-        color: #FF8E3C;
-      }
-    }
-    
-    .pet-avatar {
-      width: 50px;
-      height: 50px;
-      border-radius: 25px;
-      margin-bottom: 6px;
-      border: 2px solid transparent;
-      background-color: #f0f0f0;
-    }
-    
-    .pet-name {
-      font-size: 12px;
-      color: #333;
-    }
-  }
-}
+@import '@/styles/vars.scss';
 
 .container {
-  min-height: 100vh;
-  background-color: $color-bg-page;
-  padding: 0 $spacing-lg 200rpx; // Bottom padding for footer
+  padding-bottom: 180rpx;
 }
 
 .nav-placeholder {
   height: var(--status-bar-height);
-  width: 100%;
+  background: transparent;
 }
 
 .page-header {
-  margin: $spacing-md 0 $spacing-lg;
-  
+  padding: 40rpx 30rpx;
   .title {
-    font-size: 48rpx;
-    font-weight: 800;
+    font-size: 40rpx;
+    font-weight: bold;
     color: $color-text-main;
     display: block;
-    margin-bottom: 8rpx;
+    margin-bottom: 10rpx;
   }
-  
   .subtitle {
-    font-size: 28rpx;
+    font-size: 26rpx;
     color: $color-text-secondary;
   }
 }
 
-  /* Service Type Switch */
-  .service-type-switch {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 24px;
-    
-    .switch-item {
-      flex: 1;
-      background: #fff;
-      border-radius: 16px;
-      padding: 16px;
-      display: flex;
-      align-items: center;
-      position: relative;
-      border: 2px solid transparent;
-      transition: all 0.3s;
-      
-      .icon {
-        font-size: 28px;
-        margin-right: 12px;
-      }
-      
-      .info {
-        flex: 1;
-        .label {
-          font-size: 16px;
-          font-weight: bold;
-          color: #333;
-          display: block;
-        }
-        .desc {
-          font-size: 11px;
-          color: #999;
-          margin-top: 4px;
-        }
-      }
-      
-      .check-mark {
-        position: absolute;
-        top: 8px;
-        right: 8px;
-        color: #FF8E3C;
-        font-weight: bold;
-      }
-      
-      &.feeding.active {
-        border-color: #FF8E3C;
-        background: #FFF0E5;
-        .label { color: #FF8E3C; }
-      }
-      
-      &.walking.active {
-        border-color: #4CAF50; // Use Green for Walking to distinguish
-        background: #E8F5E9;
-        .check-mark { color: #4CAF50; }
-        .label { color: #4CAF50; }
-      }
-    }
-  }
+.card-section {
+  background: #fff;
+  border-radius: 24rpx;
+  margin: 0 30rpx 24rpx;
+  padding: 30rpx;
+  box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.02);
+}
 
-  .card-section {
-    background: #FFF;
-    border-radius: $radius-xl;
-    padding: 32rpx;
-    margin-bottom: $spacing-md;
-    box-shadow: $shadow-card;
+.section-header {
+  margin-bottom: 24rpx;
+  display: flex;
+  align-items: baseline;
   
-    .section-header {
-      margin-bottom: 24rpx;
-      
-      .section-title {
-        font-size: 32rpx;
-        font-weight: 700;
-        color: $color-text-main;
-        margin-right: 16rpx;
-      }
-      
-      .section-sub {
-        font-size: 24rpx;
-        color: $color-text-secondary;
-      }
-    }
+  .section-title {
+    font-size: 32rpx;
+    font-weight: 600;
+    color: $color-text-main;
+    margin-right: 16rpx;
   }
+  .section-sub {
+    font-size: 24rpx;
+    color: $color-text-secondary;
+  }
+}
 
-  .address-time-card {
-    padding: 0; // Reset padding for this card
-    
-    .form-row {
-      display: flex;
-      align-items: center;
-      padding: 32rpx;
-      
-      &:active {
-        background: $color-bg-page;
-      }
+.mode-grid {
+  display: flex;
+  gap: 24rpx;
   
-      &.compact {
-        padding: 24rpx;
-      }
-      
-      .icon-box {
-        width: 72rpx;
-        height: 72rpx;
-        background: $color-bg;
-        border-radius: 50%;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        margin-right: 24rpx;
-        font-size: 36rpx;
-        
-        &.location { background: rgba(255, 142, 60, 0.1); color: $color-primary; }
-        &.time { background: rgba(24, 144, 255, 0.1); color: $color-blue; }
-      }
-      
-      .row-content {
-        flex: 1;
-        
-        .row-label {
-          font-size: 28rpx;
-          color: $color-text-secondary;
-          margin-bottom: 8rpx;
-        }
-        
-        .row-value {
-          font-size: 26rpx;
-          font-weight: 500;
-          color: $color-text-main;
-          line-height: 1.4;
-          
-          &.placeholder {
-            color: $color-text-placeholder;
-            font-weight: 400;
-          }
-        }
-      }
-      
-      .arrow {
-        color: $color-text-placeholder;
-        font-size: 32rpx;
-      }
-    }
-    
-    .divider {
-      height: 1rpx;
-      background: #F5F6F8;
-      margin: 0 32rpx;
-    }
-    
-    .time-selection-area {
-       padding: 0 32rpx 32rpx;
-       
-       .time-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 24rpx;
-          
-          .mode-switch {
-             background: #f5f5f5;
-             border-radius: 12rpx;
-             padding: 8rpx 16rpx;
-             font-size: 24rpx;
-             color: #999;
-             display: flex;
-             align-items: center;
-             
-             text {
-                padding: 4rpx 16rpx;
-                border-radius: 8rpx;
-                &.active {
-                   background: #fff;
-                   color: #333;
-                   font-weight: bold;
-                   box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.1);
-                }
-             }
-             .sep { padding: 0 8rpx; color: #ddd; }
-          }
-       }
-       
-       .date-display {
-          background: #f9f9f9;
-          padding: 24rpx;
-          border-radius: 16rpx;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 32rpx;
-          
-          .date-val { font-size: 32rpx; font-weight: 500; color: #333; }
-          .icon { font-size: 36rpx; }
-       }
-       
-       .multi-date-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 32rpx;
-          
-          .date-box {
-             background: #f9f9f9;
-             padding: 16rpx 24rpx;
-             border-radius: 16rpx;
-             min-width: 200rpx;
-             
-             .lbl { font-size: 20rpx; color: #999; display: block; margin-bottom: 4rpx; }
-             .val { font-size: 28rpx; font-weight: 500; color: #333; }
-          }
-          
-          .arrow { color: #ccc; margin: 0 16rpx; }
-       }
-       
-       .slots-container {
-          .slots-scroll {
-             width: 100%;
-             white-space: nowrap;
-          }
-          .slots-row {
-             display: flex;
-             padding-bottom: 8rpx;
-          }
-          .time-slot {
-             display: inline-block;
-             padding: 12rpx 24rpx;
-             background: #f5f5f5;
-             border-radius: 12rpx;
-             margin-right: 16rpx;
-             font-size: 28rpx;
-             color: #666;
-             
-             &.active {
-                background: #333;
-                color: #fff;
-             }
-          }
-       }
-    }
-  }
-
-  /* Duration Selector (Enhanced) */
-  .duration-selector {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 20rpx;
-    
-    .duration-item {
-      position: relative;
-      background: #FAFAFA;
-      border: 2rpx solid transparent;
-      border-radius: 20rpx;
-      padding: 30rpx 24rpx;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      transition: all 0.3s;
-      
-      &.active {
-        border-color: #FF8E3C;
-        background: #FFF0E5;
-        box-shadow: 0 4rpx 12rpx rgba(255, 142, 60, 0.15);
-        
-        .num { color: #FF8E3C; }
-        .unit { color: #FF8E3C; }
-      }
-      
-      .d-val {
-        display: flex;
-        align-items: baseline;
-        
-        .num { font-size: 40rpx; font-weight: 800; color: #333; margin-right: 6rpx; letter-spacing: -1rpx; }
-        .unit { font-size: 24rpx; color: #999; font-weight: 500; }
-      }
-      
-      .d-price-tag {
-        font-size: 22rpx;
-        color: #999;
-        background: #F0F0F0;
-        padding: 6rpx 16rpx;
-        border-radius: 100rpx;
-        font-weight: 500;
-        
-        &.has-markup {
-          color: #FF8E3C;
-          background: rgba(255, 142, 60, 0.1);
-        }
-      }
-      
-      .check-icon {
-        position: absolute;
-        top: -12rpx;
-        right: -12rpx;
-        width: 36rpx;
-        height: 36rpx;
-        background: #FF8E3C;
-        color: #fff;
-        border-radius: 50%;
-        font-size: 22rpx;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        border: 4rpx solid #fff;
-        box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.1);
-      }
-    }
-  }
-  
-  .pet-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20rpx;
-  
-  .pet-card {
-    border: 2rpx solid transparent;
-    background: #FAFAFA;
-    border-radius: $radius-lg;
+  .mode-card {
+    flex: 1;
+    border-radius: 16rpx;
     padding: 24rpx 16rpx;
     display: flex;
     flex-direction: column;
     align-items: center;
+    text-align: center;
     position: relative;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    
-    &.active {
-      border-color: $color-primary;
-      background: rgba(255, 142, 60, 0.05);
-      box-shadow: $shadow-sm;
-      transform: translateY(-2rpx);
-      
-      .pet-name { color: $color-primary; font-weight: 700; }
-    }
-    
-    .pet-icon {
-      font-size: 56rpx;
-      margin-bottom: 12rpx;
-    }
-    
-    .pet-name {
-      font-size: 26rpx;
-      color: $color-text-main;
-      margin-bottom: 4rpx;
-      transition: color 0.3s;
-    }
-    
-    .pet-desc {
-      font-size: 20rpx;
-      color: $color-text-secondary;
-    }
-    
-    .pet-badge {
-      position: absolute;
-      top: -12rpx;
-      right: -12rpx;
-      background: linear-gradient(135deg, #FF4D4F 0%, #FF7875 100%);
-      color: #FFF;
-      font-size: 20rpx;
-      padding: 4rpx 12rpx;
-      border-radius: $radius-full;
-      box-shadow: 0 4rpx 8rpx rgba(255, 77, 79, 0.3);
-      z-index: 1;
-    }
-  }
-}
-
-
-
-.addon-list {
-  display: flex;
-  flex-direction: column;
-  gap: 24rpx;
-  
-  .addon-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 32rpx;
-    border-radius: $radius-lg;
-    background: #FAFAFA;
     border: 2rpx solid transparent;
     transition: all 0.3s;
     
-    &.active {
-      border-color: $color-primary;
-      background: rgba(255, 142, 60, 0.05);
-      box-shadow: $shadow-sm;
-      
-      .checkbox {
-        background: $color-primary;
-        border-color: $color-primary;
-        
-        &::after {
-          content: '✓';
-          color: #FFF;
-          font-size: 24rpx;
-        }
+    &.mode-hall {
+      background: #E3F2FD;
+      &.active {
+        background: #BBDEFB;
+        border-color: #2196F3;
       }
+      .check-mark { color: #2196F3; }
     }
     
-    .addon-info {
+    &.mode-sitter {
+      background: #FFF3E0;
+      &.active {
+        background: #FFE0B2;
+        border-color: #FF9800;
+      }
+      .check-mark { color: #FF9800; }
+    }
+    
+    &.disabled {
+      opacity: 0.5;
+      filter: grayscale(1);
+    }
+    
+    .mode-info {
       display: flex;
       flex-direction: column;
-      
-      .addon-name {
-        font-size: 30rpx;
-        color: $color-text-main;
-        margin-bottom: 8rpx;
-        font-weight: 500;
-      }
-      
-      .addon-price {
-        font-size: 26rpx;
-        color: $color-primary;
-        font-weight: 700;
-      }
+      align-items: center;
     }
     
-    .checkbox {
-      width: 44rpx;
-      height: 44rpx;
-      border: 2rpx solid #D9D9D9;
-      border-radius: 50%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      transition: all 0.2s;
-    }
-  }
-}
-
-.remark-box {
-  .remark-input {
-    width: 100%;
-    min-height: 200rpx;
-    background: #FAFAFA;
-    border-radius: $radius-md;
-    padding: 32rpx;
-    font-size: 28rpx;
-    color: $color-text-main;
-    box-sizing: border-box;
-    line-height: 1.6;
-  }
-}
-
-.notice-section {
-  padding: 0 $spacing-lg;
-  margin-bottom: 60rpx;
-  
-  .notice-item {
-    font-size: 24rpx;
-    color: $color-text-secondary;
-    margin-bottom: 16rpx;
-    display: flex;
-    align-items: center;
-    opacity: 0.8;
-  }
-}
-
-.footer-bar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(20px);
-  padding: 24rpx 32rpx calc(24rpx + env(safe-area-inset-bottom));
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  box-shadow: 0 -8rpx 32rpx rgba(0,0,0,0.05);
-  z-index: 100;
-  border-top: 1px solid rgba(0,0,0,0.03);
-
-  .price-container {
-    display: flex;
-    flex-direction: column;
-
-    .price-label {
-      font-size: 24rpx;
-      color: $color-text-secondary;
+    .mode-title {
+      font-size: 28rpx;
+      font-weight: 600;
+      color: $color-text-main;
       margin-bottom: 4rpx;
     }
-
-    .price-val {
-      color: $color-primary;
-      font-weight: 800;
-      display: flex;
-      align-items: baseline;
-      
-      .symbol { font-size: 32rpx; margin-right: 4rpx; }
-      .amount { font-size: 56rpx; line-height: 1; }
-    }
-  }
-
-  .btn-submit {
-    margin: 0;
-    width: 320rpx;
-    height: 96rpx;
-    line-height: 96rpx;
-    background: linear-gradient(135deg, #FF8E3C 0%, #FF6B6B 100%);
-    color: #FFF;
-    border-radius: $radius-full;
-    font-size: 34rpx;
-    font-weight: 700;
-    box-shadow: $shadow-float;
     
-    &:active {
-      transform: scale(0.98);
-      opacity: 0.95;
+    .mode-desc {
+      font-size: 22rpx;
+      color: $color-text-secondary;
+    }
+    
+    .check-mark {
+      position: absolute;
+      top: 8rpx;
+      right: 8rpx;
+      font-weight: bold;
+      font-size: 24rpx;
     }
   }
 }
 
-/* Coupon Popup */
-.coupon-popup-mask {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  z-index: 999;
+/* Service Switch - Top Position */
+.service-type-switch {
   display: flex;
-  justify-content: center;
-  align-items: flex-end;
-}
-
-.coupon-popup-content {
-  width: 100%;
-  background: #F5F6F8;
-  border-radius: 40rpx 40rpx 0 0;
-  padding: 32rpx;
-  max-height: 80vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.popup-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 32rpx;
+  gap: 24rpx;
   
-  .popup-title {
-    font-size: 36rpx;
-    font-weight: 700;
-    color: #333;
-  }
-  
-  .popup-close {
-    font-size: 48rpx;
-    color: #999;
-    padding: 0 16rpx;
-  }
-}
-
-.coupon-scroll {
-  flex: 1;
-  max-height: 60vh;
-}
-
-.coupon-list {
-  padding-bottom: 32rpx;
-}
-
-.no-coupon-item {
-  background: #FFF;
-  border-radius: 24rpx;
-  padding: 32rpx;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24rpx;
-  
-  text {
-    font-size: 30rpx;
-    color: #333;
-  }
-  
-  &.active {
-    border: 2rpx solid #FF8E3C;
-    background: #FFF0E5;
-    text { color: #FF8E3C; font-weight: 500; }
-  }
-}
-
-.coupon-card-item {
-  background: linear-gradient(135deg, #FF4D4F 0%, #FF7875 100%);
-  border-radius: 24rpx;
-  padding: 32rpx;
-  margin-bottom: 24rpx;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  color: #FFF;
-  position: relative;
-  overflow: hidden;
-  box-shadow: 0 8rpx 24rpx rgba(255, 77, 79, 0.2);
-  
-  .card-left {
+  .switch-item {
+    flex: 1;
+    border-radius: 24rpx;
+    padding: 24rpx 16rpx;
     display: flex;
     flex-direction: column;
-    
-    .amount-box {
-      display: flex;
-      align-items: baseline;
-      margin-bottom: 8rpx;
-      
-      .symbol { font-size: 32rpx; font-weight: 500; margin-right: 4rpx; }
-      .num { font-size: 64rpx; font-weight: 800; line-height: 1; }
-    }
-    
-    .condition {
-      font-size: 24rpx;
-      opacity: 0.9;
-    }
-  }
-  
-  .card-right {
-    display: flex;
     align-items: center;
+    text-align: center;
+    position: relative;
+    border: 2rpx solid transparent;
+    transition: all 0.3s;
+    
+    &.feeding {
+      background: #E8F5E9;
+      &.active {
+        background: #C8E6C9;
+        border-color: #4CAF50;
+      }
+      .check-mark { color: #4CAF50; }
+    }
+    
+    &.walking {
+      background: #F3E5F5;
+      &.active {
+        background: #E1BEE7;
+        border-color: #9C27B0;
+      }
+      .check-mark { color: #9C27B0; }
+    }
     
     .info {
       display: flex;
       flex-direction: column;
-      align-items: flex-end;
-      margin-right: 24rpx;
-      
-      .name { font-size: 32rpx; font-weight: 700; margin-bottom: 8rpx; }
-      .date { font-size: 20rpx; opacity: 0.8; }
+      .label {
+        font-size: 30rpx;
+        font-weight: 600;
+        color: $color-text-main;
+      }
+      .desc {
+        font-size: 22rpx;
+        color: $color-text-secondary;
+        margin-top: 4rpx;
+      }
     }
-  }
-  
-  .sawtooth-left, .sawtooth-right {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 24rpx;
-    height: 24rpx;
-    background: #F5F6F8;
-    border-radius: 50%;
-  }
-  
-  .sawtooth-left { left: -12rpx; }
-  .sawtooth-right { right: -12rpx; }
-}
-
-.radio-circle {
-  width: 40rpx;
-  height: 40rpx;
-  border-radius: 50%;
-  border: 2rpx solid rgba(255,255,255,0.6);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  
-  &.checked {
-    background: #FFF;
-    border-color: #FFF;
     
-    &::after {
-      content: '✓';
-      color: #FF4D4F;
-      font-size: 24rpx;
+    &.disabled {
+      opacity: 0.5;
+      background: #f5f5f5;
+    }
+    
+    .check-mark {
+      position: absolute;
+      right: 12rpx;
+      top: 12rpx;
       font-weight: bold;
     }
   }
 }
 
-.no-coupon-item .radio-circle {
-    border-color: #DDD;
-    &.checked {
-        background: #FF8E3C;
-        border-color: #FF8E3C;
-        &::after { color: #FFF; }
+/* Sitter Scroll */
+.sitter-select-card {
+  padding: 30rpx 0 30rpx 30rpx; // Right padding 0 for scroll
+  
+  .sitter-scroll {
+    white-space: nowrap;
+    width: 100%;
+    
+    .sitter-list {
+      display: flex;
+      padding-right: 30rpx;
     }
+    
+    .sitter-card {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      width: 200rpx;
+      margin-right: 20rpx;
+      padding: 24rpx;
+      background: #f8f8f8;
+      border-radius: 16rpx;
+      border: 2rpx solid transparent;
+      box-sizing: border-box;
+      
+      &.active {
+        background: rgba(255, 142, 60, 0.08);
+        border-color: $color-primary;
+      }
+      
+      &.no-sitter {
+         justify-content: center;
+         .icon-placeholder {
+            font-size: 60rpx;
+            margin-bottom: 10rpx;
+         }
+      }
+      
+      .avatar {
+        width: 80rpx;
+        height: 80rpx;
+        border-radius: 50%;
+        margin-bottom: 12rpx;
+        background: #eee;
+      }
+      
+      .name-row {
+         display: flex;
+         align-items: center;
+         margin-bottom: 6rpx;
+         
+         .name {
+           font-size: 26rpx;
+           font-weight: 600;
+           margin-right: 6rpx;
+           max-width: 80rpx;
+           overflow: hidden;
+           text-overflow: ellipsis;
+         }
+         
+         .level-badge {
+            font-size: 16rpx;
+            padding: 2rpx 6rpx;
+            border-radius: 6rpx;
+            color: #fff;
+            &.gold { background: #FFD700; color: #8B4500; }
+            &.silver { background: #C0C0C0; color: #555; }
+            &.bronze { background: #CD7F32; }
+         }
+      }
+      
+      .desc {
+        font-size: 20rpx;
+        color: $color-text-secondary;
+        white-space: normal;
+        text-align: center;
+        line-height: 1.2;
+      }
+      
+      .check-mark {
+         position: absolute;
+         top: 10rpx;
+         right: 10rpx;
+         color: $color-primary;
+         font-size: 24rpx;
+      }
+    }
+  }
 }
 
-.empty-coupons {
-  text-align: center;
-  padding: 64rpx 0;
-  color: #999;
-  font-size: 28rpx;
+/* Common Form Rows */
+.form-row {
+  display: flex;
+  align-items: center;
+  padding: 10rpx 0;
+  
+  .icon-box {
+    width: 40rpx;
+    font-size: 32rpx;
+    margin-right: 20rpx;
+    text-align: center;
+  }
+  
+  .row-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    
+    .row-label {
+      font-size: 28rpx;
+      color: $color-text-main;
+      margin-bottom: 4rpx;
+    }
+    .row-value {
+      font-size: 30rpx;
+      color: $color-text-main;
+      font-weight: 500;
+      
+      &.placeholder {
+        color: $color-text-secondary;
+        font-weight: normal;
+      }
+      &.highlight {
+         color: $color-error;
+      }
+    }
+  }
+  
+  .arrow {
+    color: $color-text-secondary;
+    font-size: 28rpx;
+  }
+}
+
+.divider {
+  height: 1px;
+  background: #f0f0f0;
+  margin: 24rpx 0;
+}
+
+/* Time Selection */
+.time-selection-area {
+   .time-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20rpx;
+      
+      .row-label { font-size: 28rpx; font-weight: 600; }
+      
+      .mode-switch {
+         font-size: 24rpx;
+         color: $color-text-secondary;
+         .active { color: $color-primary; font-weight: bold; }
+         .sep { margin: 0 10rpx; }
+      }
+   }
+   
+   .date-display {
+      background: #f9f9f9;
+      padding: 20rpx;
+      border-radius: 12rpx;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20rpx;
+      
+      .date-val { font-size: 30rpx; font-weight: 500; }
+   }
+   
+   .multi-date-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20rpx;
+      
+      .date-box {
+         background: #f9f9f9;
+         padding: 16rpx 24rpx;
+         border-radius: 12rpx;
+         width: 260rpx;
+         
+         .lbl { display: block; font-size: 22rpx; color: $color-text-secondary; margin-bottom: 4rpx; }
+         .val { font-size: 28rpx; font-weight: 500; }
+      }
+      .arrow { color: $color-text-secondary; }
+   }
+   
+   .slots-container {
+      width: 100%;
+      overflow: hidden;
+      
+      .slots-scroll {
+         white-space: nowrap;
+         width: 100%;
+         
+         .slots-row {
+            display: flex;
+            padding-bottom: 10rpx; // scroll bar space
+         }
+         
+         .time-slot {
+            display: inline-block;
+            padding: 12rpx 24rpx;
+            background: #f5f5f5;
+            border-radius: 30rpx;
+            font-size: 26rpx;
+            color: $color-text-main;
+            margin-right: 16rpx;
+            border: 2rpx solid transparent;
+            
+            &.active {
+               background: rgba(255, 142, 60, 0.1);
+               color: $color-primary;
+               border-color: $color-primary;
+            }
+         }
+      }
+   }
+}
+
+/* Pets */
+.my-pets {
+   margin-bottom: 30rpx;
+   
+   .section-header-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 16rpx;
+      .sub-label { font-size: 26rpx; color: $color-text-secondary; }
+      .add-pet-link {
+         font-size: 24rpx;
+         color: $color-primary;
+         display: flex;
+         align-items: center;
+         .plus { margin-right: 4rpx; font-size: 30rpx; }
+      }
+   }
+   
+   .pets-scroll {
+      white-space: nowrap;
+      .pets-row {
+         display: flex;
+      }
+   }
+   
+   .my-pet-item {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      margin-right: 24rpx;
+      opacity: 0.6;
+      transition: all 0.2s;
+      
+      &.active {
+         opacity: 1;
+         transform: scale(1.05);
+         .pet-avatar { border: 4rpx solid $color-primary; }
+         .pet-name { color: $color-primary; font-weight: bold; }
+      }
+      
+      .pet-avatar {
+         width: 90rpx;
+         height: 90rpx;
+         border-radius: 50%;
+         margin-bottom: 8rpx;
+         border: 4rpx solid transparent;
+      }
+      .pet-name {
+         font-size: 24rpx;
+         color: $color-text-main;
+      }
+      
+      &.add-item {
+         opacity: 1;
+         .add-icon {
+            width: 90rpx;
+            height: 90rpx;
+            border-radius: 50%;
+            background: #f5f5f5;
+            color: #ccc;
+            font-size: 50rpx;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 8rpx;
+         }
+      }
+   }
+}
+
+.pet-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12rpx;
+  
+  .pet-card {
+    background: #f9f9f9;
+    padding: 20rpx 10rpx;
+    border-radius: 16rpx;
+    border: 2rpx solid transparent;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    
+    &.active {
+      background: rgba(255, 142, 60, 0.08);
+      border-color: $color-primary;
+    }
+    
+    .pet-icon-img { 
+      width: 80rpx; 
+      height: 80rpx; 
+      display: block; 
+      margin-bottom: 12rpx; 
+      border-radius: 50%;
+      object-fit: cover;
+    }
+    .pet-name { font-size: 24rpx; font-weight: 600; display: block; white-space: nowrap; }
+    .pet-desc { font-size: 20rpx; color: $color-text-secondary; white-space: nowrap; transform: scale(0.9); }
+    
+    .pet-badge {
+      position: absolute;
+      top: -10rpx;
+      right: -10rpx;
+      font-size: 18rpx;
+      color: #fff;
+      background: $color-error;
+      padding: 2rpx 6rpx;
+      border-radius: 8rpx;
+      z-index: 1;
+    }
+  }
+}
+
+/* Duration */
+.duration-selector {
+  display: flex;
+  justify-content: space-between;
+  
+  .duration-item {
+    flex: 1;
+    margin: 0 10rpx;
+    background: #f9f9f9;
+    padding: 20rpx 0;
+    text-align: center;
+    border-radius: 16rpx;
+    border: 2rpx solid transparent;
+    position: relative;
+    
+    &:first-child { margin-left: 0; }
+    &:last-child { margin-right: 0; }
+    
+    &.active {
+      background: rgba(255, 142, 60, 0.08);
+      border-color: $color-primary;
+      .d-val { color: $color-primary; }
+    }
+    
+    .d-val {
+      color: $color-text-main;
+      margin-bottom: 6rpx;
+      .num { font-size: 36rpx; font-weight: bold; }
+      .unit { font-size: 22rpx; margin-left: 4rpx; }
+    }
+    
+    .d-price-tag {
+      font-size: 20rpx;
+      color: $color-text-secondary;
+      &.has-markup { color: $color-error; }
+    }
+    
+    .check-icon {
+      position: absolute;
+      top: 6rpx;
+      right: 6rpx;
+      font-size: 20rpx;
+      color: $color-primary;
+    }
+  }
+}
+
+/* Addons */
+.addon-list {
+  .addon-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 24rpx 0;
+    border-bottom: 1rpx solid #f5f5f5;
+    
+    &:last-child { border-bottom: none; padding-bottom: 0; }
+    &:first-child { padding-top: 0; }
+    
+    .addon-info {
+      display: flex;
+      flex-direction: column;
+      .addon-name { font-size: 28rpx; color: $color-text-main; }
+      .addon-price { font-size: 24rpx; color: $color-error; margin-top: 4rpx; }
+    }
+    
+    .checkbox {
+      width: 40rpx;
+      height: 40rpx;
+      border: 2rpx solid #ddd;
+      border-radius: 50%;
+      &.checked {
+        background: $color-primary;
+        border-color: $color-primary;
+        position: relative;
+        &::after {
+          content: '✓';
+          color: #fff;
+          font-size: 24rpx;
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+        }
+      }
+    }
+  }
+}
+
+/* Footer Bar */
+.footer-bar-placeholder { height: 140rpx; }
+.footer-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 120rpx;
+  background: #fff;
+  box-shadow: 0 -4rpx 16rpx rgba(0,0,0,0.05);
+  display: flex;
+  align-items: center;
+  padding: 0 30rpx;
+  box-sizing: border-box;
+  z-index: 100;
+  
+  .price-container {
+    flex: 1;
+    
+    .price-label { font-size: 24rpx; color: $color-text-secondary; }
+    
+    .price-col {
+       display: flex;
+       align-items: baseline;
+       
+       .price-val {
+         color: $color-error;
+         margin-right: 16rpx;
+         .symbol { font-size: 28rpx; }
+         .amount { font-size: 48rpx; font-weight: bold; }
+       }
+       .original-price {
+         text-decoration: line-through;
+         color: $color-text-secondary;
+         font-size: 24rpx;
+       }
+    }
+  }
+  
+  .btn-submit {
+    width: 240rpx;
+    height: 80rpx;
+    background: linear-gradient(135deg, #FFB07C 0%, #FF8E3C 100%);
+    color: #fff;
+    border-radius: 40rpx;
+    font-size: 30rpx;
+    font-weight: 600;
+    line-height: 80rpx;
+    margin: 0;
+    
+    &:active { opacity: 0.9; }
+  }
+}
+
+/* Coupon Popup */
+.coupon-popup-mask {
+   position: fixed;
+   top: 0;
+   left: 0;
+   width: 100%;
+   height: 100%;
+   background: rgba(0,0,0,0.5);
+   z-index: 999;
+   display: flex;
+   align-items: flex-end;
+}
+
+.coupon-popup-content {
+   width: 100%;
+   height: 70vh;
+   background: #fff;
+   border-radius: 30rpx 30rpx 0 0;
+   display: flex;
+   flex-direction: column;
+   
+   .popup-header {
+      padding: 30rpx;
+      text-align: center;
+      position: relative;
+      border-bottom: 1rpx solid #eee;
+      .popup-title { font-size: 32rpx; font-weight: bold; }
+      .popup-close {
+         position: absolute;
+         right: 30rpx;
+         top: 30rpx;
+         font-size: 40rpx;
+         color: #999;
+         line-height: 1;
+      }
+   }
+   
+   .coupon-scroll {
+      flex: 1;
+      padding: 30rpx;
+      box-sizing: border-box;
+      background: #f5f5f5;
+   }
+   
+   .no-coupon-item {
+      background: #fff;
+      padding: 30rpx;
+      border-radius: 16rpx;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24rpx;
+      
+      &.active { color: $color-primary; }
+      .radio-circle {
+         width: 36rpx;
+         height: 36rpx;
+         border: 2rpx solid #ccc;
+         border-radius: 50%;
+         &.checked {
+            border-color: $color-primary;
+            background: $color-primary;
+         }
+      }
+   }
+   
+   .coupon-card-item {
+      background: #fff;
+      border-radius: 16rpx;
+      margin-bottom: 24rpx;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.03);
+      
+      .card-left {
+         width: 200rpx;
+         background: linear-gradient(135deg, #FFB07C 0%, #FF8E3C 100%);
+         color: #fff;
+         display: flex;
+         flex-direction: column;
+         align-items: center;
+         justify-content: center;
+         padding: 20rpx;
+         
+         .amount-box {
+            .symbol { font-size: 24rpx; }
+            .num { font-size: 56rpx; font-weight: bold; }
+         }
+         .condition { font-size: 20rpx; opacity: 0.9; }
+      }
+      
+      .card-right {
+         flex: 1;
+         padding: 30rpx;
+         display: flex;
+         justify-content: space-between;
+         align-items: center;
+         
+         .info {
+            display: flex;
+            flex-direction: column;
+            .name { font-size: 30rpx; font-weight: 600; margin-bottom: 8rpx; }
+            .date { font-size: 22rpx; color: #999; }
+         }
+         
+         .radio-circle {
+            width: 36rpx;
+            height: 36rpx;
+            border: 2rpx solid #ccc;
+            border-radius: 50%;
+            &.checked {
+               border-color: $color-primary;
+               background: $color-primary;
+            }
+         }
+      }
+      
+      /* Sawtooth effect */
+      .sawtooth-left, .sawtooth-right {
+         position: absolute;
+         width: 20rpx;
+         height: 20rpx;
+         background: #f5f5f5;
+         border-radius: 50%;
+         top: 50%;
+         transform: translateY(-50%);
+         z-index: 10;
+      }
+      .sawtooth-left { left: -10rpx; }
+      .sawtooth-right { right: -10rpx; display: none; }
+   }
+   
+   .empty-coupons {
+      text-align: center;
+      padding: 60rpx 0;
+      color: #999;
+      font-size: 26rpx;
+   }
+}
+
+/* Service Guarantee */
+.service-guarantee {
+  margin: 40rpx 30rpx 60rpx;
+  
+  .guarantee-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 30rpx;
+    
+    .title {
+      font-size: 24rpx;
+      color: #999;
+      margin: 0 20rpx;
+    }
+    
+    .line {
+      width: 40rpx;
+      height: 2rpx;
+      background: #eee;
+    }
+  }
+  
+  .guarantee-grid {
+    display: flex;
+    justify-content: space-between;
+    
+    .g-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      
+      .icon-box {
+        width: 80rpx;
+        height: 80rpx;
+        background: #fff;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 36rpx;
+        margin-bottom: 16rpx;
+        box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.03);
+      }
+      
+      .g-title {
+        font-size: 24rpx;
+        color: $color-text-main;
+        font-weight: 600;
+        margin-bottom: 6rpx;
+      }
+      
+      .g-desc {
+        font-size: 20rpx;
+        color: #999;
+      }
+    }
+  }
 }
 </style>

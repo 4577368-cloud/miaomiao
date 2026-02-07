@@ -59,6 +59,18 @@
       "style": {
         "navigationBarTitleText": "我的钱包"
       }
+    },
+    {
+      "path": "pages/profile/certification",
+      "style": {
+        "navigationBarTitleText": "宠托师认证"
+      }
+    },
+    {
+      "path": "pages/publish/sitter",
+      "style": {
+        "navigationBarTitleText": "发布接单意向"
+      }
     }
   ],
   "globalStyle": {

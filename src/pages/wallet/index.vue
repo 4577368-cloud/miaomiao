@@ -2,9 +2,10 @@
   <view class="container">
     <!-- Balance Card -->
     <view class="balance-card">
-      <view class="balance-info">
+      <view class="balance-info" @click="handleWithdraw">
         <text class="label">账户余额 (元)</text>
         <text class="amount">{{ userStore.userInfo?.balance?.toFixed(2) || '0.00' }}</text>
+        <text class="withdraw-hint" v-if="(userStore.userInfo?.balance || 0) > 0">点击提现</text>
       </view>
       <button class="btn-recharge" @click="handleRecharge">充值</button>
     </view>
@@ -97,6 +98,28 @@ const handleRecharge = () => {
   });
 };
 
+const handleWithdraw = () => {
+  const balance = userStore.userInfo?.balance || 0;
+  if (balance <= 0) {
+    uni.showToast({ title: '余额不足', icon: 'none' });
+    return;
+  }
+  
+  uni.showModal({
+    title: '申请提现',
+    content: `当前可提现金额 ¥${balance.toFixed(2)}，确认全部提现？`,
+    success: (res) => {
+      if (res.confirm) {
+        if (userStore.deductBalance(balance)) {
+          uni.showToast({ title: '提现申请已提交', icon: 'success' });
+        } else {
+          uni.showToast({ title: '提现失败', icon: 'none' });
+        }
+      }
+    }
+  });
+};
+
 const handleUse = (coupon: Coupon) => {
   // Navigate to Publish with couponId
   uni.navigateTo({
@@ -136,6 +159,12 @@ const handleUse = (coupon: Coupon) => {
       color: #fff;
       font-size: 60rpx;
       font-weight: bold;
+    }
+    
+    .withdraw-hint {
+      color: rgba(255,255,255,0.6);
+      font-size: 22rpx;
+      margin-top: 4rpx;
     }
   }
   

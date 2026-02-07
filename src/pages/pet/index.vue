@@ -57,6 +57,15 @@
                  <view class="radio-item" :class="{active: form.type === 'dog'}" @click="handleTypeChange('dog')">🐶 狗狗</view>
               </view>
             </view>
+            <view class="divider"></view>
+            <view class="form-row">
+              <text class="label">品种</text>
+              <picker mode="selector" :range="availableBreeds" @change="handleBreedChange">
+                <view class="picker-value">
+                  {{ form.breed || '请选择品种' }} <text class="arrow">></text>
+                </view>
+              </picker>
+            </view>
              <view class="divider"></view>
             <view class="form-row">
               <text class="label">性别</text>
@@ -125,6 +134,24 @@
         </view>
       </scroll-view>
     </view>
+
+    <!-- Avatar Selection Modal -->
+    <view class="modal-mask" v-if="showAvatarModal" @click="showAvatarModal = false">
+      <view class="modal-content" @click.stop>
+        <view class="modal-header">
+          <text class="title">选择默认头像</text>
+          <text class="close" @click="showAvatarModal = false">×</text>
+        </view>
+        <scroll-view scroll-y class="avatar-scroll">
+          <view class="avatar-grid">
+            <view class="grid-item" v-for="(file, breed) in BREED_AVATAR_MAP" :key="breed" @click="selectDefaultAvatar(file)">
+              <image :src="'/static/avatars/' + file" mode="aspectFill" />
+              <text class="name">{{ breed }}</text>
+            </view>
+          </view>
+        </scroll-view>
+      </view>
+    </view>
   </view>
 </template>
 
@@ -132,10 +159,12 @@
 import { ref, computed } from 'vue';
 import { useUserStore, type PetInfo } from '@/stores/user';
 import { PetSize, PET_SIZE_COEFFICIENTS } from '@/constants/pet';
+import { DOG_BREEDS, CAT_BREEDS, BREED_AVATAR_MAP } from '@/constants/breeds';
 
 const userStore = useUserStore();
 const pets = computed(() => userStore.userInfo?.pets || []);
 const showModal = ref(false);
+const showAvatarModal = ref(false);
 const isEditing = ref(false);
 
 const defaultForm: Partial<PetInfo> = {
@@ -148,6 +177,7 @@ const defaultForm: Partial<PetInfo> = {
   vaccine: false,
   avatar: '',
   name: '',
+  breed: '',
   description: ''
 };
 
@@ -198,6 +228,44 @@ const autoSelectSize = () => {
   else form.value.size = PetSize.GIANT;
 };
 
+const availableBreeds = computed(() => {
+  return form.value.type === 'cat' ? CAT_BREEDS : DOG_BREEDS;
+});
+
+const handleBreedChange = (e: any) => {
+  const index = e.detail.value;
+  const breed = availableBreeds.value[index];
+  form.value.breed = breed;
+  
+  // Auto-select avatar if empty or using default-pet
+  if ((!form.value.avatar || form.value.avatar.includes('default-pet')) && BREED_AVATAR_MAP[breed]) {
+    form.value.avatar = `/static/avatars/${BREED_AVATAR_MAP[breed]}`;
+  }
+};
+
+const chooseAvatar = () => {
+  uni.showActionSheet({
+    itemList: ['从相册/相机选择', '选择默认头像'],
+    success: (res) => {
+      if (res.tapIndex === 0) {
+        uni.chooseImage({
+          count: 1,
+          success: (res) => {
+            form.value.avatar = res.tempFilePaths[0];
+          }
+        });
+      } else {
+        showAvatarModal.value = true;
+      }
+    }
+  });
+};
+
+const selectDefaultAvatar = (filename: string) => {
+  form.value.avatar = `/static/avatars/${filename}`;
+  showAvatarModal.value = false;
+};
+
 const addNewPet = () => {
   isEditing.value = false;
   form.value = JSON.parse(JSON.stringify(defaultForm));
@@ -212,18 +280,7 @@ const editPet = (pet: PetInfo) => {
 
 const closeModal = () => showModal.value = false;
 
-const chooseAvatar = () => {
-  uni.chooseImage({
-    count: 1,
-    success: (res) => {
-      form.value.avatar = res.tempFilePaths[0];
-    },
-    fail: () => {
-      // Mock for web testing
-       form.value.avatar = 'https://placehold.co/200x200?text=Pet';
-    }
-  });
-};
+
 
 const savePet = () => {
   if (!form.value.name) return uni.showToast({ title: '请输入昵称', icon: 'none' });
@@ -244,6 +301,11 @@ const savePet = () => {
   userStore.updateUser({ pets: currentPets });
   showModal.value = false;
   uni.showToast({ title: '保存成功' });
+  
+  // 优化动线：保存后自动返回上一页
+  setTimeout(() => {
+    uni.navigateBack();
+  }, 800);
 };
 
 const deletePet = () => {
@@ -480,6 +542,20 @@ const deletePet = () => {
     text-align: right;
     font-size: 14px;
   }
+  
+  .picker-value {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    font-size: 14px;
+    color: #333;
+    
+    .arrow {
+      margin-left: 4px;
+      color: #999;
+      font-size: 12px;
+    }
+  }
 }
 
 .form-column {
@@ -554,21 +630,101 @@ const deletePet = () => {
   width: 100%;
   min-height: 80px;
   font-size: 14px;
-  padding: 16px 0;
+  line-height: 1.5;
+  padding: 10px;
+  background: #f9f9f9;
+  border-radius: 8px;
 }
 
 .delete-btn {
+  margin-top: 20px;
   text-align: center;
   color: #ff4d4f;
   font-size: 14px;
-  padding: 16px;
-  background: #fff;
-  border-radius: 12px;
-  margin-top: 24px;
+  padding: 12px;
 }
 
 .spacer {
   height: 40px;
+}
+
+/* Avatar Modal */
+.modal-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-content {
+  width: 80%;
+  max-height: 70vh;
+  background: #fff;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  
+  .modal-header {
+    padding: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #f5f5f5;
+    
+    .title {
+      font-size: 16px;
+      font-weight: bold;
+    }
+    
+    .close {
+      font-size: 24px;
+      color: #999;
+      line-height: 1;
+      padding: 0 8px;
+    }
+  }
+  
+  .avatar-scroll {
+    flex: 1;
+    min-height: 400px;
+  }
+  
+  .avatar-grid {
+    display: flex;
+    flex-wrap: wrap;
+    padding: 16px;
+    justify-content: space-between;
+    
+    .grid-item {
+      width: 48%;
+      margin-bottom: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      
+      image {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        margin-bottom: 8px;
+        border: 2px solid #f5f5f5;
+        object-fit: cover;
+      }
+      
+      .name {
+        font-size: 12px;
+        color: #666;
+        text-align: center;
+      }
+    }
+  }
 }
 
 .mb-2 {

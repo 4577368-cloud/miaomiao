@@ -5,7 +5,15 @@ import { PetSize } from '@/constants/pet';
 export type UserRole = 'owner' | 'sitter';
 export type SitterLevel = 'GOLD' | 'SILVER' | 'BRONZE';
 
+export interface SitterAvailability {
+  time: string; // e.g., "Weekends", "All day"
+  locations: string[]; // e.g., ["Chaoyang", "Haidian"]
+  services: ('feeding' | 'walking')[];
+}
+
 export interface SitterProfile {
+  realName?: string;
+  idCard?: string;
   level: SitterLevel;
   completedOrders: number;
   rating: number;
@@ -13,6 +21,8 @@ export interface SitterProfile {
   tags: string[];
   bio: string;
   isCertified: boolean; // 是否实名/资质认证
+  certificationStatus?: 'none' | 'pending' | 'verified' | 'rejected';
+  availability?: SitterAvailability;
 }
 
 export interface PetInfo {
@@ -75,7 +85,7 @@ export const useUserStore = defineStore('user', () => {
         ensureData(); // Ensure structure for existing data
         isLoggedIn.value = true;
       } catch (e) {
-        console.error('Failed to parse user info', e);
+        console.error('Failed to parse user info', (e as Error).message || e);
         logout();
       }
     } else {
@@ -106,7 +116,7 @@ export const useUserStore = defineStore('user', () => {
           {
             id: 'p2',
             name: '旺财',
-            avatar: 'https://img.yzcdn.cn/vant/dog.png', // Assuming a dog image exists or use a placeholder
+            avatar: '/static/avatars/dog-shiba.jpg',
             type: 'dog',
             gender: 'female',
             size: PetSize.MEDIUM,
@@ -170,8 +180,17 @@ export const useUserStore = defineStore('user', () => {
 
   const switchRole = (newRole: UserRole) => {
     if (userInfo.value) {
+      // Check if switching to sitter but no profile
+      if (newRole === 'sitter' && !userInfo.value.sitterProfile) {
+        uni.navigateTo({ url: '/pages/sitter-register/index' });
+        return;
+      }
+      
       userInfo.value.role = newRole;
       uni.setStorageSync('miaomiao_user', JSON.stringify(userInfo.value));
+      
+      // Navigate to Home or refresh
+      uni.reLaunch({ url: '/pages/home/index' });
     }
   };
 
@@ -192,11 +211,15 @@ export const useUserStore = defineStore('user', () => {
     }
   };
 
-  const recharge = (amount: number) => {
+  const addBalance = (amount: number) => {
     if (userInfo.value) {
       userInfo.value.balance = (userInfo.value.balance || 0) + amount;
       uni.setStorageSync('miaomiao_user', JSON.stringify(userInfo.value));
     }
+  };
+
+  const recharge = (amount: number) => {
+    addBalance(amount);
   };
 
   const deductBalance = (amount: number): boolean => {
@@ -208,6 +231,45 @@ export const useUserStore = defineStore('user', () => {
     return false;
   };
 
+  const calculateSitterLevel = (years: number): SitterLevel => {
+    if (years >= 5) return 'GOLD';
+    if (years >= 2) return 'SILVER';
+    return 'BRONZE';
+  };
+
+  const registerAsSitter = (data: {
+    realName: string;
+    idCard: string;
+    experienceYears: number;
+    tags: string[];
+    bio: string;
+    availability: SitterAvailability;
+  }) => {
+    if (!userInfo.value) return;
+    
+    const level = calculateSitterLevel(data.experienceYears);
+    
+    userInfo.value.sitterProfile = {
+      realName: data.realName,
+      idCard: data.idCard,
+      level: level,
+      completedOrders: 0,
+      rating: 5.0, // Initial rating
+      experienceYears: data.experienceYears,
+      tags: data.tags,
+      bio: data.bio,
+      isCertified: true, // Auto-verify for demo
+      certificationStatus: 'verified',
+      availability: data.availability
+    };
+    
+    // Auto-switch to sitter role upon registration?
+    // User asked: "Cannot directly switch... fill info first"
+    // So after this, we can switch role.
+    userInfo.value.role = 'sitter';
+    uni.setStorageSync('miaomiao_user', JSON.stringify(userInfo.value));
+  };
+
   return {
     userInfo,
     isLoggedIn,
@@ -217,7 +279,9 @@ export const useUserStore = defineStore('user', () => {
     switchRole,
     updateUser,
     useCoupon,
+    addBalance,
     recharge,
-    deductBalance
+    deductBalance,
+    registerAsSitter
   };
 });

@@ -66,7 +66,7 @@ export const getCurrentLocation = (): Promise<LocationResult> => {
         // #endif
       },
       fail: (err) => {
-        console.error('获取位置失败', err);
+        console.error('获取位置失败', err.errMsg || err);
         // 如果是Key额度不足，降级使用模拟位置（方便开发调试）
         if (err.errMsg && (err.errMsg.includes('limit') || err.errMsg.includes('上限'))) {
             uni.showToast({

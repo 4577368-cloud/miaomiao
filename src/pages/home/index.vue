@@ -5,13 +5,14 @@
 
     <!-- 头部区域 -->
     <view class="header-section">
-      <view class="user-welcome">
-        <text class="greeting">早安，</text>
-        <text class="username">{{ userStore.userInfo?.nickname || '铲屎官' }}</text>
-      </view>
-      <view class="location-badge" @click="handleLocationClick">
-        <text class="icon">📍</text>
-        <text>{{ locationName }}</text>
+      <view class="header-row">
+        <view class="user-welcome">
+          <text class="username">{{ userStore.userInfo?.nickname || '铲屎官' }}</text>
+        </view>
+        <view class="location-badge" @click="handleLocationClick">
+          <text class="icon">📍</text>
+          <text>{{ locationName }}</text>
+        </view>
       </view>
     </view>
 
@@ -54,7 +55,7 @@
         
         <view class="service-grid">
           <!-- 上门喂养 -->
-          <view class="service-card feed" @click="selectService(ServiceType.FEEDING)">
+          <view class="service-card feed" @click="selectService('FEEDING')">
             <view class="card-bg-decoration"></view>
             <view class="card-info">
               <view class="card-header">
@@ -71,7 +72,7 @@
           </view>
 
           <!-- 上门遛宠 -->
-          <view class="service-card walk" @click="selectService(ServiceType.WALKING)">
+          <view class="service-card walk" @click="selectService('WALKING')">
             <view class="card-bg-decoration"></view>
             <view class="card-info">
               <view class="card-header">
@@ -119,13 +120,50 @@
 
     <!-- 宠托师视图 (接单大厅) -->
     <view v-else class="sitter-view">
+      <!-- Sitter Action Banner -->
+      <view class="sitter-action-card" @click="handlePublishAvailability">
+        <view class="action-info">
+          <text class="action-title">发布接单意向</text>
+          <text class="action-desc">展示擅长宠物、空闲时间与服务区域</text>
+        </view>
+        <view class="action-btn">去发布</view>
+      </view>
+
       <view class="section-container">
-        <view class="section-header">
-          <text class="title">任务大厅</text>
-          <text class="more">附近 {{ pendingOrders.length }} 个任务</text>
+        <view class="hall-header">
+           <text class="title">任务大厅</text>
+           <text class="subtitle">附近 {{ processedOrders.length }} 个任务</text>
+        </view>
+        
+        <!-- Filter/Sort Bar -->
+        <view class="filter-bar">
+           <view class="sort-options">
+              <view 
+                class="sort-item" 
+                :class="{ active: currentSort === 'distance' }"
+                @click="setSort('distance')"
+              >距离优先</view>
+              <view 
+                class="sort-item" 
+                :class="{ active: currentSort === 'amount' }"
+                @click="setSort('amount')"
+              >金额最高</view>
+              <view 
+                class="sort-item" 
+                :class="{ active: currentSort === 'date' }"
+                @click="setSort('date')"
+              >最新发布</view>
+           </view>
+           <view class="filter-options">
+               <!-- Simple toggle for Service Type -->
+               <view class="filter-btn" @click="toggleFilter">
+                  <text>{{ currentFilter === 'all' ? '全部服务' : currentFilter === ServiceType.FEEDING ? '只看喂养' : '只看遛宠' }}</text>
+                  <text class="icon">▼</text>
+               </view>
+           </view>
         </view>
 
-        <view v-if="pendingOrders.length === 0" class="empty-state">
+        <view v-if="processedOrders.length === 0" class="empty-state">
           <text class="empty-icon">📭</text>
           <text class="empty-text">暂时没有新任务</text>
           <text class="empty-sub">休息一下，稍后再来刷刷看~</text>
@@ -134,18 +172,22 @@
         <view v-else class="task-list">
           <view 
             class="task-card" 
-            v-for="order in pendingOrders" 
+            v-for="order in processedOrders" 
             :key="order.id"
           >
             <view class="task-header">
               <view class="task-type">
                 <text class="type-tag">{{ order.serviceType === ServiceType.FEEDING ? '上门喂养' : '上门遛宠' }}</text>
-                <text class="price">¥{{ order.totalPrice }}</text>
+                <text class="distance-tag">📍 {{ getDistance(order.id) }}km</text>
               </view>
-              <text class="time">{{ order.time }}</text>
+              <text class="price">¥{{ order.totalPrice }}</text>
             </view>
             
             <view class="task-body">
+              <view class="info-row">
+                <text class="label">时间：</text>
+                <text class="value highlight">{{ order.time }}</text>
+              </view>
               <view class="info-row">
                 <text class="label">宠物：</text>
                 <text class="value">{{ order.petSize === 'SMALL' ? '小型' : order.petSize === 'MEDIUM' ? '中型' : '大型' }}宠物</text>
@@ -182,11 +224,51 @@ const orderStore = useOrderStore();
 
 const locationName = ref('点击定位');
 
+type SortType = 'distance' | 'amount' | 'date';
+const currentSort = ref<SortType>('distance');
+const currentFilter = ref<ServiceType | 'all'>('all');
+const orderDistances = ref<Record<string, number>>({});
+
 const isOwner = computed(() => userStore.userInfo?.role === 'owner');
 
-const pendingOrders = computed(() => {
-  return orderStore.orders.filter(order => order.status === 'PENDING');
+const getDistance = (orderId: string) => {
+  if (!orderDistances.value[orderId]) {
+    // Generate random distance 0.1 - 5.0 km
+    orderDistances.value[orderId] = parseFloat((Math.random() * 5).toFixed(1));
+  }
+  return orderDistances.value[orderId];
+}
+
+const processedOrders = computed(() => {
+  let orders = [...orderStore.orders.filter(order => order.status === 'PENDING')];
+
+  // Filter
+  if (currentFilter.value !== 'all') {
+    orders = orders.filter(o => o.serviceType === currentFilter.value);
+  }
+
+  // Sort
+  return orders.sort((a, b) => {
+    if (currentSort.value === 'distance') {
+       return getDistance(a.id) - getDistance(b.id);
+    } else if (currentSort.value === 'amount') {
+       return b.totalPrice - a.totalPrice; // Higher first
+    } else if (currentSort.value === 'date') {
+       return new Date(b.time).getTime() - new Date(a.time).getTime(); // Newest first
+    }
+    return 0;
+  });
 });
+
+const setSort = (type: SortType) => {
+    currentSort.value = type;
+}
+
+const toggleFilter = () => {
+    if (currentFilter.value === 'all') currentFilter.value = ServiceType.FEEDING;
+    else if (currentFilter.value === ServiceType.FEEDING) currentFilter.value = ServiceType.WALKING;
+    else currentFilter.value = 'all';
+}
 
 const handleClaimCoupon = () => {
   uni.showModal({
@@ -236,7 +318,7 @@ const handleLocationClick = () => {
         locationName.value = res.name || res.address;
       },
       fail: (err) => {
-        console.error('Choose location failed:', err);
+        console.error('Choose location failed:', err.errMsg || err);
         // #ifdef H5
         // H5平台特殊处理
         if (err.errMsg && (err.errMsg.includes('auth denied') || err.errMsg.includes('denied'))) {
@@ -275,7 +357,27 @@ const handleLocationClick = () => {
     });
   };
 
-const selectService = (type: ServiceType) => {
+const handlePublishAvailability = () => {
+  if (!userStore.userInfo?.sitterProfile?.isCertified) {
+    uni.showModal({
+      title: '未认证',
+      content: '发布接单意向需要先完成宠托师认证',
+      confirmText: '去认证',
+      success: (res) => {
+        if (res.confirm) {
+          uni.navigateTo({ url: '/pages/profile/certification' });
+        }
+      }
+    });
+    return;
+  }
+  
+  uni.navigateTo({
+    url: '/pages/publish/sitter'
+  });
+};
+
+const selectService = (type: ServiceType | string) => {
   uni.navigateTo({
     url: `/pages/publish/index?serviceType=${type}`
   });
@@ -320,11 +422,14 @@ const handleAcceptOrder = (orderId: string) => {
 }
 
 .header-section {
-  padding: $spacing-lg $spacing-lg 0;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  margin-bottom: $spacing-lg;
+  padding: 20rpx 30rpx 0;
+  
+  .header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30rpx;
+  }
 
   .user-welcome {
     display: flex;
@@ -332,12 +437,6 @@ const handleAcceptOrder = (orderId: string) => {
     flex: 1;
     min-width: 0;
     margin-right: $spacing-md;
-    
-    .greeting {
-      font-size: 28rpx;
-      color: $color-text-secondary;
-      margin-bottom: 4rpx;
-    }
     
     .username {
       font-size: 44rpx;
@@ -457,6 +556,46 @@ const handleAcceptOrder = (orderId: string) => {
       transform: rotate(15deg) translateY(20rpx);
       filter: drop-shadow(0 10rpx 20rpx rgba(0,0,0,0.2));
     }
+  }
+}
+
+.sitter-action-card {
+  margin: 0 $spacing-lg $spacing-lg;
+  background: linear-gradient(135deg, #FFF0E5 0%, #FFFFFF 100%);
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: $shadow-sm;
+  border: 1px solid rgba(255, 142, 60, 0.1);
+
+  .action-info {
+    flex: 1;
+    margin-right: $spacing-md;
+    
+    .action-title {
+      font-size: 32rpx;
+      font-weight: bold;
+      color: $color-text-main;
+      margin-bottom: 8rpx;
+      display: block;
+    }
+    
+    .action-desc {
+      font-size: 24rpx;
+      color: $color-text-secondary;
+    }
+  }
+
+  .action-btn {
+    background: $color-primary;
+    color: #fff;
+    font-size: 28rpx;
+    font-weight: 600;
+    padding: 12rpx 32rpx;
+    border-radius: $radius-full;
+    box-shadow: 0 4rpx 12rpx rgba(255, 142, 60, 0.3);
   }
 }
 
@@ -636,6 +775,82 @@ const handleAcceptOrder = (orderId: string) => {
 
 // 宠托师视图样式
 .sitter-view {
+  .hall-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: $spacing-md;
+    
+    .title {
+      font-size: 36rpx;
+      font-weight: 800;
+      color: $color-text-main;
+    }
+    
+    .subtitle {
+      font-size: 24rpx;
+      color: $color-text-secondary;
+    }
+  }
+
+  .filter-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: $spacing-md;
+    background: #FFF;
+    padding: 16rpx 20rpx;
+    border-radius: $radius-md;
+    box-shadow: $shadow-sm;
+    
+    .sort-options {
+      display: flex;
+      gap: 24rpx;
+      
+      .sort-item {
+        font-size: 26rpx;
+        color: $color-text-secondary;
+        position: relative;
+        padding-bottom: 4rpx;
+        
+        &.active {
+          color: $color-primary;
+          font-weight: 600;
+          
+          &::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 20rpx;
+            height: 4rpx;
+            background: $color-primary;
+            border-radius: 2rpx;
+          }
+        }
+      }
+    }
+    
+    .filter-options {
+      .filter-btn {
+        display: flex;
+        align-items: center;
+        gap: 4rpx;
+        font-size: 26rpx;
+        color: $color-text-main;
+        background: $color-bg;
+        padding: 8rpx 16rpx;
+        border-radius: $radius-sm;
+        
+        .icon {
+          font-size: 20rpx;
+          color: $color-text-secondary;
+        }
+      }
+    }
+  }
+
   .empty-state {
     display: flex;
     flex-direction: column;
@@ -691,16 +906,19 @@ const handleAcceptOrder = (orderId: string) => {
             color: $color-text-main;
           }
           
-          .price {
-            font-size: 32rpx;
-            font-weight: 800;
-            color: $color-price;
+          .distance-tag {
+            font-size: 22rpx;
+            color: $color-text-secondary;
+            background: $color-bg;
+            padding: 4rpx 12rpx;
+            border-radius: 8rpx;
           }
         }
         
-        .time {
-          font-size: 24rpx;
-          color: $color-text-secondary;
+        .price {
+          font-size: 32rpx;
+          font-weight: 800;
+          color: $color-price;
         }
       }
       
@@ -722,6 +940,11 @@ const handleAcceptOrder = (orderId: string) => {
             color: $color-text-main;
             flex: 1;
             @include text-ellipsis;
+
+            &.highlight {
+              color: $color-primary;
+              font-weight: 600;
+            }
           }
         }
       }
