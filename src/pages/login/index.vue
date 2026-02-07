@@ -73,23 +73,27 @@
 
         <!-- 邮箱输入 -->
         <block v-else>
-          <input 
-            class="input-field" 
-            type="text" 
-            v-model="email" 
-            placeholder="请输入邮箱" 
-            placeholder-class="input-placeholder"
-          />
+          <view class="input-group">
+            <input 
+              class="input-field" 
+              type="text" 
+              v-model="email" 
+              placeholder="请输入邮箱" 
+              placeholder-class="input-placeholder"
+            />
+          </view>
         </block>
 
         <!-- 密码输入 (通用) -->
-        <input 
-          class="input-field" 
-          type="password" 
-          v-model="password" 
-          placeholder="请输入密码" 
-          placeholder-class="input-placeholder"
-        />
+        <view class="input-group">
+          <input 
+            class="input-field" 
+            type="password" 
+            v-model="password" 
+            placeholder="请输入密码" 
+            placeholder-class="input-placeholder"
+          />
+        </view>
 
         <!-- 仅注册时显示：昵称、头像、角色选择 -->
         <block v-if="isRegister">
