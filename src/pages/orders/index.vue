@@ -50,29 +50,87 @@
 
           <!-- 卡片内容：核心信息 -->
           <view class="card-body">
-            <view class="info-grid">
-              <view class="info-item full">
-                <text class="icon">🕒</text>
-                <text class="text">{{ order.time }} ({{ order.duration }}h)</text>
+            <!-- 1. 宠物信息 -->
+            <view class="info-section pet-section" v-if="order.petName">
+              <view class="pet-header-row">
+                 <text class="pet-name">{{ order.petName }}</text>
+                 <text class="pet-breed">{{ order.petBreed }}</text>
+                 <view class="pet-tags" v-if="order.petSnapshot">
+                    <text class="tag" v-if="order.petSnapshot.sterilized">已绝育</text>
+                    <text class="tag" v-if="order.petSnapshot.vaccine">已免疫</text>
+                 </view>
               </view>
-              <view class="info-item full">
-                <text class="icon">📍</text>
-                <text class="text address-text">{{ order.address }}</text>
+              <view class="pet-details-row">
+                 <text>{{ order.petGender === 'male' ? '弟弟' : '妹妹' }}</text>
+                 <text class="divider">|</text>
+                 <text>{{ order.petAge }}岁</text>
+                 <text class="divider">|</text>
+                 <text>{{ order.petWeight }}kg</text>
               </view>
-              <view class="info-item">
-                <text class="icon">🐾</text>
-                <text class="text">{{ formatPetSize(order.petSize) }}</text>
+              <view class="pet-pref-row" v-if="order.petSnapshot?.description">
+                 <text class="label">偏好：</text>
+                 <text class="val">{{ order.petSnapshot.description }}</text>
               </view>
-              <view class="info-item" v-if="hasAddOns(order.addOns)">
-                <text class="icon">✨</text>
-                <text class="text highlight">含增值服务</text>
-              </view>
-              <view class="info-item full" v-if="order.serviceEvidence">
-                <text class="icon">📷</text>
-                <view class="evidence-photos">
-                   <image v-for="(photo, idx) in order.serviceEvidence.photos" :key="idx" :src="photo" class="evidence-img" mode="aspectFill" @click.stop="previewImage(order.serviceEvidence.photos, idx)"></image>
+            </view>
+            
+            <!-- 2. 服务信息 -->
+            <view class="info-section service-section">
+               <!-- 基础服务内容 -->
+               <view class="info-row content-row">
+                  <text class="icon">📋</text>
+                  <view class="content-list">
+                     <text class="content-label">包含服务：</text>
+                     <view class="content-tags">
+                        <text class="content-tag" v-for="item in getServiceItems(order.serviceType)" :key="item">{{ item }}</text>
+                     </view>
+                  </view>
+               </view>
+
+               <view class="info-row">
+                  <text class="icon">🕒</text>
+                  <text class="text highlight">{{ order.time }}</text>
+                  <text class="sub-text">({{ order.duration }}分钟)</text>
+               </view>
+               <view class="info-row">
+                  <text class="icon">📍</text>
+                  <text class="text address">{{ order.address }}</text>
+               </view>
+               <!-- Add-ons -->
+               <view class="info-row" v-if="hasAddOns(order.addOns)">
+                  <text class="icon">✨</text>
+                  <view class="addons-list">
+                     <text class="content-label">附加服务：</text>
+                     <view class="addons-tags">
+                        <text class="addon-tag" v-if="order.addOns.play">陪玩</text>
+                        <text class="addon-tag" v-if="order.addOns.deepClean">深度清洁</text>
+                        <text class="addon-tag" v-if="order.addOns.medicine">喂药</text>
+                     </view>
+                  </view>
+               </view>
+            </view>
+
+            <!-- 3. 联系人信息 (仅接单后可见) -->
+            <view class="info-section contact-section" v-if="!isOwner && ['ACCEPTED', 'IN_SERVICE'].includes(order.status) && order.contactPhone">
+                <view class="contact-box">
+                    <view class="contact-left">
+                        <text class="label">联系人</text>
+                        <view class="person">
+                            <text class="name">{{ order.contactName }}</text>
+                            <text class="phone-link" @click.stop="makeCall(order.contactPhone)">{{ order.contactPhone }}</text>
+                        </view>
+                    </view>
+                    <view class="call-btn" @click.stop="makeCall(order.contactPhone)">
+                        <text class="icon">📞</text>
+                        <text>拨打</text>
+                    </view>
                 </view>
-              </view>
+            </view>
+            
+            <view class="info-section evidence-section" v-if="order.serviceEvidence">
+               <text class="section-label">服务实拍</text>
+               <view class="evidence-photos">
+                  <image v-for="(photo, idx) in order.serviceEvidence.photos" :key="idx" :src="photo" class="evidence-img" mode="aspectFill" @click.stop="previewImage(order.serviceEvidence.photos, idx)"></image>
+               </view>
             </view>
           </view>
           
@@ -267,6 +325,13 @@ const filteredOrders = computed(() => {
 
 const formatServiceType = (type: ServiceType) => {
   return type === ServiceType.FEEDING ? '上门喂养' : '上门遛狗';
+};
+
+const getServiceItems = (type: ServiceType) => {
+  if (type === ServiceType.FEEDING) {
+    return ['喂食', '换水', '铲屎', '拍摄反馈'];
+  }
+  return ['遛狗', '陪玩', '清洁', '拍摄反馈'];
 };
 
 const formatPetSize = (size: PetSize) => {
@@ -515,6 +580,21 @@ const handleReview = (order: Order) => {
 
 const handleReorder = (order: Order) => {
     goToPublish();
+};
+
+const makeCall = (phone: string) => {
+    uni.showModal({
+        title: '拨打电话',
+        content: `确认拨打 ${phone} 吗？`,
+        confirmText: '拨打',
+        success: (res) => {
+            if (res.confirm) {
+                uni.makePhoneCall({
+                    phoneNumber: phone
+                });
+            }
+        }
+    });
 };
 
 </script>
@@ -779,40 +859,160 @@ const handleReorder = (order: Order) => {
   }
   
   .card-body {
-    .info-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16rpx;
+    display: flex;
+    flex-direction: column;
+    gap: 20rpx;
+    
+    .info-section {
+      background: #F9FAFB;
+      border-radius: 12rpx;
+      padding: 20rpx;
       
-      .info-item {
-        display: flex;
-        align-items: center;
+      &.pet-section {
+        background: #FFF5EB; // Light orange bg
         
-        &.full {
-          grid-column: span 2;
-        }
-        
-        .icon {
-          font-size: 28rpx;
-          margin-right: 12rpx;
-          opacity: 0.8;
-        }
-        
-        .text {
-          font-size: 26rpx;
-          color: $color-text-regular;
+        .pet-header-row {
+          display: flex;
+          align-items: center;
+          margin-bottom: 12rpx;
           
-          &.address-text {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-          }
-          
-          &.highlight {
-            color: $color-primary;
-            font-weight: 500;
+          .pet-name { font-size: 30rpx; font-weight: 700; color: #333; margin-right: 12rpx; }
+          .pet-breed { font-size: 24rpx; color: #666; margin-right: 12rpx; }
+          .pet-tags { 
+            display: flex; gap: 8rpx;
+            .tag { font-size: 20rpx; color: #FF8E3C; border: 1px solid #FF8E3C; padding: 0 8rpx; border-radius: 4rpx; }
           }
         }
+        
+        .pet-details-row {
+          font-size: 24rpx;
+          color: #666;
+          margin-bottom: 12rpx;
+          display: flex;
+          align-items: center;
+          .divider { color: #DDD; margin: 0 12rpx; }
+        }
+        
+        .pet-pref-row {
+           font-size: 24rpx;
+           color: #666;
+           background: rgba(255,255,255,0.8);
+           padding: 12rpx;
+           border-radius: 8rpx;
+           .label { color: #999; }
+           .val { color: #333; }
+        }
+      }
+      
+      &.service-section {
+         .info-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 16rpx;
+            &:last-child { margin-bottom: 0; }
+            
+            &.content-row {
+               align-items: flex-start;
+               .icon { margin-top: 4rpx; }
+            }
+            
+            .icon { font-size: 30rpx; margin-right: 16rpx; }
+            .text { font-size: 28rpx; color: #333; }
+            .sub-text { font-size: 24rpx; color: #999; margin-left: 8rpx; }
+            .address { 
+              flex: 1; 
+              overflow: hidden; 
+              text-overflow: ellipsis; 
+              white-space: nowrap; 
+              color: #333;
+            }
+            .highlight { font-weight: 500; }
+            
+            .content-list, .addons-list {
+               flex: 1;
+               
+               .content-label {
+                  font-size: 24rpx;
+                  color: #999;
+                  margin-bottom: 8rpx;
+                  display: block;
+               }
+               
+               .content-tags, .addons-tags {
+                  display: flex;
+                  flex-wrap: wrap;
+                  gap: 12rpx;
+               }
+               
+               .content-tag {
+                  font-size: 22rpx;
+                  color: #666;
+                  background: #F0F0F0;
+                  padding: 4rpx 12rpx;
+                  border-radius: 6rpx;
+               }
+               
+               .addon-tag {
+                  font-size: 22rpx; 
+                  background: #E6F7FF; 
+                  color: #1890FF; 
+                  padding: 4rpx 12rpx; 
+                  border-radius: 6rpx; 
+               }
+            }
+         }
+      }
+      
+      &.contact-section {
+         background: #F0F9FF;
+         border: 1px solid #E6F7FF;
+         
+         .contact-box {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            
+            .contact-left {
+               display: flex;
+               flex-direction: column;
+               
+               .label { font-size: 20rpx; color: #1890FF; opacity: 0.8; margin-bottom: 6rpx; }
+               .person {
+                  display: flex;
+                  align-items: center;
+                  gap: 16rpx;
+                  
+                  .name { font-size: 28rpx; font-weight: 600; color: #333; }
+                  .phone-link { 
+                    font-size: 28rpx; 
+                    color: #1890FF; 
+                    text-decoration: underline; 
+                    font-weight: 500;
+                  }
+               }
+            }
+            
+            .call-btn {
+               display: flex;
+               align-items: center;
+               gap: 8rpx;
+               background: #1890FF;
+               color: #FFF;
+               padding: 12rpx 28rpx;
+               border-radius: 100rpx;
+               font-size: 24rpx;
+               font-weight: 500;
+               box-shadow: 0 4rpx 12rpx rgba(24, 144, 255, 0.3);
+               
+               .icon { font-size: 24rpx; }
+               
+               &:active { opacity: 0.9; transform: scale(0.98); }
+            }
+         }
+      }
+      
+      &.evidence-section {
+         .section-label { font-size: 24rpx; color: #999; margin-bottom: 12rpx; display: block; }
       }
     }
   }

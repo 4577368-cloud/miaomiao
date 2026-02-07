@@ -8,6 +8,19 @@ export interface Order {
   creatorId: string; // 发布者ID
   sitterId?: string; // 接单者ID
   sitterSnapshot?: UserInfo; // 接单者快照信息
+  
+  // Pet Details Snapshot
+  petName?: string;
+  petBreed?: string;
+  petGender?: 'male' | 'female';
+  petAge?: number;
+  petWeight?: number;
+  petSnapshot?: any; // Complete PetInfo snapshot
+  
+  // Contact Info
+  contactName: string;
+  contactPhone: string;
+  
   serviceType: ServiceType;
   petSize: PetSize;
   duration: number;

@@ -127,19 +127,32 @@
       </view>
       
       <!-- My Pets Selection -->
-      <view class="my-pets" v-if="userStore.userInfo?.pets?.length">
-         <text class="sub-label">从我的爱宠中选择：</text>
+      <view class="my-pets">
+         <view class="section-header-row">
+            <text class="sub-label">从我的爱宠中选择：</text>
+            <view class="add-pet-link" @click="goToPetPage">
+               <text class="plus">+</text>
+               <text>管理/添加</text>
+            </view>
+         </view>
+         
          <scroll-view scroll-x class="pets-scroll">
             <view class="pets-row">
                <view 
                   class="my-pet-item" 
-                  v-for="pet in userStore.userInfo.pets" 
+                  v-for="pet in userStore.userInfo?.pets" 
                   :key="pet.id"
                   :class="{ active: selectedPetId === pet.id }"
                   @click="selectMyPet(pet)"
                >
                   <image :src="pet.avatar || '/static/default-pet.png'" mode="aspectFill" class="pet-avatar" />
                   <text class="pet-name">{{ pet.name }}</text>
+               </view>
+               
+               <!-- Add Pet Card (Visible when list is empty or always at end) -->
+               <view class="my-pet-item add-item" @click="goToPetPage">
+                  <view class="add-icon">+</view>
+                  <text class="pet-name">添加爱宠</text>
                </view>
             </view>
          </scroll-view>
@@ -283,12 +296,66 @@
       </view>
       <button class="btn-submit" @click="handleSubmit">立即发布</button>
     </view>
+
+    <!-- 优惠券选择弹窗 -->
+    <view class="coupon-popup-mask" v-if="showCouponPopup" @click="closeCouponPopup">
+      <view class="coupon-popup-content" @click.stop>
+        <view class="popup-header">
+          <text class="popup-title">选择优惠券</text>
+          <text class="popup-close" @click="closeCouponPopup">×</text>
+        </view>
+        
+        <scroll-view scroll-y class="coupon-scroll">
+          <view class="coupon-list">
+             <!-- 不使用优惠券选项 -->
+            <view 
+              class="no-coupon-item" 
+              :class="{ active: !form.couponId }"
+              @click="selectCoupon('')"
+            >
+              <text>不使用优惠券</text>
+              <view class="radio-circle" :class="{ checked: !form.couponId }"></view>
+            </view>
+
+            <!-- 优惠券列表 -->
+            <view 
+              class="coupon-card-item" 
+              v-for="coupon in availableCoupons" 
+              :key="coupon.id"
+              @click="selectCoupon(coupon.id)"
+            >
+              <view class="card-left">
+                <view class="amount-box">
+                  <text class="symbol">¥</text>
+                  <text class="num">{{ coupon.value }}</text>
+                </view>
+                <text class="condition">{{ coupon.threshold > 0 ? `满${coupon.threshold}可用` : '无门槛' }}</text>
+              </view>
+              <view class="card-right">
+                <view class="info">
+                  <text class="name">{{ coupon.name }}</text>
+                  <text class="date">有效期至 {{ new Date(coupon.expiresAt).toLocaleDateString() }}</text>
+                </view>
+                <view class="radio-circle" :class="{ checked: form.couponId === coupon.id }"></view>
+              </view>
+              <!-- 锯齿装饰 -->
+              <view class="sawtooth-left"></view>
+              <view class="sawtooth-right"></view>
+            </view>
+            
+            <view v-if="availableCoupons.length === 0" class="empty-coupons">
+              <text>暂无可用优惠券</text>
+            </view>
+          </view>
+        </scroll-view>
+      </view>
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
 import { reactive, computed, ref, onUnmounted } from 'vue';
-import { onLoad } from '@dcloudio/uni-app';
+import { onLoad, onShow } from '@dcloudio/uni-app';
 import { PetSize, ServiceType, ADD_ON_PRICES, PET_SIZE_COEFFICIENTS } from '@/constants/pet';
 import { calculateTotalPrice } from '@/utils/pricing';
 import { useOrderStore } from '@/stores/order';
@@ -299,10 +366,11 @@ const userStore = useUserStore();
 const BASE_PRICE = 50; 
 
 const selectedPetId = ref<string>('');
+const showCouponPopup = ref(false);
+const lastPetCount = ref(0);
 
 const selectMyPet = (pet: PetInfo) => {
   if (selectedPetId.value === pet.id) {
-    // Deselect
     selectedPetId.value = '';
     form.remark = '';
     return;
@@ -319,6 +387,8 @@ const selectMyPet = (pet: PetInfo) => {
 
 const form = reactive({
   address: '',
+  contactName: '',
+  contactPhone: '',
   date: '',
   time: '',
   serviceType: ServiceType.FEEDING,
@@ -333,6 +403,10 @@ const form = reactive({
     medicine: false,
   }
 });
+
+const goToPetPage = () => {
+  uni.navigateTo({ url: '/pages/pet/index' });
+};
 
 // 日期范围: 今天 ~ 30天后
 const today = new Date();
@@ -375,13 +449,15 @@ const selectedCoupon = computed(() => {
   return userStore.userInfo?.coupons?.find(c => c.id === form.couponId) || null;
 });
 
-const availableCouponsCount = computed(() => {
+const availableCoupons = computed(() => {
   return userStore.userInfo?.coupons?.filter(c => 
     c.status === 'UNUSED' && 
     c.expiresAt > Date.now() && 
     (c.threshold === 0 || c.threshold <= rawTotalPrice.value)
-  ).length || 0;
+  ) || [];
 });
+
+const availableCouponsCount = computed(() => availableCoupons.value.length);
 
 const finalPrice = computed(() => {
   let price = rawTotalPrice.value;
@@ -399,6 +475,9 @@ const finalPrice = computed(() => {
 const totalPrice = finalPrice;
 
 onLoad((options: any) => {
+  // Initialize lastPetCount
+  lastPetCount.value = userStore.userInfo?.pets?.length || 0;
+
   if (options.serviceType) {
     // Ensure the service type is valid before setting
     const type = options.serviceType as ServiceType;
@@ -412,8 +491,41 @@ onLoad((options: any) => {
   
   // Listen for address selection
   uni.$on('addressSelected', (addr: Address) => {
-    form.address = `${addr.name ? addr.name + ' ' : ''}${addr.detail} (${addr.contactName} ${addr.contactPhone})`;
+    // form.address = `${addr.name ? addr.name + ' ' : ''}${addr.detail} (${addr.contactName} ${addr.contactPhone})`;
+    // User requested to remove the label (e.g. "Home") and just show detail + contact
+    form.address = `${addr.detail} (${addr.contactName} ${addr.contactPhone})`;
+    form.contactName = addr.contactName;
+    form.contactPhone = addr.contactPhone;
   });
+});
+
+onShow(() => {
+  const currentPets = userStore.userInfo?.pets || [];
+  
+  // If selectedPetId is set but pet no longer exists (deleted), clear it
+  if (selectedPetId.value && !currentPets.find(p => p.id === selectedPetId.value)) {
+     selectedPetId.value = '';
+     form.remark = '';
+  }
+  
+  // Auto-select logic
+  if (currentPets.length > 0) {
+      // Case 1: First pet added or Single pet default selection
+      if (!selectedPetId.value && currentPets.length === 1) {
+          // Only select if we didn't explicitly deselect (hard to track "explicit deselect", so just auto-select for now)
+          selectMyPet(currentPets[0]);
+      }
+      // Case 2: New pet added (count increased)
+      else if (currentPets.length > lastPetCount.value) {
+          // Select the last added pet
+          const newPet = currentPets[currentPets.length - 1];
+          if (newPet.id !== selectedPetId.value) {
+             selectMyPet(newPet);
+          }
+      }
+  }
+  
+  lastPetCount.value = currentPets.length;
 });
 
 onUnmounted(() => {
@@ -453,30 +565,16 @@ const handleAddressSelect = () => {
 };
 
 const openCouponSelector = () => {
-  const available = userStore.userInfo?.coupons?.filter(c => 
-    c.status === 'UNUSED' && 
-    c.expiresAt > Date.now() && 
-    (c.threshold === 0 || c.threshold <= rawTotalPrice.value)
-  ) || [];
-  
-  if (available.length === 0) {
-    uni.showToast({ title: '暂无可用优惠券', icon: 'none' });
-    return;
-  }
-  
-  const itemList = available.map(c => `¥${c.value} ${c.name} (${c.threshold > 0 ? `满${c.threshold}可用` : '无门槛'})`);
-  itemList.push('不使用优惠券');
-  
-  uni.showActionSheet({
-    itemList,
-    success: (res) => {
-      if (res.tapIndex === itemList.length - 1) {
-        form.couponId = '';
-      } else {
-        form.couponId = available[res.tapIndex].id;
-      }
-    }
-  });
+  showCouponPopup.value = true;
+};
+
+const closeCouponPopup = () => {
+  showCouponPopup.value = false;
+};
+
+const selectCoupon = (id: string) => {
+  form.couponId = id;
+  closeCouponPopup();
 };
 
 const handleDateChange = (e: any) => {
@@ -488,6 +586,21 @@ const handleTimeChange = (e: any) => {
 };
 
 const handleSubmit = () => {
+  if (!selectedPetId.value) {
+    uni.showModal({
+      title: '温馨提示',
+      content: '请先选择需要服务的爱宠，以便宠托师了解详情',
+      confirmText: '去添加',
+      cancelText: '再看看',
+      success: (res) => {
+        if (res.confirm) {
+          goToPetPage();
+        }
+      }
+    });
+    return;
+  }
+
   if (!form.address) return uni.showToast({ title: '请选择地址', icon: 'none' });
   if (!form.date || !form.time) return uni.showToast({ title: '请选择时间', icon: 'none' });
 
@@ -525,6 +638,8 @@ const handleSubmit = () => {
           if (userStore.deductBalance(price)) {
               uni.showToast({ title: '支付成功', icon: 'success' });
               
+              const pet = userStore.userInfo?.pets?.find(p => p.id === selectedPetId.value);
+              
               orderStore.addOrder({
                 id: Date.now().toString(),
                 creatorId: userStore.userInfo?.id || 'anonymous',
@@ -538,7 +653,16 @@ const handleSubmit = () => {
                 isPaid: true,
                 createdAt: Date.now(),
                 remark: form.remark,
-                addOns: form.addOns
+                addOns: form.addOns,
+                // Enhanced fields
+                petName: pet?.name,
+                petBreed: pet?.type === 'cat' ? '猫咪' : '狗狗',
+                petGender: pet?.gender,
+                petAge: pet?.age,
+                petWeight: pet?.weight,
+                petSnapshot: pet,
+                contactName: form.contactName,
+                contactPhone: form.contactPhone
               });
               
               // Use coupon if selected
@@ -555,7 +679,7 @@ const handleSubmit = () => {
         }
       }
     });
-  }, 1000);
+  }, 500);
 };
 </script>
 
@@ -563,11 +687,31 @@ const handleSubmit = () => {
 .my-pets {
   margin-bottom: 20px;
   
-  .sub-label {
-    font-size: 14px;
-    color: #666;
-    margin-bottom: 12px;
-    display: block;
+  .section-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12rpx;
+    
+    .sub-label {
+      font-size: 26rpx;
+      color: #666;
+      margin-bottom: 0;
+    }
+    
+    .add-pet-link {
+      display: flex;
+      align-items: center;
+      font-size: 26rpx;
+      color: #FF8E3C;
+      font-weight: 500;
+      
+      .plus {
+        font-size: 32rpx;
+        margin-right: 4rpx;
+        line-height: 1;
+      }
+    }
   }
   
   .pets-scroll {
@@ -599,6 +743,29 @@ const handleSubmit = () => {
       .pet-name {
         color: #FF8E3C;
         font-weight: bold;
+      }
+    }
+    
+    &.add-item {
+      opacity: 1;
+      
+      .add-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 25px;
+        background: #FFF0E5;
+        border: 2px dashed #FF8E3C;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: #FF8E3C;
+        font-size: 24px;
+        margin-bottom: 6px;
+        box-sizing: border-box;
+      }
+      
+      .pet-name {
+        color: #FF8E3C;
       }
     }
     
@@ -765,15 +932,16 @@ const handleSubmit = () => {
         flex: 1;
         
         .row-label {
-          font-size: 24rpx;
+          font-size: 28rpx;
           color: $color-text-secondary;
           margin-bottom: 8rpx;
         }
         
         .row-value {
-          font-size: 32rpx;
-          font-weight: 600;
+          font-size: 28rpx;
+          font-weight: 500;
           color: $color-text-main;
+          line-height: 1.4;
           
           &.placeholder {
             color: $color-text-placeholder;
@@ -1155,5 +1323,177 @@ const handleSubmit = () => {
       opacity: 0.95;
     }
   }
+}
+
+/* Coupon Popup */
+.coupon-popup-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 999;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+}
+
+.coupon-popup-content {
+  width: 100%;
+  background: #F5F6F8;
+  border-radius: 40rpx 40rpx 0 0;
+  padding: 32rpx;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32rpx;
+  
+  .popup-title {
+    font-size: 36rpx;
+    font-weight: 700;
+    color: #333;
+  }
+  
+  .popup-close {
+    font-size: 48rpx;
+    color: #999;
+    padding: 0 16rpx;
+  }
+}
+
+.coupon-scroll {
+  flex: 1;
+  max-height: 60vh;
+}
+
+.coupon-list {
+  padding-bottom: 32rpx;
+}
+
+.no-coupon-item {
+  background: #FFF;
+  border-radius: 24rpx;
+  padding: 32rpx;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24rpx;
+  
+  text {
+    font-size: 30rpx;
+    color: #333;
+  }
+  
+  &.active {
+    border: 2rpx solid #FF8E3C;
+    background: #FFF0E5;
+    text { color: #FF8E3C; font-weight: 500; }
+  }
+}
+
+.coupon-card-item {
+  background: linear-gradient(135deg, #FF4D4F 0%, #FF7875 100%);
+  border-radius: 24rpx;
+  padding: 32rpx;
+  margin-bottom: 24rpx;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #FFF;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8rpx 24rpx rgba(255, 77, 79, 0.2);
+  
+  .card-left {
+    display: flex;
+    flex-direction: column;
+    
+    .amount-box {
+      display: flex;
+      align-items: baseline;
+      margin-bottom: 8rpx;
+      
+      .symbol { font-size: 32rpx; font-weight: 500; margin-right: 4rpx; }
+      .num { font-size: 64rpx; font-weight: 800; line-height: 1; }
+    }
+    
+    .condition {
+      font-size: 24rpx;
+      opacity: 0.9;
+    }
+  }
+  
+  .card-right {
+    display: flex;
+    align-items: center;
+    
+    .info {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      margin-right: 24rpx;
+      
+      .name { font-size: 32rpx; font-weight: 700; margin-bottom: 8rpx; }
+      .date { font-size: 20rpx; opacity: 0.8; }
+    }
+  }
+  
+  .sawtooth-left, .sawtooth-right {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 24rpx;
+    height: 24rpx;
+    background: #F5F6F8;
+    border-radius: 50%;
+  }
+  
+  .sawtooth-left { left: -12rpx; }
+  .sawtooth-right { right: -12rpx; }
+}
+
+.radio-circle {
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  border: 2rpx solid rgba(255,255,255,0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  
+  &.checked {
+    background: #FFF;
+    border-color: #FFF;
+    
+    &::after {
+      content: '✓';
+      color: #FF4D4F;
+      font-size: 24rpx;
+      font-weight: bold;
+    }
+  }
+}
+
+.no-coupon-item .radio-circle {
+    border-color: #DDD;
+    &.checked {
+        background: #FF8E3C;
+        border-color: #FF8E3C;
+        &::after { color: #FFF; }
+    }
+}
+
+.empty-coupons {
+  text-align: center;
+  padding: 64rpx 0;
+  color: #999;
+  font-size: 28rpx;
 }
 </style>

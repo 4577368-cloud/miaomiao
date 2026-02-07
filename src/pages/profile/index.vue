@@ -10,8 +10,6 @@
           <view class="avatar-box" @click="handleAvatarClick">
             <image v-if="userInfo?.avatar" :src="userInfo.avatar" class="avatar-img" mode="aspectFill" />
             <view v-else class="avatar"></view>
-            <view class="status-dot"></view>
-            <view class="edit-hint">📷</view>
           </view>
           <view class="info-content">
             <view class="name-row">
@@ -20,28 +18,53 @@
                 <text>{{ roleLabel }}</text>
               </view>
             </view>
+            <view class="join-days" v-if="userInfo?.joinDate">
+               <text>已加入 {{ joinedDays }} 天</text>
+            </view>
             <text class="bio">还没有填写个人简介...</text>
           </view>
         </view>
         
         <view class="stats-row">
-          <view class="stat-item">
-            <text class="num">{{ joinedDays }}</text>
-            <text class="label">加入天数</text>
+          <view class="stat-item" @click="navigateTo('/pages/wallet/index')">
+             <view class="num-row">
+               <text class="symbol">¥</text>
+               <text class="num">{{ userInfo?.balance?.toFixed(2) || '0.00' }}</text>
+             </view>
+             <text class="label">余额</text>
           </view>
           <view class="stat-item">
-            <text class="num">0.00</text>
-            <text class="label">余额</text>
+            <text class="num">{{ userInfo?.coupons?.length || 0 }}</text>
+            <text class="label">优惠券</text>
           </view>
           <view class="stat-item">
-            <text class="num">0</text>
+            <text class="num">{{ userInfo?.points || 0 }}</text>
             <text class="label">积分</text>
           </view>
         </view>
       </view>
     </view>
     
-    <!-- 我的爱宠 (Horizontal Scroll) - REMOVED -->
+    <!-- 我的爱宠 -->
+    <view class="section-title" v-if="currentRole === 'owner'">我的爱宠</view>
+    <view class="pets-section" v-if="currentRole === 'owner'">
+      <scroll-view scroll-x class="pets-scroll">
+        <view class="pets-row">
+          <view class="pet-card" v-for="pet in userInfo?.pets" :key="pet.id" @click="navigateTo('/pages/pet/index')">
+            <image :src="pet.avatar || '/static/default-pet.png'" class="pet-avatar" mode="aspectFill" />
+            <view class="pet-info">
+              <text class="pet-name">{{ pet.name }}</text>
+              <text class="pet-desc">{{ pet.type === 'cat' ? '猫咪' : '狗狗' }} · {{ pet.age }}岁</text>
+            </view>
+          </view>
+          
+          <view class="add-pet-card" @click="navigateTo('/pages/pet/index')">
+            <text class="plus">+</text>
+            <text class="text">添加爱宠</text>
+          </view>
+        </view>
+      </scroll-view>
+    </view>
 
     <!-- 常用功能 (Bento Grid 风格) -->
     <view class="section-title">我的服务</view>
@@ -104,8 +127,8 @@ const userStore = useUserStore();
 
 const userInfo = computed(() => userStore.userInfo);
 const currentRole = computed(() => userInfo.value?.role || 'owner');
-const roleLabel = computed(() => currentRole.value === 'owner' ? '雇主' : '宠托师');
-const switchRoleLabel = computed(() => currentRole.value === 'owner' ? '切换身份 (宠托师)' : '切换身份 (雇主)');
+const roleLabel = computed(() => currentRole.value === 'owner' ? '铲屎官' : '宠托师');
+const switchRoleLabel = computed(() => currentRole.value === 'owner' ? '切换身份 (宠托师)' : '切换身份 (铲屎官)');
 
 const joinedDays = computed(() => {
   if (!userInfo.value?.joinDate) return 1;
@@ -135,7 +158,7 @@ const handleSwitchRole = () => {
     userStore.switchRole(newRole);
     uni.hideLoading();
     uni.showToast({
-      title: `已切换为${newRole === 'owner' ? '雇主' : '宠托师'}身份`,
+      title: `已切换为${newRole === 'owner' ? '铲屎官' : '宠托师'}身份`,
       icon: 'success'
     });
   }, 500);
@@ -246,6 +269,16 @@ const handleSwitchRole = () => {
         }
       }
       
+      .join-days {
+        font-size: 22rpx;
+        color: #999;
+        margin-bottom: 12rpx;
+        background: rgba(0,0,0,0.03);
+        display: inline-block;
+        padding: 4rpx 12rpx;
+        border-radius: 8rpx;
+      }
+
       .bio {
         font-size: 26rpx;
         color: $color-text-secondary;
@@ -263,6 +296,17 @@ const handleSwitchRole = () => {
       display: flex;
       flex-direction: column;
       align-items: center;
+      
+      .num-row {
+        display: flex;
+        align-items: baseline;
+        
+        .symbol {
+          font-size: 24rpx;
+          font-weight: bold;
+          margin-right: 2rpx;
+        }
+      }
       
       .num {
         font-size: 36rpx;
@@ -355,7 +399,8 @@ const handleSwitchRole = () => {
 
   /* Pets Section */
   .pets-section {
-    margin-bottom: 24px;
+    padding: 0 $spacing-lg;
+    margin-bottom: $spacing-xl;
     
     .pets-scroll {
       width: 100%;
@@ -364,44 +409,46 @@ const handleSwitchRole = () => {
     
     .pets-row {
       display: flex;
-      padding-bottom: 4px;
+      padding-bottom: $spacing-sm;
     }
     
     .pet-card {
       display: inline-flex;
       flex-direction: column;
       align-items: center;
-      width: 100px;
-      margin-right: 12px;
-      background: #fff;
-      border-radius: 12px;
-      padding: 12px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+      width: 200rpx;
+      margin-right: $spacing-md;
+      background: #FFFFFF;
+      border-radius: $radius-lg;
+      padding: $spacing-md;
+      box-shadow: $shadow-sm;
       
       .pet-avatar {
-        width: 50px;
-        height: 50px;
-        border-radius: 25px;
-        margin-bottom: 8px;
-        background: #f0f0f0;
+        width: 100rpx;
+        height: 100rpx;
+        border-radius: 50%;
+        margin-bottom: $spacing-sm;
+        background: #F5F6F8;
       }
       
       .pet-info {
         text-align: center;
+        width: 100%;
+        
         .pet-name {
-          font-size: 14px;
-          font-weight: bold;
-          color: #333;
+          font-size: 28rpx;
+          font-weight: 600;
+          color: $color-text-main;
           display: block;
-          margin-bottom: 2px;
+          margin-bottom: 4rpx;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
-          width: 76px;
         }
+        
         .pet-desc {
-          font-size: 11px;
-          color: #999;
+          font-size: 22rpx;
+          color: $color-text-secondary;
         }
       }
     }
@@ -411,36 +458,23 @@ const handleSwitchRole = () => {
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      width: 100px;
-      height: 110px; // Approximate match
-      background: #fff;
-      border-radius: 12px;
-      border: 1px dashed #ddd;
-      margin-right: 12px;
+      width: 200rpx;
+      height: 220rpx;
+      background: #F9FAFB;
+      border-radius: $radius-lg;
+      border: 2rpx dashed #E5E7EB;
+      margin-right: $spacing-md;
       
       .plus {
-        font-size: 24px;
-        color: #ccc;
-        margin-bottom: 4px;
+        font-size: 48rpx;
+        color: $color-text-placeholder;
+        margin-bottom: 8rpx;
       }
       
       .text {
-        font-size: 12px;
-        color: #999;
+        font-size: 24rpx;
+        color: $color-text-secondary;
       }
-    }
-    
-    .empty-pets {
-      background: #fff;
-      border-radius: 16px;
-      padding: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      
-      .icon { font-size: 24px; margin-right: 12px; }
-      .text { font-size: 14px; color: #666; flex: 1; }
-      .arrow { color: #ccc; }
     }
   }
 

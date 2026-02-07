@@ -21,7 +21,7 @@
       <view class="banner-swiper">
         <swiper class="swiper" autoplay circular interval="5000" duration="500">
           <swiper-item>
-            <view class="banner-item banner-1">
+            <view class="banner-item banner-1" @click="handleClaimCoupon">
               <view class="banner-content">
                 <text class="banner-tag">新人专享</text>
                 <text class="banner-title">首单立减 ¥30</text>
@@ -188,6 +188,22 @@ const pendingOrders = computed(() => {
   return orderStore.orders.filter(order => order.status === 'PENDING');
 });
 
+const handleClaimCoupon = () => {
+  uni.showModal({
+    title: '领取成功',
+    content: '已放到我的优惠',
+    cancelText: '稍后使用',
+    confirmText: '发布任务',
+    success: (res) => {
+      if (res.confirm) {
+        uni.navigateTo({
+          url: '/pages/publish/index'
+        });
+      }
+    }
+  });
+};
+
 // 页面显示时加载数据
 onShow(() => {
   if (!userStore.isLoggedIn) {
@@ -313,6 +329,9 @@ const handleAcceptOrder = (orderId: string) => {
   .user-welcome {
     display: flex;
     flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    margin-right: $spacing-md;
     
     .greeting {
       font-size: 28rpx;
@@ -324,6 +343,8 @@ const handleAcceptOrder = (orderId: string) => {
       font-size: 44rpx;
       font-weight: 800;
       color: $color-text-main;
+      @include text-ellipsis;
+      display: block;
     }
   }
 
@@ -338,9 +359,17 @@ const handleAcceptOrder = (orderId: string) => {
     align-items: center;
     box-shadow: $shadow-sm;
     backdrop-filter: blur(10px);
+    max-width: 40%;
 
     .icon {
       margin-right: 8rpx;
+      flex-shrink: 0;
+    }
+
+    & > text:last-child {
+      flex: 1;
+      min-width: 0;
+      @include text-ellipsis;
     }
   }
 }
