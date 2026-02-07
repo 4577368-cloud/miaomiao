@@ -50,6 +50,7 @@
     "@dcloudio/uni-mp-toutiao": "3.0.0-alpha-5000120260205002",
     "@dcloudio/uni-mp-weixin": "3.0.0-alpha-5000120260205002",
     "@dcloudio/uni-quickapp-webview": "3.0.0-alpha-5000120260205002",
+    "@supabase/supabase-js": "^2.95.3",
     "pinia": "^2.0.36",
     "vue": "^3.5.13",
     "vue-i18n": "^9.1.9"

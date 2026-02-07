@@ -1,5 +1,5 @@
 <template>
-  <view class="container">
+  <view :class="['container', isOwner ? 'theme-owner' : 'theme-sitter']">
     <!-- 顶部导航栏占位 (沉浸式) -->
     <view class="nav-placeholder"></view>
 
@@ -213,11 +213,14 @@
     </view>
 
   </view>
+  <view style="height: 50px;"></view>
+  <CustomTabBar current-path="pages/home/index" />
 </template>
 
 <script setup lang="ts">
+import CustomTabBar from '@/components/custom-tab-bar/index.vue';
 import { ref, computed } from 'vue';
-import { onShow } from '@dcloudio/uni-app';
+import { onShow, onUnload } from '@dcloudio/uni-app';
 import { ServiceType } from '@/constants/pet';
 import { getCurrentLocation } from '@/utils/location';
 import { useUserStore } from '@/stores/user';
@@ -227,6 +230,7 @@ const userStore = useUserStore();
 const orderStore = useOrderStore();
 
 const locationName = ref('点击定位');
+const isMounted = ref(false);
 
 type SortType = 'distance' | 'amount' | 'date';
 const currentSort = ref<SortType>('distance');
@@ -237,8 +241,17 @@ const isOwner = computed(() => userStore.userInfo?.role === 'owner');
 
 const getDistance = (orderId: string) => {
   if (!orderDistances.value[orderId]) {
-    // Generate random distance 0.1 - 5.0 km
-    orderDistances.value[orderId] = parseFloat((Math.random() * 5).toFixed(1));
+    // Generate deterministic "random" distance based on orderId hash
+    // This ensures the distance remains the same for the same orderId across re-renders
+    let hash = 0;
+    for (let i = 0; i < orderId.length; i++) {
+      hash = ((hash << 5) - hash) + orderId.charCodeAt(i);
+      hash |= 0; // Convert to 32bit integer
+    }
+    const absHash = Math.abs(hash);
+    // Map to range 0.1 - 5.0 km
+    const distance = (absHash % 50) / 10 + 0.1;
+    orderDistances.value[orderId] = parseFloat(distance.toFixed(1));
   }
   return orderDistances.value[orderId];
 }
@@ -292,6 +305,7 @@ const handleClaimCoupon = () => {
 
 // 页面显示时加载数据
 onShow(() => {
+  isMounted.value = true;
   if (!userStore.isLoggedIn) {
     uni.reLaunch({ url: '/pages/login/index' });
     return;
@@ -304,15 +318,21 @@ onShow(() => {
   if (locationName.value === '点击定位') {
     getCurrentLocation()
       .then(res => {
+        if (!isMounted.value) return; // Prevent updating if unmounted
         if (res.name) {
           locationName.value = res.name;
         }
       })
       .catch(() => {
+        if (!isMounted.value) return;
         // 定位失败保持默认文案
         console.log('自动定位失败，等待用户手动点击');
       });
   }
+});
+
+onUnload(() => {
+  isMounted.value = false;
 });
 
 const handleLocationClick = () => {
@@ -414,10 +434,30 @@ const handleAcceptOrder = (orderId: string) => {
 </script>
 
 <style lang="scss" scoped>
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(15deg); }
+  50% { transform: translateY(-12rpx) rotate(15deg); }
+}
+
 .container {
   min-height: 100vh;
-  background-color: $color-bg-page;
   padding-bottom: 40rpx;
+  transition: background-color 0.3s;
+  
+  &.theme-owner {
+    background-color: $color-bg-page;
+  }
+  
+  &.theme-sitter {
+    background-color: #F5F7FA; // 冷色调背景
+    
+    // 覆盖 header 区域样式适应深色主题
+    :deep(.header-section) {
+      .user-welcome .username {
+        color: #2C3E50;
+      }
+    }
+  }
 }
 
 .nav-placeholder {
@@ -557,8 +597,9 @@ const handleAcceptOrder = (orderId: string) => {
 
     .banner-img {
       font-size: 140rpx;
-      transform: rotate(15deg) translateY(20rpx);
-      filter: drop-shadow(0 10rpx 20rpx rgba(0,0,0,0.2));
+      transform: rotate(15deg);
+      filter: drop-shadow(0 20rpx 30rpx rgba(0,0,0,0.15));
+      animation: float 4s ease-in-out infinite;
     }
   }
 }
@@ -634,29 +675,34 @@ const handleAcceptOrder = (orderId: string) => {
 
 .service-card {
   height: 220rpx;
-  background: #FFF;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
   border-radius: $radius-lg;
   position: relative;
   overflow: hidden;
-  box-shadow: $shadow-md;
+  box-shadow: 0 16rpx 40rpx rgba(0, 0, 0, 0.05);
   display: flex;
   align-items: center;
   padding: 0 48rpx;
-  transition: transform 0.2s;
+  transition: transform 0.2s, box-shadow 0.2s;
 
   &:active {
     transform: scale(0.98);
+    box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.05);
   }
 
   .card-bg-decoration {
     position: absolute;
-    top: -50%;
-    right: -20%;
-    width: 300rpx;
-    height: 300rpx;
+    top: -40%;
+    right: -15%;
+    width: 320rpx;
+    height: 320rpx;
     border-radius: 50%;
-    opacity: 0.1;
+    opacity: 0.12;
     z-index: 0;
+    filter: blur(40rpx);
   }
 
   &.feed {
@@ -926,9 +972,10 @@ const handleAcceptOrder = (orderId: string) => {
         }
         
         .price {
-          font-size: 32rpx;
-          font-weight: 800;
-          color: $color-price;
+          font-size: 44rpx;
+          font-weight: 900;
+          color: #FF6B6B;
+          text-shadow: 0 4rpx 12rpx rgba(255, 107, 107, 0.15);
         }
       }
       
@@ -954,6 +1001,9 @@ const handleAcceptOrder = (orderId: string) => {
             &.highlight {
               color: $color-primary;
               font-weight: 600;
+              background: rgba(255, 142, 60, 0.1);
+              padding: 0 8rpx;
+              border-radius: 4rpx;
             }
           }
         }

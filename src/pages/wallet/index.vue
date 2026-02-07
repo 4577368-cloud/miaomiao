@@ -1,130 +1,136 @@
 <template>
   <view class="container">
-    <!-- Balance Card -->
-    <view class="balance-card">
-      <view class="balance-info" @click="handleWithdraw">
-        <text class="label">账户余额 (元)</text>
-        <text class="amount">{{ userStore.userInfo?.balance?.toFixed(2) || '0.00' }}</text>
-        <text class="withdraw-hint" v-if="(userStore.userInfo?.balance || 0) > 0">点击提现</text>
-      </view>
-      <button class="btn-recharge" @click="handleRecharge">充值</button>
-    </view>
-    
-    <!-- Coupons Section -->
-    <view class="coupons-section">
-      <view class="tabs">
-        <text 
-          class="tab" 
-          :class="{ active: currentTab === 0 }" 
-          @click="currentTab = 0"
-        >未使用 ({{ unusedCoupons.length }})</text>
-        <text 
-          class="tab" 
-          :class="{ active: currentTab === 1 }" 
-          @click="currentTab = 1"
-        >失效/已用</text>
-      </view>
-      
-      <scroll-view scroll-y class="coupon-list">
-        <view 
-          class="coupon-card" 
-          v-for="coupon in displayCoupons" 
-          :key="coupon.id"
-          :class="{ disabled: currentTab === 1 }"
-        >
-          <view class="left-part">
-            <text class="symbol">¥</text>
-            <text class="value">{{ coupon.value }}</text>
-          </view>
-          <view class="middle-part">
-            <text class="name">{{ coupon.name }}</text>
-            <text class="condition">{{ coupon.threshold > 0 ? `满${coupon.threshold}元可用` : '无门槛' }}</text>
-            <text class="date">{{ formatDate(coupon.expiresAt) }} 到期</text>
-          </view>
-          <view class="right-part">
-            <button 
-              class="btn-use" 
-              v-if="currentTab === 0"
-              @click="handleUse(coupon)"
-            >去使用</button>
-            <text class="status-text" v-else>{{ coupon.status === 'USED' ? '已使用' : '已过期' }}</text>
-          </view>
+    <!-- Header Card -->
+    <view class="wallet-card" :class="{ 'sitter-card': !isOwner }">
+      <view class="balance-info">
+        <view class="balance-label">{{ isOwner ? '我的余额' : '可提现收益' }}</view>
+        <view class="balance-amount">
+            <text class="currency">¥</text>
+            <text class="num">{{ balance.toFixed(2) }}</text>
         </view>
-        
-        <view class="empty-state" v-if="displayCoupons.length === 0">
-          <text class="text">暂无优惠券</text>
+      </view>
+      <view class="card-actions" v-if="!isOwner">
+        <button class="btn-withdraw" @click="handleWithdraw">提现</button>
+      </view>
+      <view class="card-decoration" v-if="isOwner">
+          <text class="points">积分: {{ userStore.userInfo?.points || 0 }}</text>
+      </view>
+    </view>
+
+    <!-- Owner: Coupons -->
+    <view class="section" v-if="isOwner">
+      <view class="section-header">
+        <text class="title">我的优惠券</text>
+        <text class="more" @click="showToast('查看全部')">{{ coupons.length }} 张可用 ></text>
+      </view>
+      <scroll-view scroll-x class="coupon-scroll" show-scrollbar="false">
+        <view class="coupon-list">
+            <view class="coupon-item" v-for="coupon in coupons" :key="coupon.id">
+            <view class="coupon-left">
+                <text class="currency">¥</text>
+                <text class="value">{{ coupon.value }}</text>
+            </view>
+            <view class="coupon-right">
+                <text class="name">{{ coupon.name }}</text>
+                <text class="desc">满{{ coupon.threshold }}可用</text>
+            </view>
+            </view>
         </view>
       </scroll-view>
+    </view>
+
+    <!-- Transaction List -->
+    <view class="section list-section">
+      <view class="section-header">
+        <text class="title">{{ isOwner ? '消费记录' : '收益明细' }}</text>
+      </view>
+      <view class="transaction-list">
+        <view class="trans-item" v-for="item in history" :key="item.id">
+          <view class="trans-icon">{{ isOwner ? '🛍️' : '💰' }}</view>
+          <view class="trans-info">
+            <text class="trans-title">{{ item.title }}</text>
+            <text class="trans-date">{{ formatTime(item.time) }}</text>
+          </view>
+          <view class="trans-amount" :class="{ income: !isOwner }">
+            {{ isOwner ? '-' : '+' }} {{ item.amount.toFixed(2) }}
+          </view>
+        </view>
+        <view class="empty-list" v-if="history.length === 0">
+            <image src="/static/empty-state.png" mode="aspectFit" class="empty-img" v-if="false"/>
+            <text>暂无记录</text>
+        </view>
+      </view>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { useUserStore, type Coupon } from '@/stores/user';
+import { computed } from 'vue';
+import { useUserStore } from '@/stores/user';
+import { useOrderStore } from '@/stores/order';
 
 const userStore = useUserStore();
-const currentTab = ref(0);
+const orderStore = useOrderStore();
 
-const unusedCoupons = computed(() => {
-  return userStore.userInfo?.coupons?.filter(c => c.status === 'UNUSED' && c.expiresAt > Date.now()) || [];
-});
+const isOwner = computed(() => userStore.userInfo?.role === 'owner');
+const balance = computed(() => isOwner.value ? (userStore.userInfo?.balance || 0) : (userStore.userInfo?.laborBalance || 0));
+const coupons = computed(() => userStore.userInfo?.coupons?.filter(c => c.status === 'UNUSED') || []);
 
-const unavailableCoupons = computed(() => {
-  return userStore.userInfo?.coupons?.filter(c => c.status !== 'UNUSED' || c.expiresAt <= Date.now()) || [];
-});
-
-const displayCoupons = computed(() => {
-  return currentTab.value === 0 ? unusedCoupons.value : unavailableCoupons.value;
-});
-
-const formatDate = (ts: number) => {
-  const d = new Date(ts);
-  return `${d.getFullYear()}.${(d.getMonth()+1).toString().padStart(2, '0')}.${d.getDate().toString().padStart(2, '0')}`;
-};
-
-const handleRecharge = () => {
-  uni.showActionSheet({
-    itemList: ['50元', '100元', '200元', '500元', '1000元'],
-    success: (res) => {
-      const amounts = [50, 100, 200, 500, 1000];
-      const amount = amounts[res.tapIndex];
-      userStore.recharge(amount);
-      uni.showToast({ title: `充值 ¥${amount} 成功`, icon: 'success' });
-    },
-    fail: (res) => {
-      console.log(res.errMsg);
+const history = computed(() => {
+    const userId = userStore.userInfo?.id;
+    if (!userId) return [];
+    
+    if (isOwner.value) {
+        // Owner consumption: Paid orders
+        return orderStore.orders
+            .filter(o => o.creatorId === userId && (o.status !== 'UNPAID' && o.status !== 'CANCELLED'))
+            .map(o => ({
+                id: o.id,
+                title: o.serviceType === 'FEEDING' ? '上门喂养服务' : '上门遛狗服务',
+                time: o.createdAt,
+                amount: o.totalPrice
+            }));
+    } else {
+        // Sitter income: Completed orders
+        return orderStore.orders
+            .filter(o => o.sitterId === userId && o.status === 'COMPLETED')
+            .map(o => ({
+                id: o.id,
+                title: '服务佣金收益',
+                time: o.actualStartTime || o.createdAt, // approximation
+                amount: o.totalPrice // Simplified: no commission deduction yet
+            }));
     }
-  });
+});
+
+const formatTime = (time: number | string) => {
+  const date = new Date(time);
+  return `${date.getMonth() + 1}-${date.getDate()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
 };
 
 const handleWithdraw = () => {
-  const balance = userStore.userInfo?.balance || 0;
-  if (balance <= 0) {
-    uni.showToast({ title: '余额不足', icon: 'none' });
-    return;
-  }
-  
-  uni.showModal({
-    title: '申请提现',
-    content: `当前可提现金额 ¥${balance.toFixed(2)}，确认全部提现？`,
-    success: (res) => {
-      if (res.confirm) {
-        if (userStore.deductBalance(balance)) {
-          uni.showToast({ title: '提现申请已提交', icon: 'success' });
-        } else {
-          uni.showToast({ title: '提现失败', icon: 'none' });
-        }
-      }
+    if (balance.value <= 0) {
+        uni.showToast({ title: '暂无收益可提现', icon: 'none' });
+        return;
     }
-  });
+    uni.showModal({
+        title: '申请提现',
+        content: `确认提现 ¥${balance.value.toFixed(2)} 到绑定账户？`,
+        success: (res) => {
+            if (res.confirm) {
+                // Sitter Withdraw
+                if (userStore.withdrawLaborIncome(balance.value)) {
+                    uni.showToast({ title: '提现申请已提交' });
+                } else {
+                    uni.showToast({ title: '提现失败', icon: 'none' });
+                }
+            }
+        }
+    });
 };
 
-const handleUse = (coupon: Coupon) => {
-  // Navigate to Publish with couponId
-  uni.navigateTo({
-    url: `/pages/publish/index?couponId=${coupon.id}`
-  });
+const showToast = (msg: string) => {
+    uni.showToast({ title: msg, icon: 'none' });
 };
 </script>
 
@@ -132,156 +138,217 @@ const handleUse = (coupon: Coupon) => {
 .container {
   min-height: 100vh;
   background-color: $color-bg-page;
-  padding: 20rpx;
+  padding: 30rpx;
 }
 
-.balance-card {
-  background: linear-gradient(135deg, #FF8E3C 0%, #FF6B6B 100%);
-  border-radius: 24rpx;
+.wallet-card {
+  background: linear-gradient(135deg, $color-primary, #ffb380);
+  border-radius: $radius-lg;
   padding: 40rpx;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  color: #fff;
   margin-bottom: 40rpx;
-  box-shadow: 0 8rpx 20rpx rgba(255, 142, 60, 0.3);
+  box-shadow: 0 10rpx 20rpx rgba($color-primary, 0.2);
+  position: relative;
+  overflow: hidden;
   
-  .balance-info {
+  &.sitter-card {
+      background: linear-gradient(135deg, $color-blue, #64b5f6);
+      box-shadow: 0 10rpx 20rpx rgba($color-blue, 0.2);
+  }
+
+  .balance-label {
+    font-size: 28rpx;
+    opacity: 0.9;
+    margin-bottom: 16rpx;
+  }
+  
+  .balance-amount {
     display: flex;
-    flex-direction: column;
+    align-items: baseline;
     
-    .label {
-      color: rgba(255,255,255,0.8);
-      font-size: 26rpx;
-      margin-bottom: 8rpx;
+    .currency {
+      font-size: 32rpx;
+      margin-right: 8rpx;
     }
     
-    .amount {
-      color: #fff;
-      font-size: 60rpx;
+    .num {
+      font-size: 64rpx;
       font-weight: bold;
     }
-    
-    .withdraw-hint {
-      color: rgba(255,255,255,0.6);
-      font-size: 22rpx;
-      margin-top: 4rpx;
-    }
   }
   
-  .btn-recharge {
-    background: rgba(255,255,255,0.2);
-    border: 1px solid rgba(255,255,255,0.4);
-    color: #fff;
-    font-size: 28rpx;
-    border-radius: 30rpx;
-    padding: 0 40rpx;
-    height: 60rpx;
-    line-height: 60rpx;
+  .card-actions {
+      position: absolute;
+      right: 40rpx;
+      top: 50%;
+      transform: translateY(-50%);
+      
+      .btn-withdraw {
+          background: rgba(255,255,255,0.2);
+          border: 1px solid rgba(255,255,255,0.4);
+          color: #fff;
+          font-size: 26rpx;
+          border-radius: 30rpx;
+          padding: 0 30rpx;
+          height: 60rpx;
+          line-height: 60rpx;
+      }
+  }
+  
+  .card-decoration {
+      margin-top: 20rpx;
+      padding-top: 20rpx;
+      border-top: 1rpx solid rgba(255,255,255,0.2);
+      font-size: 24rpx;
+      opacity: 0.8;
   }
 }
 
-.coupons-section {
-  .tabs {
+.section {
+  margin-bottom: 40rpx;
+  
+  .section-header {
     display: flex;
-    margin-bottom: 20rpx;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24rpx;
     
-    .tab {
-      margin-right: 40rpx;
-      font-size: 30rpx;
+    .title {
+      font-size: 32rpx;
+      font-weight: 600;
+      color: $color-text-main;
+    }
+    
+    .more {
+      font-size: 24rpx;
       color: $color-text-secondary;
-      padding-bottom: 8rpx;
-      
-      &.active {
-        color: $color-text-main;
-        font-weight: bold;
-        border-bottom: 4rpx solid $color-primary;
-      }
     }
   }
+}
+
+.coupon-scroll {
+  white-space: nowrap;
+  width: 100%;
 }
 
 .coupon-list {
-  height: calc(100vh - 400rpx);
-  
-  .coupon-card {
-    background: #fff;
-    border-radius: 16rpx;
     display: flex;
-    margin-bottom: 20rpx;
-    overflow: hidden;
-    position: relative;
-    
-    &::before, &::after {
+    padding-bottom: 10rpx; /* scrollbar space */
+}
+
+.coupon-item {
+  display: inline-flex;
+  background: #fff;
+  border-radius: 12rpx;
+  width: 320rpx;
+  height: 140rpx;
+  margin-right: 20rpx;
+  box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.05);
+  position: relative;
+  overflow: hidden;
+  
+  &::before {
       content: '';
       position: absolute;
-      top: 50%;
-      width: 20rpx;
-      height: 20rpx;
-      background: $color-bg-page;
-      border-radius: 50%;
-      transform: translateY(-50%);
-    }
-    &::before { left: -10rpx; }
-    &::after { right: -10rpx; }
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 8rpx;
+      background: $color-secondary;
+  }
+  
+  .coupon-left {
+    width: 100rpx;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: $color-secondary;
+    font-weight: bold;
+    border-right: 1rpx dashed #eee;
     
-    .left-part {
-      width: 180rpx;
-      background: linear-gradient(135deg, #FFF0E5 0%, #FFF 100%);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      color: #FF8E3C;
-      border-right: 1px dashed #eee;
-      
-      .symbol { font-size: 32rpx; margin-top: 10rpx; }
-      .value { font-size: 64rpx; font-weight: bold; }
-    }
+    .currency { font-size: 24rpx; margin-top: 8rpx; }
+    .value { font-size: 48rpx; }
+  }
+  
+  .coupon-right {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding-left: 20rpx;
     
-    .middle-part {
-      flex: 1;
-      padding: 24rpx;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      
-      .name { font-size: 30rpx; font-weight: bold; color: $color-text-main; margin-bottom: 8rpx; }
-      .condition { font-size: 24rpx; color: #666; margin-bottom: 4rpx; }
-      .date { font-size: 22rpx; color: #999; }
-    }
-    
-    .right-part {
-      width: 140rpx;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      padding-right: 20rpx;
-      
-      .btn-use {
-        background: $color-primary;
-        color: #fff;
-        font-size: 24rpx;
-        padding: 0 20rpx;
-        height: 50rpx;
-        line-height: 50rpx;
-        border-radius: 25rpx;
-      }
-      
-      .status-text {
-        font-size: 24rpx;
-        color: #ccc;
-      }
+    .name {
+      font-size: 28rpx;
+      font-weight: 600;
+      color: $color-text-main;
+      margin-bottom: 8rpx;
     }
     
-    &.disabled {
-      .left-part { color: #ccc; background: #f5f5f5; }
-      .middle-part .name { color: #999; }
+    .desc {
+      font-size: 22rpx;
+      color: $color-text-secondary;
     }
   }
 }
 
-.empty-state {
-  text-align: center;
-  padding-top: 100rpx;
-  color: #999;
+.transaction-list {
+  background: #fff;
+  border-radius: $radius-md;
+  padding: 0 20rpx;
+  
+  .trans-item {
+    display: flex;
+    align-items: center;
+    padding: 30rpx 0;
+    border-bottom: 1rpx solid #f5f5f5;
+    
+    &:last-child { border-bottom: none; }
+    
+    .trans-icon {
+        width: 80rpx;
+        height: 80rpx;
+        background: #f9f9f9;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 36rpx;
+        margin-right: 20rpx;
+    }
+    
+    .trans-info {
+      flex: 1;
+      
+      .trans-title {
+        display: block;
+        font-size: 30rpx;
+        color: $color-text-main;
+        margin-bottom: 8rpx;
+      }
+      
+      .trans-date {
+        font-size: 24rpx;
+        color: $color-text-secondary;
+      }
+    }
+    
+    .trans-amount {
+      font-size: 32rpx;
+      font-weight: 600;
+      color: $color-text-main;
+      
+      &.income {
+          color: $color-success; // Need to ensure variable exists or use hex
+          color: #52c41a; 
+      }
+    }
+  }
+  
+  .empty-list {
+      padding: 60rpx 0;
+      text-align: center;
+      color: $color-text-secondary;
+      font-size: 28rpx;
+  }
 }
 </style>

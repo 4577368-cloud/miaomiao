@@ -42,37 +42,49 @@
       <view class="card-header">
         <text class="title">爱宠档案</text>
       </view>
-      <view class="pet-content">
-        <image 
-          v-if="order.petSnapshot?.image" 
-          :src="order.petSnapshot.image" 
-          mode="aspectFill" 
-          class="pet-image"
-        />
-        <view class="pet-avatar-placeholder" v-else>
-          {{ order.petName?.[0] || '宠' }}
+      <view class="pet-list">
+        <view 
+          class="pet-content" 
+          v-for="(pet, index) in displayPets" 
+          :key="index"
+          :class="{ 'border-top': index > 0 }"
+        >
+          <image 
+            v-if="pet.image || pet.avatar" 
+            :src="pet.image || pet.avatar" 
+            mode="aspectFill" 
+            class="pet-image"
+          />
+          <view class="pet-avatar-placeholder" v-else>
+            {{ pet.name?.[0] || '宠' }}
+          </view>
+          
+          <view class="pet-details">
+            <view class="pet-main">
+              <text class="pet-name">{{ pet.name }}</text>
+              <text class="pet-gender">
+                <text v-if="pet.gender === 'male'">弟弟 ♂</text>
+                <text v-else-if="pet.gender === 'female'">妹妹 ♀</text>
+                <text v-else>未知</text>
+              </text>
+            </view>
+            <view class="pet-tags">
+              <text class="tag">{{ pet.breed || '未知品种' }}</text>
+              <text class="tag">{{ pet.age }}岁</text>
+              <text class="tag">{{ formatPetSize(pet.size) }}</text>
+              <text class="tag highlight" v-if="pet.isSterilized || pet.sterilized">已绝育</text>
+              <text class="tag highlight" v-if="pet.isVaccinated || pet.vaccine">已疫苗</text>
+            </view>
+            <view class="pet-remark" v-if="pet.temperament || pet.description">
+              <text class="label">性格/描述：</text>
+              <text class="text">{{ pet.temperament || pet.description }}</text>
+            </view>
+          </view>
         </view>
         
-        <view class="pet-details">
-          <view class="pet-main">
-            <text class="pet-name">{{ order.petName }}</text>
-            <text class="pet-gender">{{ order.petGender === 'male' ? '弟弟' : '妹妹' }}</text>
-          </view>
-          <view class="pet-tags">
-            <text class="tag">{{ order.petBreed }}</text>
-            <text class="tag">{{ order.petAge }}岁</text>
-            <text class="tag">{{ formatPetSize(order.petSize) }}</text>
-            <text class="tag highlight" v-if="order.petSnapshot?.isSterilized">已绝育</text>
-            <text class="tag highlight" v-if="order.petSnapshot?.isVaccinated">已疫苗</text>
-          </view>
-          <view class="pet-remark" v-if="order.petSnapshot?.temperament">
-            <text class="label">性格特点：</text>
-            <text class="text">{{ order.petSnapshot.temperament }}</text>
-          </view>
-           <view class="pet-remark" v-if="order.remark">
-            <text class="label">订单备注：</text>
-            <text class="text">{{ order.remark }}</text>
-          </view>
+        <view class="pet-remark global-remark" v-if="order.remark">
+          <text class="label">订单备注：</text>
+          <text class="text">{{ order.remark }}</text>
         </view>
       </view>
     </view>
@@ -107,6 +119,34 @@
       </view>
     </view>
 
+    <!-- 服务凭证 (拍照打卡) -->
+    <view class="card evidence-card" v-if="shouldShowEvidence">
+      <view class="card-header">
+        <text class="title">服务凭证 (拍照打卡)</text>
+      </view>
+      <view class="evidence-grid">
+        <view 
+          class="evidence-item" 
+          v-for="(photo, index) in (order.serviceEvidence?.photos || [])" 
+          :key="index"
+          @click="previewImage(index)"
+        >
+          <image :src="photo" mode="aspectFill" class="evidence-img" />
+        </view>
+        <view 
+          class="evidence-add" 
+          v-if="!isOwner && order.status === 'IN_SERVICE'"
+          @click="handleUploadEvidence"
+        >
+          <text class="add-icon">+</text>
+          <text class="add-text">拍照</text>
+        </view>
+      </view>
+      <view class="empty-evidence" v-if="!order.serviceEvidence?.photos?.length && isOwner">
+        <text>暂无服务照片，请联系宠托师上传</text>
+      </view>
+    </view>
+
     <!-- 订单信息 -->
     <view class="card info-card">
       <view class="info-row">
@@ -127,8 +167,147 @@
       </view>
     </view>
 
-    <!-- 底部操作栏 (Placeholder for consistency) -->
-    <!-- 实际操作逻辑较复杂，暂时只展示核心信息，或者复用列表页的操作逻辑 -->
+    <!-- 底部操作栏 -->
+    <view class="footer-bar-placeholder"></view>
+    <view class="footer-bar" v-if="order.status !== 'CANCELLED'">
+      <!-- Owner Actions -->
+      <block v-if="isOwner">
+        <button 
+          v-if="order.status === 'PENDING' || order.status === 'PENDING_ACCEPTANCE'" 
+          class="btn btn-outline" 
+          @click="handleCancel"
+        >取消订单</button>
+        <button 
+          v-if="order.status === 'COMPLETED'" 
+          class="btn btn-primary" 
+          @click="openOwnerReview"
+        >评价服务</button>
+        <button 
+          v-if="order.status === 'REVIEWED'" 
+          class="btn btn-outline" 
+          disabled
+        >已评价</button>
+         <button 
+            v-if="order.status === 'ACCEPTED' || order.status === 'IN_SERVICE'" 
+            class="btn btn-primary" 
+            @click="makeCall"
+        >联系宠托师</button>
+      </block>
+      
+      <!-- Sitter Actions -->
+      <block v-else>
+         <button 
+            v-if="order.status === 'PENDING'" 
+            class="btn btn-primary full-width" 
+            @click="handleAccept"
+        >立即抢单</button>
+        <button 
+            v-if="order.status === 'ACCEPTED'" 
+            class="btn btn-primary full-width" 
+            @click="handleStartService"
+        >开始服务</button>
+        <button 
+            v-if="order.status === 'IN_SERVICE'" 
+            class="btn btn-success full-width" 
+            @click="handleCompleteService"
+        >完成服务</button>
+        <view v-if="order.status === 'COMPLETED' || order.status === 'REVIEWED'" class="completed-actions">
+            <text class="completed-text">收益已到账</text>
+            <button 
+                class="btn btn-outline small" 
+                v-if="!order.sitterReview"
+                @click="openSitterReview"
+            >评价宠物</button>
+             <button 
+                class="btn btn-outline small disabled" 
+                v-else
+            >已评价</button>
+        </view>
+      </block>
+    </view>
+    
+    <!-- 宠托师评价弹窗 -->
+    <view class="modal-overlay" v-if="showSitterReviewModal" @click="closeSitterReviewModal">
+       <view class="modal-content review-modal" @click.stop>
+          <view class="review-header">
+             <text class="title">评价宠物</text>
+             <text class="sub">宠物乖不乖？写下你的感受</text>
+          </view>
+          
+          <view class="rating-stars">
+             <view 
+               class="star-item" 
+               v-for="i in 5" 
+               :key="i"
+               @click="sitterReviewRating = i"
+             >
+                <text class="star-icon" :class="{ active: i <= sitterReviewRating }">★</text>
+             </view>
+          </view>
+          
+          <view class="tags-section">
+             <view 
+                class="tag-item" 
+                :class="{ active: sitterReviewTags.includes(tag) }"
+                v-for="tag in availableTags" 
+                :key="tag"
+                @click="toggleTag(tag)"
+             >
+                {{ tag }}
+             </view>
+          </view>
+          
+          <view class="input-wrapper">
+             <textarea 
+               class="review-textarea" 
+               placeholder="宠物有什么特点？比如：粘人、护食、胆小..." 
+               placeholder-class="placeholder"
+               v-model="sitterReviewContent"
+             />
+          </view>
+          
+          <view class="modal-actions">
+             <button class="btn-cancel" @click="closeSitterReviewModal">取消</button>
+             <button class="btn-submit" @click="submitSitterReview">提交评价</button>
+          </view>
+       </view>
+    </view>
+
+    <!-- 主人评价弹窗 (评价宠托师) -->
+    <view class="modal-overlay" v-if="showOwnerReviewModal" @click="closeOwnerReviewModal">
+       <view class="modal-content review-modal" @click.stop>
+          <view class="review-header">
+             <text class="title">评价服务</text>
+             <text class="sub">服务还满意吗？给宠托师打个分吧</text>
+          </view>
+          
+          <view class="rating-stars">
+             <view 
+               class="star-item" 
+               v-for="i in 5" 
+               :key="i"
+               @click="ownerReviewRating = i"
+             >
+                <text class="star-icon" :class="{ active: i <= ownerReviewRating }">★</text>
+             </view>
+          </view>
+          
+          <view class="input-wrapper">
+             <textarea 
+               class="review-textarea" 
+               placeholder="写下您的评价，帮助更多铲屎官..." 
+               placeholder-class="placeholder"
+               v-model="ownerReviewContent"
+             />
+          </view>
+          
+          <view class="modal-actions">
+             <button class="btn-cancel" @click="closeOwnerReviewModal">取消</button>
+             <button class="btn-submit" @click="submitOwnerReview">提交评价</button>
+          </view>
+       </view>
+    </view>
+
   </view>
   <view v-else class="loading">
     <text>加载中...</text>
@@ -148,6 +327,18 @@ const order = ref<Order | null>(null);
 const timer = ref<number | null>(null);
 const countdown = ref('');
 
+// Sitter Review State
+const showSitterReviewModal = ref(false);
+const sitterReviewRating = ref(5);
+const sitterReviewContent = ref('');
+const sitterReviewTags = ref<string[]>([]);
+const availableTags = ['乖巧', '粘人', '胆小', '护食', '精力旺盛', '听话', '拆家', '环境整洁', '主人友好', '沟通顺畅'];
+
+// Owner Review State
+const showOwnerReviewModal = ref(false);
+const ownerReviewRating = ref(5);
+const ownerReviewContent = ref('');
+
 const isOwner = computed(() => userStore.userInfo?.role === 'owner');
 
 const targetUser = computed(() => {
@@ -166,22 +357,220 @@ const targetUser = computed(() => {
   }
 });
 
-onLoad((options) => {
-  if (options && options.id) {
-    const found = orderStore.orders.find(o => o.id === options.id);
-    if (found) {
-      order.value = found;
-      startTimer();
-    } else {
-      uni.showToast({ title: '订单不存在', icon: 'none' });
-      setTimeout(() => uni.navigateBack(), 1500);
-    }
+const displayPets = computed(() => {
+  if (!order.value) return [];
+  if (order.value.petSnapshots && order.value.petSnapshots.length > 0) {
+    return order.value.petSnapshots;
   }
+  if (order.value.petSnapshot) {
+    return [order.value.petSnapshot];
+  }
+  // Fallback legacy fields
+  if (order.value.petName) {
+    return [{
+      name: order.value.petName,
+      breed: order.value.petBreed,
+      gender: order.value.petGender,
+      age: order.value.petAge,
+      size: order.value.petSize,
+      isSterilized: false, // Unknown
+      isVaccinated: false  // Unknown
+    }];
+  }
+  return [];
 });
 
-onUnmounted(() => {
-  if (timer.value) clearInterval(timer.value);
+const shouldShowEvidence = computed(() => {
+  if (!order.value) return false;
+  // Sitter: Show if IN_SERVICE or COMPLETED
+  if (!isOwner.value) {
+    return ['IN_SERVICE', 'COMPLETED', 'REVIEWED'].includes(order.value.status);
+  }
+  // Owner: Show if IN_SERVICE (real-time) or COMPLETED
+  return ['IN_SERVICE', 'COMPLETED', 'REVIEWED'].includes(order.value.status);
 });
+
+const makeCall = () => {
+  const phone = targetUser.value?.phone || (isOwner.value ? null : order.value?.contactPhone);
+  if (phone) {
+    uni.makePhoneCall({ phoneNumber: phone });
+  } else {
+    uni.showToast({ title: '暂无联系电话', icon: 'none' });
+  }
+};
+
+const handleUploadEvidence = () => {
+  uni.chooseImage({
+    count: 1,
+    sourceType: ['camera', 'album'],
+    success: (res) => {
+      const tempFilePaths = res.tempFilePaths;
+      // In real app, upload to server here.
+      // Mock: just use temp path
+      if (order.value) {
+        const currentPhotos = order.value.serviceEvidence?.photos || [];
+        orderStore.updateOrderEvidence(order.value.id, {
+            photos: [...currentPhotos, tempFilePaths[0]],
+            confirmedAt: Date.now() // Mock
+        });
+        refreshOrder();
+      }
+    }
+  });
+};
+
+const handleAccept = () => {
+    if (!order.value || !userStore.userInfo) return;
+    uni.showModal({
+        title: '确认抢单',
+        content: '确定要接下这个订单吗？',
+        success: (res) => {
+            if (res.confirm) {
+                if (orderStore.acceptOrder(order.value!.id, userStore.userInfo!)) {
+                    uni.showToast({ title: '抢单成功' });
+                    refreshOrder();
+                } else {
+                    uni.showToast({ title: '抢单失败', icon: 'none' });
+                }
+            }
+        }
+    });
+};
+
+const handleStartService = () => {
+    if (!order.value) return;
+    uni.showLoading({ title: '定位打卡中...' });
+    // Mock Location Check
+    setTimeout(() => {
+        uni.hideLoading();
+        // Simulate checking if location matches (mock success)
+        if (orderStore.startService(order.value!.id)) {
+             uni.showToast({ title: '已开启服务' });
+             refreshOrder();
+        } else {
+             uni.showToast({ title: '开启失败', icon: 'none' });
+        }
+    }, 1000);
+};
+
+const handleCompleteService = () => {
+    if (!order.value) return;
+    // Check if photos uploaded
+    if (!order.value.serviceEvidence?.photos?.length) {
+        uni.showToast({ title: '请先上传服务照片', icon: 'none' });
+        return;
+    }
+    
+    uni.showModal({
+        title: '确认完成',
+        content: '确认服务已完成并通知主人？',
+        success: (res) => {
+            if (res.confirm) {
+                if (orderStore.completeService(order.value!.id)) {
+                    uni.showToast({ title: '订单完成，收益已到账' });
+                    refreshOrder();
+                }
+            }
+        }
+    });
+};
+
+const handleCancel = () => {
+    if (!order.value) return;
+    uni.showModal({
+        title: '取消订单',
+        content: '确定要取消吗？',
+        success: (res) => {
+            if (res.confirm) {
+                const role = isOwner.value ? 'owner' : 'sitter';
+                if (orderStore.cancelOrder(order.value!.id, role)) {
+                    uni.showToast({ title: '已取消' });
+                    uni.navigateBack();
+                } else {
+                    uni.showToast({ title: '取消失败，当前状态不可取消', icon: 'none' });
+                }
+            }
+        }
+    });
+};
+
+// Sitter Review Logic
+const openSitterReview = () => {
+    showSitterReviewModal.value = true;
+};
+
+const closeSitterReviewModal = () => {
+    showSitterReviewModal.value = false;
+    sitterReviewRating.value = 5;
+    sitterReviewContent.value = '';
+    sitterReviewTags.value = [];
+};
+
+const toggleTag = (tag: string) => {
+    if (sitterReviewTags.value.includes(tag)) {
+        sitterReviewTags.value = sitterReviewTags.value.filter(t => t !== tag);
+    } else {
+        if (sitterReviewTags.value.length >= 3) {
+            uni.showToast({ title: '最多选择3个标签', icon: 'none' });
+            return;
+        }
+        sitterReviewTags.value.push(tag);
+    }
+};
+
+const submitSitterReview = () => {
+    if (!order.value) return;
+    orderStore.submitSitterReview(
+        order.value.id, 
+        sitterReviewRating.value, 
+        sitterReviewContent.value,
+        sitterReviewTags.value
+    );
+    uni.showToast({ title: '评价成功' });
+    closeSitterReviewModal();
+    refreshOrder();
+};
+
+// Owner Review Logic
+const openOwnerReview = () => {
+    showOwnerReviewModal.value = true;
+};
+
+const closeOwnerReviewModal = () => {
+    showOwnerReviewModal.value = false;
+    ownerReviewRating.value = 5;
+    ownerReviewContent.value = '';
+};
+
+const submitOwnerReview = () => {
+    if (!order.value) return;
+    orderStore.submitOwnerReview(
+        order.value.id, 
+        ownerReviewRating.value, 
+        ownerReviewContent.value
+    );
+    uni.showToast({ title: '评价成功' });
+    closeOwnerReviewModal();
+    refreshOrder();
+};
+
+const refreshOrder = () => {
+    if (order.value) {
+        const found = orderStore.orders.find(o => o.id === order.value!.id);
+        if (found) {
+            order.value = JSON.parse(JSON.stringify(found));
+        }
+    }
+};
+const previewImage = (index: number) => {
+  const photos = order.value?.serviceEvidence?.photos || [];
+  if (photos.length) {
+    uni.previewImage({
+      urls: photos,
+      current: index
+    });
+  }
+};
 
 const startTimer = () => {
   if (order.value?.status === 'IN_SERVICE' && order.value.actualStartTime) {
@@ -203,17 +592,22 @@ const startTimer = () => {
   }
 };
 
-const makeCall = () => {
-  const phone = isOwner.value 
-    ? order.value?.sitterSnapshot?.phone 
-    : order.value?.contactPhone;
-    
-  if (phone) {
-    uni.makePhoneCall({ phoneNumber: phone });
-  } else {
-    uni.showToast({ title: '暂无联系方式', icon: 'none' });
+onLoad((options) => {
+  if (options && options.id) {
+    const found = orderStore.orders.find(o => o.id === options.id);
+    if (found) {
+      order.value = found;
+      startTimer();
+    } else {
+      uni.showToast({ title: '订单不存在', icon: 'none' });
+      setTimeout(() => uni.navigateBack(), 1500);
+    }
   }
-};
+});
+
+onUnmounted(() => {
+  if (timer.value) clearInterval(timer.value);
+});
 
 const formatStatus = (status: string) => {
   const map: Record<string, string> = {
@@ -372,6 +766,50 @@ const formatTime = (time: number | string) => {
   }
 }
 
+.evidence-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20rpx;
+  
+  .evidence-item {
+    width: 200rpx;
+    height: 200rpx;
+    border-radius: 16rpx;
+    overflow: hidden;
+    background: #f8f8f8;
+    
+    .evidence-img {
+      width: 100%;
+      height: 100%;
+    }
+  }
+  
+  .evidence-add {
+    width: 200rpx;
+    height: 200rpx;
+    border-radius: 16rpx;
+    background: #f8f8f8;
+    border: 2rpx dashed #ddd;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #999;
+    
+    .add-icon { font-size: 60rpx; font-weight: 300; margin-bottom: 8rpx; }
+    .add-text { font-size: 24rpx; }
+    
+    &:active { background: #eee; }
+  }
+}
+
+.empty-evidence {
+  text-align: center;
+  color: $color-text-secondary;
+  padding: 40rpx 0;
+  font-size: 26rpx;
+}
+
 .pet-content {
   display: flex;
   
@@ -486,5 +924,91 @@ const formatTime = (time: number | string) => {
   justify-content: center;
   padding-top: 100rpx;
   color: $color-text-secondary;
+}
+
+.pet-list {
+  .pet-content {
+    padding-bottom: 24rpx;
+    
+    &.border-top {
+      border-top: 1rpx dashed #eee;
+      padding-top: 24rpx;
+    }
+  }
+}
+
+.global-remark {
+  border-top: 1rpx dashed #eee;
+  padding-top: 20rpx;
+  margin-top: 8rpx;
+}
+
+.footer-bar-placeholder {
+  height: 120rpx;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.footer-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #fff;
+  padding: 20rpx 30rpx;
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+  box-shadow: 0 -4rpx 16rpx rgba(0,0,0,0.05);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 20rpx;
+  z-index: 100;
+  
+  .btn {
+    font-size: 28rpx;
+    font-weight: 600;
+    padding: 0 40rpx;
+    height: 80rpx;
+    line-height: 80rpx;
+    border-radius: 40rpx;
+    border: none;
+    margin: 0;
+    
+    &.btn-primary {
+      background: $color-primary;
+      color: #fff;
+      &:active { opacity: 0.9; }
+    }
+    
+    &.btn-outline {
+      background: #fff;
+      color: $color-text-main;
+      border: 1rpx solid #ddd;
+      &:active { background: #f5f5f5; }
+    }
+
+    &.btn-secondary {
+       background: $color-secondary-light;
+       color: $color-primary;
+       &:active { opacity: 0.9; }
+    }
+    
+    &.btn-success {
+      background: $color-success;
+      color: #fff;
+      &:active { opacity: 0.9; }
+    }
+    
+    &.full-width {
+      flex: 1;
+    }
+  }
+  
+  .completed-text {
+      flex: 1;
+      text-align: center;
+      color: $color-success;
+      font-size: 28rpx;
+      font-weight: 500;
+  }
 }
 </style>

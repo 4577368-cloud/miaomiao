@@ -24,3 +24,9 @@ export const ADD_ON_PRICES = {
   DEEP_CLEAN: 20,
   MEDICINE: 10,
 };
+
+// Pricing Constants
+export const HOLIDAY_MULTIPLIER = 1.5; // 节假日溢价 1.5倍
+export const RUSH_FEE_MULTIPLIER = 1.2; // 急单溢价 1.2倍
+export const RUSH_THRESHOLD_HOURS = 2; // 急单阈值 (小时)
+export const MULTI_PET_DISCOUNT = 0.5; // 第二只宠物半价 (50%)

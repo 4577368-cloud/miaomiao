@@ -97,33 +97,22 @@
     
     <view class="section-title">更多功能</view>
     <view class="menu-list">
-      <view class="menu-item" @click="navigateTo('/pages/profile/certification')">
-        <view class="left">
+      <!-- 宠托师认证入口 -->
+      <view class="menu-item" @click="handleCertificationClick">
+        <view class="item-left">
           <text class="icon">🎓</text>
-          <text class="label">宠托师认证</text>
+          <text class="label">{{ isSitter ? '宠托师中心' : '成为宠托师' }}</text>
         </view>
-        <view class="right-content">
-          <text class="status-text" v-if="userInfo?.sitterProfile?.isCertified">已认证</text>
+        <view class="item-right">
+          <text class="status-tag" v-if="certificationStatus === 'verified'">已认证</text>
+          <text class="status-tag pending" v-else-if="certificationStatus === 'pending'">审核中</text>
+          <text class="status-tag gray" v-else>去认证</text>
           <text class="arrow">></text>
         </view>
       </view>
 
-      <view class="menu-item" @click="handleSwitchRole">
-        <view class="left">
-          <text class="icon">🔄</text>
-          <text class="label">{{ switchRoleLabel }}</text>
-        </view>
-        <text class="arrow">></text>
-      </view>
-      <view class="menu-item">
-        <view class="left">
-          <text class="icon">🎧</text>
-          <text class="label">联系客服</text>
-        </view>
-        <text class="arrow">></text>
-      </view>
-      <view class="menu-item">
-        <view class="left">
+      <view class="menu-item" @click="navigateTo('/pages/settings/index')">
+        <view class="item-left">
           <text class="icon">⚙️</text>
           <text class="label">设置</text>
         </view>
@@ -136,24 +125,33 @@
        <image src="https://imgus.tangbuy.com/static/images/2026-02-07/fb3eeeb726ef43ea9a0020b18da5290e-177045207976112019662246898497843.jpeg" class="footer-logo" mode="heightFix" />
        <text class="footer-text">宠乐到家 · 您的贴心宠托伙伴</text>
     </view>
+    <view style="height: 50px;"></view>
+    <CustomTabBar current-path="pages/profile/index" />
   </view>
 </template>
 
 <script setup lang="ts">
+import CustomTabBar from '@/components/custom-tab-bar/index.vue';
 import { computed } from 'vue';
 import { useUserStore } from '@/stores/user';
 
 const userStore = useUserStore();
-
 const userInfo = computed(() => userStore.userInfo);
+
 const currentRole = computed(() => userInfo.value?.role || 'owner');
-const roleLabel = computed(() => currentRole.value === 'owner' ? '铲屎官' : '宠托师');
-const switchRoleLabel = computed(() => currentRole.value === 'owner' ? '切换身份 (宠托师)' : '切换身份 (铲屎官)');
+const isSitter = computed(() => userInfo.value?.sitterProfile?.isCertified);
+const certificationStatus = computed(() => userInfo.value?.sitterProfile?.certificationStatus || 'none');
+
+const roleLabel = computed(() => {
+  if (currentRole.value === 'sitter') return '宠托师';
+  return '铲屎官';
+});
 
 const joinedDays = computed(() => {
-  if (!userInfo.value?.joinDate) return 1;
-  const diff = Date.now() - userInfo.value.joinDate;
-  return Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  if (!userInfo.value?.joinDate) return 0;
+  const now = Date.now();
+  const diff = now - userInfo.value.joinDate;
+  return Math.floor(diff / (1000 * 60 * 60 * 24));
 });
 
 const navigateTo = (url: string) => {
@@ -161,27 +159,13 @@ const navigateTo = (url: string) => {
 };
 
 const handleAvatarClick = () => {
-    uni.chooseImage({
-        count: 1,
-        success: (res) => {
-            userStore.updateUser({ avatar: res.tempFilePaths[0] });
-        }
-    });
+  if (!userStore.isLoggedIn) {
+    uni.reLaunch({ url: '/pages/login/index' });
+  }
 };
 
-const handleSwitchRole = () => {
-  const newRole = currentRole.value === 'owner' ? 'sitter' : 'owner';
-  
-  uni.showLoading({ title: '切换身份中...' });
-  
-  setTimeout(() => {
-    userStore.switchRole(newRole);
-    uni.hideLoading();
-    uni.showToast({
-      title: `已切换为${newRole === 'owner' ? '铲屎官' : '宠托师'}身份`,
-      icon: 'success'
-    });
-  }, 500);
+const handleCertificationClick = () => {
+  uni.navigateTo({ url: '/pages/profile/certification' });
 };
 </script>
 
@@ -514,7 +498,7 @@ const handleSwitchRole = () => {
       border-bottom: none;
     }
     
-    .left {
+    .item-left {
       display: flex;
       align-items: center;
       
@@ -529,22 +513,32 @@ const handleSwitchRole = () => {
       }
     }
     
-    .arrow {
-      color: #BFBFBF;
-      font-size: 24rpx;
-    }
-    
-    .right-content {
+    .item-right {
       display: flex;
       align-items: center;
       
-      .status-text {
+      .arrow {
+        color: #BFBFBF;
         font-size: 24rpx;
+        margin-left: 12rpx;
+      }
+      
+      .status-tag {
+        font-size: 22rpx;
         color: $color-success;
-        margin-right: 12rpx;
-        background: rgba($color-success, 0.1);
-        padding: 2rpx 12rpx;
-        border-radius: 20rpx;
+        background: rgba(82, 196, 26, 0.1);
+        padding: 4rpx 12rpx;
+        border-radius: 8rpx;
+        
+        &.pending {
+          color: $color-warning;
+          background: rgba(250, 173, 20, 0.1);
+        }
+        
+        &.gray {
+          color: $color-text-secondary;
+          background: rgba(0, 0, 0, 0.05);
+        }
       }
     }
   }

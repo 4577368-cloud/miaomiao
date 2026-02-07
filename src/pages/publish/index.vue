@@ -249,7 +249,7 @@
                     class="my-pet-item" 
                     v-for="pet in userStore.userInfo?.pets" 
                     :key="pet.id"
-                    :class="{ active: selectedPetId === pet.id }"
+                    :class="{ active: selectedPetIds.includes(pet.id) }"
                     @click="selectMyPet(pet)"
                  >
                     <image :src="pet.avatar || '/static/default-pet.png'" mode="aspectFill" class="pet-avatar" />
@@ -264,12 +264,15 @@
            </scroll-view>
         </view>
 
-        <view class="pet-grid">
+        <view class="pet-grid" :class="{ disabled: selectedPetIds.length > 0 }">
+          <view class="grid-overlay" v-if="selectedPetIds.length > 0">
+             <text>已选择"我的爱宠"，将自动匹配体型</text>
+          </view>
           <view 
             v-for="size in petSizes" 
             :key="size.value"
             :class="['pet-card', { active: form.petSize === size.value }]"
-            @click="form.petSize = size.value"
+            @click="selectedPetIds.length === 0 && (form.petSize = size.value)"
           >
             <image :src="size.image" mode="aspectFill" class="pet-icon-img" />
             <text class="pet-name">{{ size.label }}</text>
@@ -409,14 +412,23 @@
       <!-- 底部价格栏 -->
       <view class="footer-bar-placeholder"></view>
       <view class="footer-bar">
-        <view class="price-container">
-          <text class="price-label">预估总价</text>
+        <view class="price-container" @click="openPriceDetail">
+          <view class="price-label-row">
+             <text class="price-label">预估总价</text>
+             <text class="price-detail-link">明细 ></text>
+          </view>
           <view class="price-col">
-            <view class="price-val">
-              <text class="symbol">¥</text>
-              <text class="amount">{{ finalPrice }}</text>
+            <view class="price-main">
+              <view class="price-val">
+                <text class="symbol">¥</text>
+                <text class="amount">{{ finalPrice }}</text>
+              </view>
+              <text class="original-price" v-if="finalPrice < rawTotalPrice">¥{{ rawTotalPrice }}</text>
             </view>
-            <text class="original-price" v-if="finalPrice < rawTotalPrice">¥{{ rawTotalPrice }}</text>
+            <view class="price-tags" v-if="priceBreakdown.holiday > 0 || priceBreakdown.rush > 0">
+               <text class="tag holiday" v-if="priceBreakdown.holiday > 0">节日+{{ priceBreakdown.holiday }}</text>
+               <text class="tag rush" v-if="priceBreakdown.rush > 0">急单+{{ priceBreakdown.rush }}</text>
+            </view>
           </view>
         </view>
         <button class="btn-submit" @click="handleSubmit">
@@ -424,8 +436,57 @@
         </button>
       </view>
 
+      <!-- 价格明细弹窗 -->
+      <view class="price-detail-mask" v-if="showPriceDetail" @click="closePriceDetail">
+         <view class="price-detail-content" @click.stop>
+            <view class="pd-header">
+               <text class="pd-title">费用明细</text>
+               <text class="pd-close" @click="closePriceDetail">×</text>
+            </view>
+            <view class="pd-list">
+               <view class="pd-item">
+                  <text class="pd-label">基础服务费</text>
+                  <text class="pd-val">¥{{ priceBreakdown.base }}</text>
+               </view>
+               <view class="pd-item" v-if="priceBreakdown.pets > priceBreakdown.base">
+                  <text class="pd-label">多宠附加费</text>
+                  <text class="pd-val">+¥{{ (priceBreakdown.pets - priceBreakdown.base).toFixed(2) }}</text>
+               </view>
+               <view class="pd-item" v-if="priceBreakdown.duration > 0">
+                  <text class="pd-label">时长加价</text>
+                  <text class="pd-val">+¥{{ priceBreakdown.duration }}</text>
+               </view>
+               <view class="pd-item" v-if="priceBreakdown.holiday > 0">
+                  <text class="pd-label">节假日溢价</text>
+                  <text class="pd-val">+¥{{ priceBreakdown.holiday }}</text>
+               </view>
+               <view class="pd-item" v-if="priceBreakdown.rush > 0">
+                  <text class="pd-label">急单溢价</text>
+                  <text class="pd-val">+¥{{ priceBreakdown.rush }}</text>
+               </view>
+               <view class="pd-item" v-if="priceBreakdown.addOns > 0">
+                  <text class="pd-label">附加服务费</text>
+                  <text class="pd-val">+¥{{ priceBreakdown.addOns }}</text>
+               </view>
+               <view class="pd-divider"></view>
+               <view class="pd-item total">
+                  <text class="pd-label">总计</text>
+                  <text class="pd-val">¥{{ priceBreakdown.total }}</text>
+               </view>
+               <view class="pd-item discount" v-if="selectedCoupon">
+                  <text class="pd-label">优惠券</text>
+                  <text class="pd-val">-¥{{ selectedCoupon.value }}</text>
+               </view>
+               <view class="pd-item final" v-if="selectedCoupon">
+                  <text class="pd-label">实付</text>
+                  <text class="pd-val">¥{{ finalPrice }}</text>
+               </view>
+            </view>
+         </view>
+      </view>
+
       <!-- 优惠券选择弹窗 -->
-      <view class="coupon-popup-mask" v-if="showCouponPopup" @click="closeCouponPopup">
+    <view class="coupon-popup-mask" v-if="showCouponPopup" @click="closeCouponPopup">
         <view class="coupon-popup-content" @click.stop>
           <view class="popup-header">
             <text class="popup-title">选择优惠券</text>
@@ -479,13 +540,16 @@
       </view>
     </block>
   </view>
+  <view style="height: 50px;"></view>
+  <CustomTabBar current-path="pages/publish/index" />
 </template>
 
 <script setup lang="ts">
+import CustomTabBar from '@/components/custom-tab-bar/index.vue';
 import { reactive, computed, ref, onUnmounted } from 'vue';
 import { onLoad, onShow } from '@dcloudio/uni-app';
 import { PetSize, ServiceType, ADD_ON_PRICES, PET_SIZE_COEFFICIENTS } from '@/constants/pet';
-import { calculateTotalPrice } from '@/utils/pricing';
+import { calculateTotalPrice, type PriceBreakdown } from '@/utils/pricing';
 import { useOrderStore } from '@/stores/order';
 import { useUserStore, type PetInfo, type Address } from '@/stores/user';
 import { useSitterStore } from '@/stores/sitter';
@@ -496,7 +560,7 @@ const sitterStore = useSitterStore();
 const BASE_PRICE = 50; 
 
 // OWNER LOGIC
-const selectedPetId = ref<string>('');
+const selectedPetIds = ref<string[]>([]);
 const showCouponPopup = ref(false);
 const lastPetCount = ref(0);
 const showSitterSelector = ref(false);
@@ -636,9 +700,20 @@ const goToPetPage = () => {
 };
 
 const selectMyPet = (pet: PetInfo) => {
-   selectedPetId.value = pet.id;
-   form.petSize = pet.size; // Auto-select size
-   form.remark = `${pet.breed} - ${pet.age}岁`;
+   const index = selectedPetIds.value.indexOf(pet.id);
+   if (index > -1) {
+     selectedPetIds.value.splice(index, 1);
+   } else {
+     selectedPetIds.value.push(pet.id);
+   }
+   
+   // Update remark with all selected pets
+   const selectedPets = userStore.userInfo?.pets?.filter(p => selectedPetIds.value.includes(p.id)) || [];
+   if (selectedPets.length > 0) {
+     form.remark = selectedPets.map(p => `${p.name}(${p.breed})`).join(', ');
+   } else {
+     form.remark = '';
+   }
 };
 
 const petSizes = [
@@ -680,16 +755,40 @@ const selectedCoupon = computed(() => {
 });
 
 
+const showPriceDetail = ref(false);
+const openPriceDetail = () => {
+   showPriceDetail.value = true;
+};
+const closePriceDetail = () => {
+   showPriceDetail.value = false;
+};
+
 // Price Calculation
-const rawTotalPrice = computed(() => {
+const priceBreakdown = computed(() => {
+  // Determine effective pet sizes
+  let petSizes: PetSize[] = [];
+  if (selectedPetIds.value.length > 0) {
+    const selectedPets = userStore.userInfo?.pets?.filter(p => selectedPetIds.value.includes(p.id)) || [];
+    petSizes = selectedPets.map(p => p.size);
+  } else {
+    petSizes = [form.petSize];
+  }
+
+  // Parse date for holiday check (use start date if range)
+  // form.date format example: "2023-10-01" or "2023-10-01 至 2023-10-03"
+  const serviceDate = form.date.split(' ')[0] || new Date().toISOString().split('T')[0];
+
   return calculateTotalPrice({
     basePrice: BASE_PRICE,
-    serviceType: form.serviceType,
-    petSize: form.petSize,
+    petSizes: petSizes,
     durationMarkup: durations.find(d => d.value === form.duration)?.markup || 0,
+    serviceDate: serviceDate,
+    serviceTime: form.time || '12:00',
     addOns: form.addOns
   });
 });
+
+const rawTotalPrice = computed(() => priceBreakdown.value.total);
 
 const finalPrice = computed(() => {
   let price = rawTotalPrice.value;
@@ -709,6 +808,9 @@ const handleSubmit = () => {
   if (!form.date) return uni.showToast({ title: '请选择时间', icon: 'none' });
   if (!form.time) return uni.showToast({ title: '请选择时间段', icon: 'none' });
   
+  // Get selected pets
+  const selectedPets = userStore.userInfo?.pets?.filter(p => selectedPetIds.value.includes(p.id)) || [];
+
   // Create Order
   const newOrder = {
     id: Date.now().toString(),
@@ -719,7 +821,9 @@ const handleSubmit = () => {
     totalPrice: finalPrice.value,
     address: form.address,
     time: `${form.date} ${form.time}`,
-    petSize: form.petSize,
+    petSize: selectedPets.length > 0 ? selectedPets[0].size : form.petSize,
+    petIds: selectedPetIds.value,
+    petSnapshots: selectedPets,
     duration: form.duration,
     remark: form.remark,
     addOns: form.addOns,
@@ -1398,7 +1502,27 @@ onShow(() => {
     
     .price-col {
        display: flex;
-       align-items: baseline;
+       flex-direction: column;
+       
+       .price-main {
+         display: flex;
+         align-items: baseline;
+       }
+       
+       .price-tags {
+         display: flex;
+         margin-top: 4rpx;
+         
+         .tag {
+           font-size: 20rpx;
+           padding: 2rpx 8rpx;
+           border-radius: 6rpx;
+           margin-right: 8rpx;
+           
+           &.holiday { background: #FFEBEE; color: #D32F2F; }
+           &.rush { background: #E3F2FD; color: #1976D2; }
+         }
+       }
        
        .price-val {
          color: $color-error;
@@ -1630,5 +1754,111 @@ onShow(() => {
       }
     }
   }
+}
+
+.price-label-row {
+   display: flex;
+   align-items: center;
+   margin-bottom: 4rpx;
+   
+   .price-label { font-size: 24rpx; color: $color-text-secondary; margin-right: 10rpx; }
+   .price-detail-link { font-size: 22rpx; color: $color-primary; }
+}
+
+.price-detail-mask {
+   position: fixed;
+   top: 0;
+   left: 0;
+   width: 100%;
+   height: 100%;
+   background: rgba(0,0,0,0.5);
+   z-index: 200;
+   display: flex;
+   align-items: flex-end;
+}
+
+.price-detail-content {
+   width: 100%;
+   background: #fff;
+   border-radius: 30rpx 30rpx 0 0;
+   padding-bottom: env(safe-area-inset-bottom);
+   
+   .pd-header {
+      padding: 30rpx;
+      text-align: center;
+      position: relative;
+      border-bottom: 1rpx solid #eee;
+      .pd-title { font-size: 32rpx; font-weight: bold; }
+      .pd-close {
+         position: absolute;
+         right: 30rpx;
+         top: 30rpx;
+         font-size: 40rpx;
+         color: #999;
+         line-height: 1;
+      }
+   }
+   
+   .pd-list {
+      padding: 30rpx;
+      
+      .pd-item {
+         display: flex;
+         justify-content: space-between;
+         margin-bottom: 20rpx;
+         font-size: 28rpx;
+         color: $color-text-main;
+         
+         &.total {
+            font-weight: bold;
+            font-size: 32rpx;
+            margin-top: 20rpx;
+         }
+         
+         &.discount {
+            color: $color-error;
+         }
+         
+         &.final {
+            font-weight: bold;
+            font-size: 36rpx;
+            color: $color-error;
+            margin-top: 10rpx;
+         }
+      }
+      
+      .pd-divider {
+         height: 1rpx;
+         background: #eee;
+         margin: 20rpx 0;
+      }
+   }
+}
+
+.pet-grid {
+   position: relative;
+   &.disabled {
+      .pet-card { opacity: 0.5; filter: grayscale(0.5); }
+   }
+   .grid-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255,255,255,0.6);
+      
+      text {
+         background: rgba(0,0,0,0.7);
+         color: #fff;
+         padding: 10rpx 20rpx;
+         border-radius: 30rpx;
+         font-size: 24rpx;
+      }
+   }
 }
 </style>

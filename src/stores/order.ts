@@ -16,7 +16,9 @@ export interface Order {
   petGender?: 'male' | 'female';
   petAge?: number;
   petWeight?: number;
-  petSnapshot?: any; // Complete PetInfo snapshot
+  petSnapshot?: any; // Complete PetInfo snapshot (Legacy single pet)
+  petSnapshots?: any[]; // List of PetInfo snapshots (Multi-pet support)
+  petIds?: string[]; // IDs of involved pets
   
   // Contact Info
   contactName: string;
@@ -47,6 +49,12 @@ export interface Order {
   };
   review?: {
     rating: number;
+    content: string;
+    createdAt: number;
+  };
+  sitterReview?: {
+    rating: number; // 1-5
+    tags: string[]; // e.g. "乖巧", "护食", "粘人"
     content: string;
     createdAt: number;
   };
@@ -91,54 +99,151 @@ export const useOrderStore = defineStore('order', () => {
     return false;
   };
 
+  // State Machine Actions
+  
+  const startService = (orderId: string) => {
+    const orderIndex = orders.value.findIndex(o => o.id === orderId);
+    if (orderIndex > -1) {
+        const order = orders.value[orderIndex];
+        if (order.status === 'ACCEPTED') {
+            orders.value[orderIndex] = {
+                ...order,
+                status: 'IN_SERVICE',
+                actualStartTime: Date.now()
+            };
+            uni.setStorageSync('miaomiao_orders', JSON.stringify(orders.value));
+            return true;
+        }
+    }
+    return false;
+  };
+
+  const completeService = (orderId: string) => {
+    const orderIndex = orders.value.findIndex(o => o.id === orderId);
+    if (orderIndex > -1) {
+        const order = orders.value[orderIndex];
+        if (order.status === 'IN_SERVICE') {
+            orders.value[orderIndex] = {
+                ...order,
+                status: 'COMPLETED'
+            };
+            
+            // Auto-settle funds
+            const userStore = useUserStore();
+            const sitterId = order.sitterId;
+            if (sitterId && userStore.userInfo?.id === sitterId) {
+                userStore.addLaborIncome(order.totalPrice);
+            }
+            
+            uni.setStorageSync('miaomiao_orders', JSON.stringify(orders.value));
+            return true;
+        }
+    }
+    return false;
+  };
+
+  const submitOwnerReview = (orderId: string, rating: number, content: string) => {
+    const orderIndex = orders.value.findIndex(o => o.id === orderId);
+    if (orderIndex > -1) {
+        orders.value[orderIndex].review = {
+            rating,
+            content,
+            createdAt: Date.now()
+        };
+        // If Sitter hasn't reviewed yet, status stays COMPLETED (or maybe change to REVIEWED to hide from "Pending Review" list)
+        // For simplicity: Status -> REVIEWED implies Owner has reviewed.
+        orders.value[orderIndex].status = 'REVIEWED';
+        uni.setStorageSync('miaomiao_orders', JSON.stringify(orders.value));
+    }
+  };
+
+  const submitSitterReview = (orderId: string, rating: number, content: string, tags: string[] = []) => {
+    const orderIndex = orders.value.findIndex(o => o.id === orderId);
+    if (orderIndex > -1) {
+        orders.value[orderIndex].sitterReview = {
+            rating,
+            content,
+            tags,
+            createdAt: Date.now()
+        };
+        // Sitter review doesn't change main status from COMPLETED usually, 
+        // but if both reviewed, maybe archive? 
+        // For now, just save it.
+        uni.setStorageSync('miaomiao_orders', JSON.stringify(orders.value));
+    }
+  };
+
+  const cancelOrder = (orderId: string, role: 'owner' | 'sitter') => {
+    const orderIndex = orders.value.findIndex(o => o.id === orderId);
+    if (orderIndex > -1) {
+        const order = orders.value[orderIndex];
+        // Allow cancellation only in early stages
+        if (['UNPAID', 'PENDING', 'PENDING_ACCEPTANCE', 'ACCEPTED'].includes(order.status)) {
+            // If cancelling an accepted order, might need more logic (notifications, penalties)
+            // For MVP, just allow it
+            orders.value[orderIndex].status = 'CANCELLED';
+            uni.setStorageSync('miaomiao_orders', JSON.stringify(orders.value));
+            return true;
+        }
+    }
+    return false;
+  };
+
+  const payOrder = (orderId: string) => {
+      const orderIndex = orders.value.findIndex(o => o.id === orderId);
+      if (orderIndex > -1) {
+          const order = orders.value[orderIndex];
+          if (order.status === 'UNPAID') {
+              orders.value[orderIndex] = {
+                  ...order,
+                  status: 'PENDING',
+                  isPaid: true
+              };
+              uni.setStorageSync('miaomiao_orders', JSON.stringify(orders.value));
+              return true;
+          }
+      }
+      return false;
+  };
+
   const updateOrderStatus = (orderId: string, status: Order['status']) => {
+    // Deprecated: Strict state machine actions should be used instead.
+    // Kept only for legacy or debug.
+    console.warn('updateOrderStatus is deprecated. Use specific actions like startService, completeService, cancelOrder, payOrder.');
+    
+    if (status === 'IN_SERVICE') return startService(orderId);
+    if (status === 'COMPLETED') return completeService(orderId);
+    
     const orderIndex = orders.value.findIndex(o => o.id === orderId);
     if (orderIndex > -1) {
       orders.value[orderIndex].status = status;
-      // If starting service, record start time
-      if (status === 'IN_SERVICE' && !orders.value[orderIndex].actualStartTime) {
-        orders.value[orderIndex].actualStartTime = Date.now();
-      }
       uni.setStorageSync('miaomiao_orders', JSON.stringify(orders.value));
     }
   };
 
-  const completeOrder = (orderId: string, evidence: NonNullable<Order['serviceEvidence']>) => {
+  const updateOrderEvidence = (orderId: string, evidence: NonNullable<Order['serviceEvidence']>) => {
     const orderIndex = orders.value.findIndex(o => o.id === orderId);
     if (orderIndex > -1) {
-      const order = orders.value[orderIndex];
-      orders.value[orderIndex] = {
-        ...order,
-        status: 'COMPLETED',
-        serviceEvidence: evidence
+      orders.value[orderIndex].serviceEvidence = {
+        ...orders.value[orderIndex].serviceEvidence,
+        ...evidence
       };
-      
-      // Add balance to sitter
-      if (order.sitterId && order.totalPrice > 0) {
-        const userStore = useUserStore();
-        // Check if current user is the sitter (should be, as they complete the order)
-        // Or if we need to update remote, this is mock.
-        // We just update current user if they are the sitter.
-        if (userStore.userInfo?.id === order.sitterId) {
-            userStore.addBalance(order.totalPrice);
-        }
-      }
-
       uni.setStorageSync('miaomiao_orders', JSON.stringify(orders.value));
     }
-  };
-
-  const createOrder = (order: Order) => {
-    addOrder(order);
   };
 
   return {
     orders,
     loadOrders,
     addOrder,
-    createOrder,
     acceptOrder,
+    startService,
+    completeService,
+    submitOwnerReview,
+    submitSitterReview,
+    cancelOrder,
+    payOrder,
     updateOrderStatus,
-    completeOrder
+    updateOrderEvidence
   };
 });

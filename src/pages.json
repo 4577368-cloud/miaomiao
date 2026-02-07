@@ -104,6 +104,12 @@
         "selectedIconPath": "static/tab-order-active.svg"
       },
       {
+        "pagePath": "pages/message/index",
+        "text": "消息",
+        "iconPath": "static/tab-order.svg",
+        "selectedIconPath": "static/tab-order-active.svg"
+      },
+      {
         "pagePath": "pages/profile/index",
         "text": "我的",
         "iconPath": "static/tab-profile.svg",

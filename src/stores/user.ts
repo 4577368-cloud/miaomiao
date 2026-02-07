@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { PetSize } from '@/constants/pet';
+import { useOrderStore } from '@/stores/order';
 
 export type UserRole = 'owner' | 'sitter';
 export type SitterLevel = 'GOLD' | 'SILVER' | 'BRONZE';
@@ -25,6 +26,13 @@ export interface SitterProfile {
   availability?: SitterAvailability;
 }
 
+export interface PetCareProfile {
+  medications?: string[]; // 药物清单
+  allergies?: string[];   // 过敏源
+  habits?: string[];      // 特殊习惯/禁忌
+  notes?: string;         // 其他备注
+}
+
 export interface PetInfo {
   id: string;
   name: string;
@@ -38,6 +46,7 @@ export interface PetInfo {
   sterilized: boolean;
   vaccine: boolean;
   description?: string;
+  careProfile?: PetCareProfile; // 健康档案
 }
 
 export interface Address {
@@ -71,6 +80,7 @@ export interface UserInfo {
   addresses?: Address[];
   balance?: number;
   coupons?: Coupon[];
+  laborBalance?: number; // 宠托师劳务收入钱包
 }
 
 export const useUserStore = defineStore('user', () => {
@@ -161,6 +171,7 @@ export const useUserStore = defineStore('user', () => {
         ];
       }
       if (userInfo.value.balance === undefined) userInfo.value.balance = 0;
+      if (userInfo.value.laborBalance === undefined) userInfo.value.laborBalance = 0;
     }
   };
 
@@ -180,17 +191,54 @@ export const useUserStore = defineStore('user', () => {
 
   const switchRole = (newRole: UserRole) => {
     if (userInfo.value) {
-      // Check if switching to sitter but no profile
-      if (newRole === 'sitter' && !userInfo.value.sitterProfile) {
-        uni.navigateTo({ url: '/pages/sitter-register/index' });
-        return;
+      const orderStore = useOrderStore();
+
+      // 1. Check Certification for Sitter
+      if (newRole === 'sitter') {
+        if (!userInfo.value.sitterProfile) {
+          uni.navigateTo({ url: '/pages/sitter-register/index' });
+          return;
+        }
+        if (!userInfo.value.sitterProfile.isCertified) {
+          uni.showModal({
+             title: '未认证',
+             content: '切换宠托师身份需要先完成实名认证',
+             showCancel: false,
+             success: () => {
+                uni.navigateTo({ url: '/pages/profile/certification' });
+             }
+          });
+          return;
+        }
       }
-      
+
+      // 2. Check Active Orders
+      // Prevent switching role if there are active orders that require this role
+      if (userInfo.value.role === 'sitter' && newRole === 'owner') {
+         // Check if I am a sitter in any IN_SERVICE order
+         const hasActiveJob = orderStore.orders.some(o => 
+           o.sitterId === userInfo.value?.id && 
+           ['ACCEPTED', 'IN_SERVICE'].includes(o.status)
+         );
+         
+         if (hasActiveJob) {
+           uni.showToast({
+             title: '有进行中的订单，请先完成',
+             icon: 'none'
+           });
+           return;
+         }
+      }
+
       userInfo.value.role = newRole;
       uni.setStorageSync('miaomiao_user', JSON.stringify(userInfo.value));
       
-      // Navigate to Home or refresh
-      uni.reLaunch({ url: '/pages/home/index' });
+      // Force TabBar update by navigating to appropriate home/root
+      if (newRole === 'owner') {
+          uni.switchTab({ url: '/pages/home/index' });
+      } else {
+          uni.switchTab({ url: '/pages/home/index' });
+      }
     }
   };
 
@@ -216,6 +264,22 @@ export const useUserStore = defineStore('user', () => {
       userInfo.value.balance = (userInfo.value.balance || 0) + amount;
       uni.setStorageSync('miaomiao_user', JSON.stringify(userInfo.value));
     }
+  };
+
+  const addLaborIncome = (amount: number) => {
+    if (userInfo.value) {
+      userInfo.value.laborBalance = (userInfo.value.laborBalance || 0) + amount;
+      uni.setStorageSync('miaomiao_user', JSON.stringify(userInfo.value));
+    }
+  };
+
+  const withdrawLaborIncome = (amount: number): boolean => {
+    if (userInfo.value && (userInfo.value.laborBalance || 0) >= amount) {
+      userInfo.value.laborBalance = (userInfo.value.laborBalance || 0) - amount;
+      uni.setStorageSync('miaomiao_user', JSON.stringify(userInfo.value));
+      return true;
+    }
+    return false;
   };
 
   const recharge = (amount: number) => {
@@ -280,6 +344,8 @@ export const useUserStore = defineStore('user', () => {
     updateUser,
     useCoupon,
     addBalance,
+    addLaborIncome,
+    withdrawLaborIncome,
     recharge,
     deductBalance,
     registerAsSitter

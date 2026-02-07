@@ -103,7 +103,7 @@
                 <button class="action-btn primary" v-if="order.status === 'IN_SERVICE'" @click.stop="handleConfirmComplete(order)">确认完成</button>
                 <button class="action-btn outline" v-if="order.status === 'COMPLETED'" @click.stop="openReviewModal(order)">去评价</button>
                 <button class="action-btn outline" v-if="['COMPLETED', 'REVIEWED'].includes(order.status)" @click.stop="handleReorder(order)">再来一单</button>
-              </template>
+</template>
               
               <!-- 宠托师视角 -->
               <template v-else>
@@ -232,10 +232,13 @@
         </view>
       </view>
     </view>
+    <view style="height: 50px;"></view>
+    <CustomTabBar current-path="pages/orders/index" />
   </view>
 </template>
 
 <script setup lang="ts">
+import CustomTabBar from '@/components/custom-tab-bar/index.vue';
 // Force rebuild
 import { ref, computed } from 'vue';
 import { onShow, onHide, onUnload } from '@dcloudio/uni-app';
@@ -513,9 +516,12 @@ const handleCancel = (order: Order) => {
     content: '确定要取消订单吗？',
     success: (res) => {
       if (res.confirm) {
-        orderStore.updateOrderStatus(order.id, 'CANCELLED');
-        // Cancelled orders are usually not in a specific tab other than ALL or Cancelled history (if exists)
-        // Here we just stay or go to ALL? User didn't specify for Cancel.
+        if (orderStore.cancelOrder(order.id, 'owner')) {
+             uni.showToast({ title: '已取消' });
+             // No need to switch tab if viewing ALL, but if viewing specific status, list will update
+        } else {
+             uni.showToast({ title: '取消失败', icon: 'none' });
+        }
       }
     }
   });
@@ -525,17 +531,21 @@ const handlePay = (order: Order) => {
   uni.showLoading({ title: '支付中...' });
   setTimeout(() => {
     uni.hideLoading();
-    orderStore.updateOrderStatus(order.id, 'PENDING');
-    uni.showToast({ title: '支付成功', icon: 'success' });
-    switchToTab('PENDING');
+    if (orderStore.payOrder(order.id)) {
+        uni.showToast({ title: '支付成功', icon: 'success' });
+        switchToTab('PENDING');
+    } else {
+        uni.showToast({ title: '支付失败', icon: 'none' });
+    }
   }, 1000);
 };
 
 const handleConfirmStart = (order: Order) => {
     // 铲屎官确认开始
-    orderStore.updateOrderStatus(order.id, 'IN_SERVICE');
-    uni.showToast({ title: '已确认开始服务', icon: 'success' });
-    switchToTab('IN_SERVICE');
+    if (orderStore.startService(order.id)) {
+        uni.showToast({ title: '已确认开始服务', icon: 'success' });
+        switchToTab('IN_SERVICE');
+    }
 };
 
 const handleSitterAccept = (order: Order) => {

@@ -118,6 +118,35 @@
             </view>
           </view>
 
+          <!-- Care Profile -->
+          <view class="card">
+            <text class="section-title">健康档案 (选填)</text>
+            
+            <text class="label mb-2">近期用药 (每行一个)</text>
+            <textarea 
+              class="textarea mb-3" 
+              v-model="careForm.medications" 
+              placeholder="例如：每日早晚各一次消炎药..." 
+              auto-height
+            />
+            
+            <text class="label mb-2">过敏史 (每行一个)</text>
+            <textarea 
+              class="textarea mb-3" 
+              v-model="careForm.allergies" 
+              placeholder="例如：对鸡肉过敏，不能吃海鲜..." 
+              auto-height
+            />
+            
+            <text class="label mb-2">特殊习惯/禁忌 (每行一个)</text>
+            <textarea 
+              class="textarea" 
+              v-model="careForm.habits" 
+              placeholder="例如：不喜欢被摸尾巴，出门容易爆冲..." 
+              auto-height
+            />
+          </view>
+
           <!-- Description -->
           <view class="card">
             <text class="label mb-2">备注信息</text>
@@ -156,7 +185,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, reactive } from 'vue';
 import { useUserStore, type PetInfo } from '@/stores/user';
 import { PetSize, PET_SIZE_COEFFICIENTS } from '@/constants/pet';
 import { DOG_BREEDS, CAT_BREEDS, BREED_AVATAR_MAP } from '@/constants/breeds';
@@ -182,6 +211,13 @@ const defaultForm: Partial<PetInfo> = {
 };
 
 const form = ref<Partial<PetInfo>>({ ...defaultForm });
+
+const careForm = reactive({
+  medications: '',
+  allergies: '',
+  habits: '',
+  notes: ''
+});
 
 const petSizesList = [
   { label: '猫咪', value: PetSize.CAT, desc: '1-15kg', type: 'cat' },
@@ -269,12 +305,25 @@ const selectDefaultAvatar = (filename: string) => {
 const addNewPet = () => {
   isEditing.value = false;
   form.value = JSON.parse(JSON.stringify(defaultForm));
+  // Reset care form
+  careForm.medications = '';
+  careForm.allergies = '';
+  careForm.habits = '';
+  careForm.notes = '';
   showModal.value = true;
 };
 
 const editPet = (pet: PetInfo) => {
   isEditing.value = true;
   form.value = JSON.parse(JSON.stringify(pet));
+  
+  // Populate care form
+  const profile = pet.careProfile || {};
+  careForm.medications = profile.medications?.join('\n') || '';
+  careForm.allergies = profile.allergies?.join('\n') || '';
+  careForm.habits = profile.habits?.join('\n') || '';
+  careForm.notes = profile.notes || '';
+  
   showModal.value = true;
 };
 
@@ -285,9 +334,18 @@ const closeModal = () => showModal.value = false;
 const savePet = () => {
   if (!form.value.name) return uni.showToast({ title: '请输入昵称', icon: 'none' });
   
+  // Construct Care Profile
+  const careProfile = {
+    medications: careForm.medications.split('\n').map(s => s.trim()).filter(s => s),
+    allergies: careForm.allergies.split('\n').map(s => s.trim()).filter(s => s),
+    habits: careForm.habits.split('\n').map(s => s.trim()).filter(s => s),
+    notes: careForm.notes
+  };
+
   const newPet = {
     ...form.value,
     id: form.value.id || Date.now().toString(),
+    careProfile
   } as PetInfo;
 
   let currentPets = [...pets.value];
@@ -727,7 +785,21 @@ const deletePet = () => {
   }
 }
 
+.section-title {
+  display: block;
+  font-size: 15px;
+  font-weight: bold;
+  color: #333;
+  padding: 16px 0 12px 0;
+  border-bottom: 1px solid #f5f5f5;
+  margin-bottom: 12px;
+}
+
 .mb-2 {
   margin-bottom: 8px;
+}
+
+.mb-3 {
+  margin-bottom: 16px;
 }
 </style>
