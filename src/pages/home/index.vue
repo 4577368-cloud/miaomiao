@@ -1,0 +1,718 @@
+<template>
+  <view class="container">
+    <!-- 顶部导航栏占位 (沉浸式) -->
+    <view class="nav-placeholder"></view>
+
+    <!-- 头部区域 -->
+    <view class="header-section">
+      <view class="user-welcome">
+        <text class="greeting">早安，</text>
+        <text class="username">{{ userStore.userInfo?.nickname || '铲屎官' }}</text>
+      </view>
+      <view class="location-badge" @click="handleLocationClick">
+        <text class="icon">📍</text>
+        <text>{{ locationName }}</text>
+      </view>
+    </view>
+
+    <!-- 铲屎官视图 -->
+    <view v-if="isOwner">
+      <!-- 顶部 Banner -->
+      <view class="banner-swiper">
+        <swiper class="swiper" autoplay circular interval="5000" duration="500">
+          <swiper-item>
+            <view class="banner-item banner-1">
+              <view class="banner-content">
+                <text class="banner-tag">新人专享</text>
+                <text class="banner-title">首单立减 ¥30</text>
+                <text class="banner-sub">专业宠托，安心无忧</text>
+                <button class="banner-btn">立即领取</button>
+              </view>
+              <view class="banner-img">🎁</view>
+            </view>
+          </swiper-item>
+          <swiper-item>
+            <view class="banner-item banner-2">
+              <view class="banner-content">
+                <text class="banner-tag">假期预售</text>
+                <text class="banner-title">春节上门喂养</text>
+                <text class="banner-sub">提前预约，不再拥挤</text>
+                <button class="banner-btn">去看看</button>
+              </view>
+              <view class="banner-img">🧧</view>
+            </view>
+          </swiper-item>
+        </swiper>
+      </view>
+      
+      <!-- 核心服务 -->
+      <view class="section-container">
+        <view class="section-header">
+          <text class="title">选择服务</text>
+          <text class="more">全部服务 ></text>
+        </view>
+        
+        <view class="service-grid">
+          <!-- 上门喂养 -->
+          <view class="service-card feed" @click="selectService(ServiceType.FEEDING)">
+            <view class="card-bg-decoration"></view>
+            <view class="card-info">
+              <view class="card-header">
+                <text class="card-name">上门喂养</text>
+                <view class="hot-badge">HOT</view>
+              </view>
+              <text class="card-desc">专业喂食 · 铲屎 · 陪玩</text>
+              <view class="card-tags">
+                <text>猫咪</text>
+                <text>小宠</text>
+              </view>
+            </view>
+            <view class="card-icon">🐱</view>
+          </view>
+
+          <!-- 上门遛宠 -->
+          <view class="service-card walk" @click="selectService(ServiceType.WALKING)">
+            <view class="card-bg-decoration"></view>
+            <view class="card-info">
+              <view class="card-header">
+                <text class="card-name">上门遛宠</text>
+              </view>
+              <text class="card-desc">专业遛狗 · 运动 · 捡屎</text>
+              <view class="card-tags">
+                <text>狗狗</text>
+              </view>
+            </view>
+            <view class="card-icon">🐕</view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 平台保障 -->
+      <view class="section-container">
+        <view class="section-header">
+          <text class="title">平台保障</text>
+        </view>
+        <view class="guarantee-scroll">
+          <view class="guarantee-card">
+            <view class="icon-box">🛡️</view>
+            <text class="g-title">实名认证</text>
+            <text class="g-desc">宠托师身份核验</text>
+          </view>
+          <view class="guarantee-card">
+            <view class="icon-box">🏥</view>
+            <text class="g-title">专业保险</text>
+            <text class="g-desc">全程意外保障</text>
+          </view>
+          <view class="guarantee-card">
+            <view class="icon-box">🎥</view>
+            <text class="g-title">全程直播</text>
+            <text class="g-desc">服务过程可视化</text>
+          </view>
+          <view class="guarantee-card">
+            <view class="icon-box">🎓</view>
+            <text class="g-title">专业培训</text>
+            <text class="g-desc">持证上岗服务</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 宠托师视图 (接单大厅) -->
+    <view v-else class="sitter-view">
+      <view class="section-container">
+        <view class="section-header">
+          <text class="title">任务大厅</text>
+          <text class="more">附近 {{ pendingOrders.length }} 个任务</text>
+        </view>
+
+        <view v-if="pendingOrders.length === 0" class="empty-state">
+          <text class="empty-icon">📭</text>
+          <text class="empty-text">暂时没有新任务</text>
+          <text class="empty-sub">休息一下，稍后再来刷刷看~</text>
+        </view>
+
+        <view v-else class="task-list">
+          <view 
+            class="task-card" 
+            v-for="order in pendingOrders" 
+            :key="order.id"
+          >
+            <view class="task-header">
+              <view class="task-type">
+                <text class="type-tag">{{ order.serviceType === ServiceType.FEEDING ? '上门喂养' : '上门遛宠' }}</text>
+                <text class="price">¥{{ order.totalPrice }}</text>
+              </view>
+              <text class="time">{{ order.time }}</text>
+            </view>
+            
+            <view class="task-body">
+              <view class="info-row">
+                <text class="label">宠物：</text>
+                <text class="value">{{ order.petSize === 'SMALL' ? '小型' : order.petSize === 'MEDIUM' ? '中型' : '大型' }}宠物</text>
+              </view>
+              <view class="info-row">
+                <text class="label">地址：</text>
+                <text class="value">{{ order.address }}</text>
+              </view>
+              <view class="info-row" v-if="order.remark">
+                <text class="label">备注：</text>
+                <text class="value">{{ order.remark }}</text>
+              </view>
+            </view>
+            
+            <button class="btn-accept" @click="handleAcceptOrder(order.id)">抢单</button>
+          </view>
+        </view>
+      </view>
+    </view>
+
+  </view>
+</template>
+
+<script setup lang="ts">
+import { ref, computed } from 'vue';
+import { onShow } from '@dcloudio/uni-app';
+import { ServiceType } from '@/constants/pet';
+import { getCurrentLocation } from '@/utils/location';
+import { useUserStore } from '@/stores/user';
+import { useOrderStore } from '@/stores/order';
+
+const userStore = useUserStore();
+const orderStore = useOrderStore();
+
+const locationName = ref('点击定位');
+
+const isOwner = computed(() => userStore.userInfo?.role === 'owner');
+
+const pendingOrders = computed(() => {
+  return orderStore.orders.filter(order => order.status === 'PENDING');
+});
+
+// 页面显示时加载数据
+onShow(() => {
+  if (!userStore.isLoggedIn) {
+    uni.reLaunch({ url: '/pages/login/index' });
+    return;
+  }
+
+  // 刷新订单数据
+  orderStore.loadOrders();
+
+  // 尝试自动定位
+  if (locationName.value === '点击定位') {
+    getCurrentLocation()
+      .then(res => {
+        if (res.name) {
+          locationName.value = res.name;
+        }
+      })
+      .catch(() => {
+        // 定位失败保持默认文案
+        console.log('自动定位失败，等待用户手动点击');
+      });
+  }
+});
+
+const handleLocationClick = () => {
+    uni.chooseLocation({
+      success: (res) => {
+        console.log('Location chosen:', res);
+        locationName.value = res.name || res.address;
+      },
+      fail: (err) => {
+        console.error('Choose location failed:', err);
+        // #ifdef H5
+        // H5平台特殊处理
+        if (err.errMsg && (err.errMsg.includes('auth denied') || err.errMsg.includes('denied'))) {
+            uni.showModal({
+                title: '定位权限受限',
+                content: '请在浏览器地址栏左侧点击锁图标，允许获取位置信息，或者检查系统定位开关。',
+                showCancel: false
+            });
+        } else if (err.errMsg && err.errMsg.includes('cancel')) {
+            // 用户取消，不做处理
+        } else {
+            // 其他错误（如Key配置问题）
+            uni.showToast({
+                title: '打开地图失败，请检查网络或配置',
+                icon: 'none'
+            });
+        }
+        // #endif
+
+        // #ifndef H5
+        uni.getSetting({
+          success: (settingRes) => {
+             if (settingRes.authSetting['scope.userLocation'] === false) {
+               uni.showModal({
+                 title: '提示',
+                 content: '需要获取您的位置信息，请在设置中打开',
+                 success: (modalRes) => {
+                   if (modalRes.confirm) uni.openSetting();
+                 }
+               });
+             }
+          }
+        });
+        // #endif
+      }
+    });
+  };
+
+const selectService = (type: ServiceType) => {
+  uni.navigateTo({
+    url: `/pages/publish/index?serviceType=${type}`
+  });
+};
+
+const handleAcceptOrder = (orderId: string) => {
+  if (!userStore.isLoggedIn) {
+    uni.navigateTo({ url: '/pages/login/index' });
+    return;
+  }
+  
+  if (!userStore.userInfo) return;
+
+  if (orderStore.acceptOrder(orderId, userStore.userInfo)) {
+    uni.showToast({
+      title: '抢单成功！',
+      icon: 'success'
+    });
+    // 抢单成功后，可以跳转到订单详情或列表
+    setTimeout(() => {
+      uni.switchTab({ url: '/pages/orders/index' });
+    }, 1500);
+  } else {
+    uni.showToast({
+      title: '抢单失败，可能已被抢走',
+      icon: 'none'
+    });
+  }
+};
+</script>
+
+<style lang="scss" scoped>
+.container {
+  min-height: 100vh;
+  background-color: $color-bg-page;
+  padding-bottom: 40rpx;
+}
+
+.nav-placeholder {
+  height: var(--status-bar-height);
+  width: 100%;
+}
+
+.header-section {
+  padding: $spacing-lg $spacing-lg 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: $spacing-lg;
+
+  .user-welcome {
+    display: flex;
+    flex-direction: column;
+    
+    .greeting {
+      font-size: 28rpx;
+      color: $color-text-secondary;
+      margin-bottom: 4rpx;
+    }
+    
+    .username {
+      font-size: 44rpx;
+      font-weight: 800;
+      color: $color-text-main;
+    }
+  }
+
+  .location-badge {
+    background: rgba(255, 255, 255, 0.8);
+    padding: 12rpx 24rpx;
+    border-radius: $radius-full;
+    font-size: 24rpx;
+    color: $color-text-main;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    box-shadow: $shadow-sm;
+    backdrop-filter: blur(10px);
+
+    .icon {
+      margin-right: 8rpx;
+    }
+  }
+}
+
+.banner-swiper {
+  padding: 0 $spacing-lg;
+  height: 380rpx;
+  margin-bottom: $spacing-xl;
+  
+  .swiper {
+    height: 100%;
+    border-radius: $radius-xl;
+    overflow: hidden;
+    transform: translateY(0); // Fix iOS radius clipping
+    box-shadow: $shadow-lg;
+  }
+  
+  .banner-item {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    padding: 56rpx;
+    box-sizing: border-box;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    
+    &.banner-1 {
+      background: linear-gradient(135deg, #2C3E50 0%, #4CA1AF 100%);
+      
+      .banner-tag { background: rgba(255,255,255,0.2); color: #FFF; backdrop-filter: blur(10px); }
+      .banner-title { color: #FFF; }
+      .banner-sub { color: rgba(255,255,255,0.8); }
+      .banner-btn { background: #FFF; color: #2C3E50; box-shadow: 0 8rpx 24rpx rgba(0,0,0,0.15); }
+    }
+    
+    &.banner-2 {
+      background: linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%);
+      
+      .banner-tag { background: rgba(255, 77, 79, 0.1); color: #FF4D4F; }
+      .banner-title { color: #5D3A3A; }
+      .banner-sub { color: rgba(93, 58, 58, 0.7); }
+      .banner-btn { background: #5D3A3A; color: #FFF; box-shadow: 0 8rpx 24rpx rgba(93, 58, 58, 0.2); }
+    }
+
+    .banner-content {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      z-index: 2;
+
+      .banner-tag {
+        font-size: 20rpx;
+        padding: 4rpx 12rpx;
+        border-radius: 8rpx;
+        margin-bottom: 16rpx;
+        font-weight: 600;
+      }
+
+      .banner-title {
+        font-size: 40rpx;
+        font-weight: 800;
+        margin-bottom: 8rpx;
+        line-height: 1.2;
+      }
+
+      .banner-sub {
+        font-size: 24rpx;
+        margin-bottom: 32rpx;
+      }
+
+      .banner-btn {
+        margin: 0;
+        font-size: 24rpx;
+        padding: 0 32rpx;
+        height: 60rpx;
+        line-height: 60rpx;
+        border-radius: $radius-full;
+        font-weight: 600;
+      }
+    }
+
+    .banner-img {
+      font-size: 140rpx;
+      transform: rotate(15deg) translateY(20rpx);
+      filter: drop-shadow(0 10rpx 20rpx rgba(0,0,0,0.2));
+    }
+  }
+}
+
+.section-container {
+  padding: 0 $spacing-lg;
+  margin-bottom: $spacing-xl;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: $spacing-md;
+
+  .title {
+    font-size: 36rpx;
+    font-weight: 800;
+    color: $color-text-main;
+  }
+
+  .more {
+    font-size: 26rpx;
+    color: $color-text-secondary;
+  }
+}
+
+.service-grid {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+}
+
+.service-card {
+  height: 220rpx;
+  background: #FFF;
+  border-radius: $radius-lg;
+  position: relative;
+  overflow: hidden;
+  box-shadow: $shadow-md;
+  display: flex;
+  align-items: center;
+  padding: 0 48rpx;
+  transition: transform 0.2s;
+
+  &:active {
+    transform: scale(0.98);
+  }
+
+  .card-bg-decoration {
+    position: absolute;
+    top: -50%;
+    right: -20%;
+    width: 300rpx;
+    height: 300rpx;
+    border-radius: 50%;
+    opacity: 0.1;
+    z-index: 0;
+  }
+
+  &.feed {
+    .card-bg-decoration { background: $color-primary; }
+    .card-icon { background: $color-primary-light; }
+  }
+
+  &.walk {
+    .card-bg-decoration { background: $color-blue; }
+    .card-icon { background: #E6F7FF; }
+  }
+
+  .card-info {
+    flex: 1;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 12rpx;
+
+      .card-name {
+        font-size: 36rpx;
+        font-weight: 800;
+        color: $color-text-main;
+        margin-right: 16rpx;
+      }
+
+      .hot-badge {
+        background: linear-gradient(90deg, #FF6B6B 0%, #FF8E3C 100%);
+        color: #FFF;
+        font-size: 20rpx;
+        padding: 4rpx 12rpx;
+        border-radius: $radius-full;
+        font-weight: 800;
+        transform: skewX(-10deg);
+      }
+    }
+
+    .card-desc {
+      font-size: 26rpx;
+      color: $color-text-secondary;
+      margin-bottom: 24rpx;
+    }
+
+    .card-tags {
+      display: flex;
+      gap: 12rpx;
+      
+      text {
+        font-size: 22rpx;
+        color: $color-text-regular;
+        background: $color-bg;
+        padding: 6rpx 16rpx;
+        border-radius: 8rpx;
+      }
+    }
+  }
+
+  .card-icon {
+    width: 120rpx;
+    height: 120rpx;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 60rpx;
+    margin-left: 24rpx;
+    z-index: 1;
+  }
+}
+
+.guarantee-scroll {
+  display: flex;
+  overflow-x: auto;
+  gap: $spacing-md;
+  padding-bottom: 20rpx; // Space for shadow
+  margin: 0 -20rpx; // Negative margin for edge-to-edge scroll
+  padding: 0 20rpx 20rpx;
+
+  .guarantee-card {
+    flex-shrink: 0;
+    width: 200rpx;
+    height: 240rpx;
+    background: #FFF;
+    border-radius: $radius-md;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: $shadow-sm;
+
+    .icon-box {
+      width: 80rpx;
+      height: 80rpx;
+      background: $color-bg;
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 40rpx;
+      margin-bottom: 24rpx;
+    }
+
+    .g-title {
+      font-size: 26rpx;
+      font-weight: 700;
+      color: $color-text-main;
+      margin-bottom: 8rpx;
+    }
+
+    .g-desc {
+      font-size: 20rpx;
+      color: $color-text-secondary;
+    }
+  }
+}
+
+// 宠托师视图样式
+.sitter-view {
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 100rpx 0;
+    
+    .empty-icon {
+      font-size: 80rpx;
+      margin-bottom: 24rpx;
+    }
+    
+    .empty-text {
+      font-size: 32rpx;
+      font-weight: 600;
+      color: $color-text-main;
+      margin-bottom: 12rpx;
+    }
+    
+    .empty-sub {
+      font-size: 26rpx;
+      color: $color-text-secondary;
+    }
+  }
+  
+  .task-list {
+    display: flex;
+    flex-direction: column;
+    gap: 24rpx;
+    
+    .task-card {
+      background: #FFF;
+      border-radius: 24rpx;
+      padding: 30rpx;
+      box-shadow: $shadow-card;
+      
+      .task-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24rpx;
+        padding-bottom: 24rpx;
+        border-bottom: 1px solid rgba(0,0,0,0.03);
+        
+        .task-type {
+          display: flex;
+          align-items: center;
+          gap: 16rpx;
+          
+          .type-tag {
+            font-size: 28rpx;
+            font-weight: 700;
+            color: $color-text-main;
+          }
+          
+          .price {
+            font-size: 32rpx;
+            font-weight: 800;
+            color: $color-price;
+          }
+        }
+        
+        .time {
+          font-size: 24rpx;
+          color: $color-text-secondary;
+        }
+      }
+      
+      .task-body {
+        margin-bottom: 30rpx;
+        
+        .info-row {
+          display: flex;
+          margin-bottom: 12rpx;
+          font-size: 26rpx;
+          
+          .label {
+            color: $color-text-secondary;
+            width: 90rpx;
+            flex-shrink: 0;
+          }
+          
+          .value {
+            color: $color-text-main;
+            flex: 1;
+            @include text-ellipsis;
+          }
+        }
+      }
+      
+      .btn-accept {
+        width: 100%;
+        height: 80rpx;
+        line-height: 80rpx;
+        background: linear-gradient(135deg, #4CA1AF 0%, #2C3E50 100%);
+        color: #FFF;
+        font-size: 28rpx;
+        font-weight: 600;
+        border-radius: 40rpx;
+        border: none;
+        
+        &:active {
+          opacity: 0.9;
+        }
+      }
+    }
+  }
+}
+</style>

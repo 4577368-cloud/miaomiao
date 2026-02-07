@@ -1,0 +1,486 @@
+<template>
+  <view class="container">
+    <!-- 顶部背景装饰 -->
+    <view class="bg-decoration"></view>
+    
+    <!-- 个人信息卡片 -->
+    <view class="header-section">
+      <view class="user-card">
+        <view class="user-info">
+          <view class="avatar-box" @click="handleAvatarClick">
+            <image v-if="userInfo?.avatar" :src="userInfo.avatar" class="avatar-img" mode="aspectFill" />
+            <view v-else class="avatar"></view>
+            <view class="status-dot"></view>
+            <view class="edit-hint">📷</view>
+          </view>
+          <view class="info-content">
+            <view class="name-row">
+              <text class="name">{{ userInfo?.nickname || '未登录' }}</text>
+              <view class="role-badge" :class="currentRole">
+                <text>{{ roleLabel }}</text>
+              </view>
+            </view>
+            <text class="bio">还没有填写个人简介...</text>
+          </view>
+        </view>
+        
+        <view class="stats-row">
+          <view class="stat-item">
+            <text class="num">{{ joinedDays }}</text>
+            <text class="label">加入天数</text>
+          </view>
+          <view class="stat-item">
+            <text class="num">0.00</text>
+            <text class="label">余额</text>
+          </view>
+          <view class="stat-item">
+            <text class="num">0</text>
+            <text class="label">积分</text>
+          </view>
+        </view>
+      </view>
+    </view>
+    
+    <!-- 我的爱宠 (Horizontal Scroll) - REMOVED -->
+
+    <!-- 常用功能 (Bento Grid 风格) -->
+    <view class="section-title">我的服务</view>
+    <view class="grid-menu">
+      <view class="grid-item medium blue" @click="navigateTo('/pages/address/index')">
+        <view class="grid-content">
+          <text class="grid-label">地址管理</text>
+        </view>
+        <text class="grid-icon">📍</text>
+      </view>
+      
+      <view class="grid-item medium pink" @click="navigateTo('/pages/wallet/index')">
+        <view class="grid-content">
+          <text class="grid-label">我的钱包</text>
+        </view>
+        <text class="grid-icon">👛</text>
+      </view>
+
+      <view class="grid-item medium blue" @click="navigateTo('/pages/message/index')">
+        <view class="grid-content">
+          <text class="grid-label">我的消息</text>
+          <text class="grid-sub">评价/通知</text>
+        </view>
+        <text class="grid-icon">🔔</text>
+      </view>
+    </view>
+    
+    <view class="section-title">更多功能</view>
+    <view class="menu-list">
+      <view class="menu-item" @click="handleSwitchRole">
+        <view class="left">
+          <text class="icon">🔄</text>
+          <text class="label">{{ switchRoleLabel }}</text>
+        </view>
+        <text class="arrow">></text>
+      </view>
+      <view class="menu-item">
+        <view class="left">
+          <text class="icon">🎧</text>
+          <text class="label">联系客服</text>
+        </view>
+        <text class="arrow">></text>
+      </view>
+      <view class="menu-item">
+        <view class="left">
+          <text class="icon">⚙️</text>
+          <text class="label">设置</text>
+        </view>
+        <text class="arrow">></text>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="ts">
+import { computed } from 'vue';
+import { useUserStore } from '@/stores/user';
+
+const userStore = useUserStore();
+
+const userInfo = computed(() => userStore.userInfo);
+const currentRole = computed(() => userInfo.value?.role || 'owner');
+const roleLabel = computed(() => currentRole.value === 'owner' ? '雇主' : '宠托师');
+const switchRoleLabel = computed(() => currentRole.value === 'owner' ? '切换身份 (宠托师)' : '切换身份 (雇主)');
+
+const joinedDays = computed(() => {
+  if (!userInfo.value?.joinDate) return 1;
+  const diff = Date.now() - userInfo.value.joinDate;
+  return Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+});
+
+const navigateTo = (url: string) => {
+  uni.navigateTo({ url });
+};
+
+const handleAvatarClick = () => {
+    uni.chooseImage({
+        count: 1,
+        success: (res) => {
+            userStore.updateUser({ avatar: res.tempFilePaths[0] });
+        }
+    });
+};
+
+const handleSwitchRole = () => {
+  const newRole = currentRole.value === 'owner' ? 'sitter' : 'owner';
+  
+  uni.showLoading({ title: '切换身份中...' });
+  
+  setTimeout(() => {
+    userStore.switchRole(newRole);
+    uni.hideLoading();
+    uni.showToast({
+      title: `已切换为${newRole === 'owner' ? '雇主' : '宠托师'}身份`,
+      icon: 'success'
+    });
+  }, 500);
+};
+</script>
+
+<style lang="scss" scoped>
+.container {
+  min-height: 100vh;
+  background-color: $color-bg-page;
+  padding-bottom: 40rpx;
+  position: relative;
+  overflow: hidden;
+}
+
+.bg-decoration {
+  position: absolute;
+  top: -200rpx;
+  right: -100rpx;
+  width: 600rpx;
+  height: 600rpx;
+  background: radial-gradient(circle, rgba(255, 142, 60, 0.15) 0%, rgba(255, 255, 255, 0) 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.header-section {
+  padding: 100rpx $spacing-lg $spacing-lg;
+}
+
+.user-card {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+  box-shadow: $shadow-float;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  
+  .user-info {
+    display: flex;
+    align-items: center;
+    margin-bottom: $spacing-xl;
+    
+    .avatar-box {
+      position: relative;
+      margin-right: $spacing-md;
+      
+      .avatar, .avatar-img {
+        width: 120rpx;
+        height: 120rpx;
+        background: linear-gradient(135deg, #FFD1DC 0%, #FFF0E5 100%);
+        border-radius: 50%;
+        border: 4rpx solid #FFFFFF;
+        box-shadow: $shadow-sm;
+      }
+
+      .edit-hint {
+        position: absolute;
+        top: 0;
+        right: 0;
+        font-size: 24rpx;
+        background: rgba(0,0,0,0.3);
+        border-radius: 50%;
+        padding: 4rpx;
+      }
+      
+      .status-dot {
+        position: absolute;
+        bottom: 4rpx;
+        right: 4rpx;
+        width: 24rpx;
+        height: 24rpx;
+        background: $color-success;
+        border: 2rpx solid #FFFFFF;
+        border-radius: 50%;
+      }
+    }
+    
+    .info-content {
+      flex: 1;
+      
+      .name-row {
+        display: flex;
+        align-items: center;
+        margin-bottom: 8rpx;
+        
+        .name {
+          font-size: 40rpx;
+          font-weight: 800;
+          color: $color-text-main;
+          margin-right: 16rpx;
+        }
+        
+        .role-badge {
+          background: linear-gradient(90deg, #FF8E3C 0%, #FF6B6B 100%);
+          padding: 4rpx 16rpx;
+          border-radius: $radius-full;
+          
+          &.sitter {
+            background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+          }
+          
+          text {
+            color: #FFFFFF;
+            font-size: 20rpx;
+            font-weight: 600;
+          }
+        }
+      }
+      
+      .bio {
+        font-size: 26rpx;
+        color: $color-text-secondary;
+      }
+    }
+  }
+  
+  .stats-row {
+    display: flex;
+    justify-content: space-around;
+    padding-top: $spacing-md;
+    border-top: 1px solid rgba(0, 0, 0, 0.03);
+    
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      
+      .num {
+        font-size: 36rpx;
+        font-weight: bold;
+        color: $color-text-main;
+        margin-bottom: 4rpx;
+      }
+      
+      .label {
+        font-size: 24rpx;
+        color: $color-text-secondary;
+      }
+    }
+  }
+}
+
+.section-title {
+  padding: 0 $spacing-lg;
+  font-size: 34rpx;
+  font-weight: 700;
+  color: $color-text-main;
+  margin-bottom: $spacing-md;
+}
+
+.grid-menu {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: $spacing-md;
+  padding: 0 $spacing-lg $spacing-xl;
+  
+  .grid-item {
+    background: #FFFFFF;
+    border-radius: $radius-lg;
+    padding: $spacing-md;
+    position: relative;
+    overflow: hidden;
+    min-height: 180rpx;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: $shadow-sm;
+    transition: transform 0.2s;
+    
+    &:active {
+      transform: scale(0.98);
+    }
+    
+    &.large {
+      grid-column: span 2;
+      background: linear-gradient(135deg, #FFF0E5 0%, #FFFFFF 100%);
+      
+      .grid-icon {
+        font-size: 64rpx;
+        position: absolute;
+        bottom: -10rpx;
+        right: 20rpx;
+        opacity: 0.8;
+      }
+    }
+    
+    &.medium {
+      .grid-icon {
+        font-size: 48rpx;
+        align-self: flex-end;
+      }
+    }
+    
+    &.blue {
+      background: linear-gradient(135deg, #E6F7FF 0%, #FFFFFF 100%);
+    }
+    
+    &.pink {
+      background: linear-gradient(135deg, #FFF0F6 0%, #FFFFFF 100%);
+    }
+    
+    .grid-label {
+      font-size: 30rpx;
+      font-weight: 700;
+      color: $color-text-main;
+      display: block;
+      margin-bottom: 8rpx;
+    }
+    
+    .grid-sub {
+      font-size: 24rpx;
+      color: $color-text-secondary;
+    }
+  }
+}
+
+  /* Pets Section */
+  .pets-section {
+    margin-bottom: 24px;
+    
+    .pets-scroll {
+      width: 100%;
+      white-space: nowrap;
+    }
+    
+    .pets-row {
+      display: flex;
+      padding-bottom: 4px;
+    }
+    
+    .pet-card {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100px;
+      margin-right: 12px;
+      background: #fff;
+      border-radius: 12px;
+      padding: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+      
+      .pet-avatar {
+        width: 50px;
+        height: 50px;
+        border-radius: 25px;
+        margin-bottom: 8px;
+        background: #f0f0f0;
+      }
+      
+      .pet-info {
+        text-align: center;
+        .pet-name {
+          font-size: 14px;
+          font-weight: bold;
+          color: #333;
+          display: block;
+          margin-bottom: 2px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          width: 76px;
+        }
+        .pet-desc {
+          font-size: 11px;
+          color: #999;
+        }
+      }
+    }
+    
+    .add-pet-card {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100px;
+      height: 110px; // Approximate match
+      background: #fff;
+      border-radius: 12px;
+      border: 1px dashed #ddd;
+      margin-right: 12px;
+      
+      .plus {
+        font-size: 24px;
+        color: #ccc;
+        margin-bottom: 4px;
+      }
+      
+      .text {
+        font-size: 12px;
+        color: #999;
+      }
+    }
+    
+    .empty-pets {
+      background: #fff;
+      border-radius: 16px;
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      
+      .icon { font-size: 24px; margin-right: 12px; }
+      .text { font-size: 14px; color: #666; flex: 1; }
+      .arrow { color: #ccc; }
+    }
+  }
+
+.menu-list {
+  margin: 0 $spacing-lg;
+  background: #FFFFFF;
+  border-radius: $radius-lg;
+  padding: 0 $spacing-md;
+  box-shadow: $shadow-sm;
+  
+  .menu-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 32rpx 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+    
+    &:last-child {
+      border-bottom: none;
+    }
+    
+    .left {
+      display: flex;
+      align-items: center;
+      
+      .icon {
+        font-size: 36rpx;
+        margin-right: 24rpx;
+      }
+      
+      .label {
+        font-size: 30rpx;
+        color: $color-text-main;
+      }
+    }
+    
+    .arrow {
+      color: #BFBFBF;
+      font-size: 24rpx;
+    }
+  }
+}
+</style>

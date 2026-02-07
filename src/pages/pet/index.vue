@@ -1,0 +1,577 @@
+<template>
+  <view class="container">
+    <view class="pet-list" v-if="!showModal">
+      <view class="pet-card" v-for="pet in pets" :key="pet.id" @click="editPet(pet)">
+        <image :src="pet.avatar || '/static/default-pet.png'" class="avatar" mode="aspectFill" />
+        <view class="info">
+          <view class="name-row">
+             <text class="name">{{ pet.name }}</text>
+             <text class="gender-icon">{{ pet.gender === 'male' ? '♂' : '♀' }}</text>
+             <text class="tag">{{ pet.type === 'cat' ? '🐱' : '🐶' }}</text>
+          </view>
+          <text class="detail">{{ getPetSizeLabel(pet.size) }} | {{ pet.weight }}kg | {{ pet.age }}岁</text>
+          <view class="badges">
+            <text class="badge" v-if="pet.sterilized">已绝育</text>
+            <text class="badge" v-if="pet.vaccine">已免疫</text>
+          </view>
+        </view>
+      </view>
+      
+      <view class="add-btn" @click="addNewPet">
+        <text class="icon">+</text>
+        <text>添加宠物</text>
+      </view>
+    </view>
+
+    <!-- Edit/Add Form (Full Page Mode or Modal) -->
+    <!-- Using a full covering view for better form experience -->
+    <view class="edit-page" v-if="showModal">
+      <view class="nav-header">
+        <text class="cancel" @click="closeModal">取消</text>
+        <text class="title">{{ isEditing ? '编辑宠物' : '添加宠物' }}</text>
+        <text class="save" @click="savePet">保存</text>
+      </view>
+      
+      <scroll-view scroll-y class="form-scroll">
+        <view class="form-content">
+          <!-- Avatar -->
+          <view class="form-item center">
+             <view class="avatar-upload" @click="chooseAvatar">
+                <image :src="form.avatar || '/static/default-pet.png'" mode="aspectFill" />
+                <view class="camera-icon">📷</view>
+             </view>
+             <text class="hint">上传爱宠头像</text>
+          </view>
+
+          <!-- Basic Info -->
+          <view class="card">
+            <view class="form-row">
+              <text class="label">昵称</text>
+              <input class="input" v-model="form.name" placeholder="请输入宠物昵称" />
+            </view>
+            <view class="divider"></view>
+            <view class="form-row">
+              <text class="label">种类</text>
+              <view class="radio-group">
+                 <view class="radio-item" :class="{active: form.type === 'cat'}" @click="handleTypeChange('cat')">🐱 猫咪</view>
+                 <view class="radio-item" :class="{active: form.type === 'dog'}" @click="handleTypeChange('dog')">🐶 狗狗</view>
+              </view>
+            </view>
+             <view class="divider"></view>
+            <view class="form-row">
+              <text class="label">性别</text>
+              <view class="radio-group">
+                 <view class="radio-item" :class="{active: form.gender === 'male'}" @click="form.gender = 'male'">♂ DD</view>
+                 <view class="radio-item" :class="{active: form.gender === 'female'}" @click="form.gender = 'female'">♀ MM</view>
+              </view>
+            </view>
+          </view>
+
+          <!-- Physical Info -->
+          <view class="card">
+            <view class="form-row">
+              <text class="label">年龄 (岁)</text>
+              <input class="input" type="number" v-model.number="form.age" placeholder="0" />
+            </view>
+            <view class="divider"></view>
+            <view class="form-row">
+              <text class="label">体重 (kg)</text>
+              <input class="input" type="digit" v-model.number="form.weight" placeholder="0.0" @input="autoSelectSize" />
+            </view>
+            <view class="divider"></view>
+            <view class="form-column">
+              <text class="label mb-2">体型选择</text>
+              <view class="size-grid">
+                <view 
+                  v-for="size in availableSizes" 
+                  :key="size.value"
+                  class="size-item"
+                  :class="{active: form.size === size.value}"
+                  @click="form.size = size.value"
+                >
+                  <text class="size-name">{{ size.label }}</text>
+                  <text class="size-desc">{{ size.desc }}</text>
+                </view>
+              </view>
+            </view>
+          </view>
+
+          <!-- Health Info -->
+          <view class="card">
+            <view class="form-row">
+              <text class="label">是否绝育</text>
+              <switch :checked="form.sterilized" @change="e => form.sterilized = e.detail.value" color="#FF8E3C" style="transform:scale(0.8)"/>
+            </view>
+            <view class="divider"></view>
+            <view class="form-row">
+              <text class="label">是否免疫</text>
+              <switch :checked="form.vaccine" @change="e => form.vaccine = e.detail.value" color="#FF8E3C" style="transform:scale(0.8)"/>
+            </view>
+          </view>
+
+          <!-- Description -->
+          <view class="card">
+            <text class="label mb-2">备注信息</text>
+            <textarea 
+              class="textarea" 
+              v-model="form.description" 
+              placeholder="记录它的性格、喜好或特殊习惯..." 
+              auto-height
+            />
+          </view>
+          
+          <view class="delete-btn" v-if="isEditing" @click="deletePet">删除宠物</view>
+          <view class="spacer"></view>
+        </view>
+      </scroll-view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="ts">
+import { ref, computed } from 'vue';
+import { useUserStore, type PetInfo } from '@/stores/user';
+import { PetSize, PET_SIZE_COEFFICIENTS } from '@/constants/pet';
+
+const userStore = useUserStore();
+const pets = computed(() => userStore.userInfo?.pets || []);
+const showModal = ref(false);
+const isEditing = ref(false);
+
+const defaultForm: Partial<PetInfo> = {
+  type: 'cat',
+  gender: 'male',
+  size: PetSize.CAT,
+  age: 1,
+  weight: 4,
+  sterilized: false,
+  vaccine: false,
+  avatar: '',
+  name: '',
+  description: ''
+};
+
+const form = ref<Partial<PetInfo>>({ ...defaultForm });
+
+const petSizesList = [
+  { label: '猫咪', value: PetSize.CAT, desc: '1-15kg', type: 'cat' },
+  { label: '小型犬', value: PetSize.SMALL, desc: '1-10kg', type: 'dog' },
+  { label: '中型犬', value: PetSize.MEDIUM, desc: '10-25kg', type: 'dog' },
+  { label: '大型犬', value: PetSize.LARGE, desc: '25-40kg', type: 'dog' },
+  { label: '巨型犬', value: PetSize.GIANT, desc: '40kg+', type: 'dog' },
+];
+
+const availableSizes = computed(() => {
+  return petSizesList.filter(s => {
+    if (form.value.type === 'cat') return s.value === PetSize.CAT;
+    return s.value !== PetSize.CAT;
+  });
+});
+
+const getPetSizeLabel = (size: PetSize) => {
+  return petSizesList.find(s => s.value === size)?.label || size;
+};
+
+const handleTypeChange = (type: 'cat' | 'dog') => {
+  form.value.type = type;
+  // Reset size based on type
+  if (type === 'cat') {
+    form.value.size = PetSize.CAT;
+  } else {
+    form.value.size = PetSize.SMALL;
+  }
+};
+
+const autoSelectSize = () => {
+  const w = form.value.weight || 0;
+  const t = form.value.type;
+  
+  if (t === 'cat') {
+    form.value.size = PetSize.CAT;
+    return;
+  }
+  
+  // Dog logic
+  if (w <= 10) form.value.size = PetSize.SMALL;
+  else if (w <= 25) form.value.size = PetSize.MEDIUM;
+  else if (w <= 40) form.value.size = PetSize.LARGE;
+  else form.value.size = PetSize.GIANT;
+};
+
+const addNewPet = () => {
+  isEditing.value = false;
+  form.value = JSON.parse(JSON.stringify(defaultForm));
+  showModal.value = true;
+};
+
+const editPet = (pet: PetInfo) => {
+  isEditing.value = true;
+  form.value = JSON.parse(JSON.stringify(pet));
+  showModal.value = true;
+};
+
+const closeModal = () => showModal.value = false;
+
+const chooseAvatar = () => {
+  uni.chooseImage({
+    count: 1,
+    success: (res) => {
+      form.value.avatar = res.tempFilePaths[0];
+    },
+    fail: () => {
+      // Mock for web testing
+       form.value.avatar = 'https://placehold.co/200x200?text=Pet';
+    }
+  });
+};
+
+const savePet = () => {
+  if (!form.value.name) return uni.showToast({ title: '请输入昵称', icon: 'none' });
+  
+  const newPet = {
+    ...form.value,
+    id: form.value.id || Date.now().toString(),
+  } as PetInfo;
+
+  let currentPets = [...pets.value];
+  if (isEditing.value) {
+    const idx = currentPets.findIndex(p => p.id === newPet.id);
+    if (idx > -1) currentPets[idx] = newPet;
+  } else {
+    currentPets.push(newPet);
+  }
+  
+  userStore.updateUser({ pets: currentPets });
+  showModal.value = false;
+  uni.showToast({ title: '保存成功' });
+};
+
+const deletePet = () => {
+  uni.showModal({
+    title: '确认删除',
+    content: '确定要删除这个宠物吗？',
+    success: (res) => {
+      if (res.confirm) {
+        const currentPets = pets.value.filter(p => p.id !== form.value.id);
+        userStore.updateUser({ pets: currentPets });
+        showModal.value = false;
+      }
+    }
+  });
+};
+</script>
+
+<style lang="scss">
+.container {
+  padding: 20px;
+  background-color: #FFFBF5;
+  min-height: 100vh;
+}
+
+.pet-list {
+  padding-bottom: 80px;
+}
+
+.pet-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  
+  .avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 30px;
+    margin-right: 16px;
+    background: #f0f0f0;
+  }
+  
+  .info {
+    flex: 1;
+    
+    .name-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 6px;
+      
+      .name {
+        font-size: 18px;
+        font-weight: bold;
+        color: #333;
+        margin-right: 8px;
+      }
+      
+      .gender-icon {
+        font-size: 14px;
+        margin-right: 8px;
+        color: #999;
+      }
+      
+      .tag {
+        font-size: 12px;
+        background: #FFF0E5;
+        color: #FF8E3C;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+    }
+    
+    .detail {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 6px;
+      display: block;
+    }
+    
+    .badges {
+      display: flex;
+      gap: 6px;
+      
+      .badge {
+        font-size: 10px;
+        background: #E8F5E9;
+        color: #4CAF50;
+        padding: 2px 4px;
+        border-radius: 4px;
+      }
+    }
+  }
+}
+
+.add-btn {
+  background: #fff;
+  border: 2px dashed #FF8E3C;
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FF8E3C;
+  font-size: 16px;
+  font-weight: bold;
+  
+  .icon {
+    font-size: 24px;
+    margin-right: 8px;
+    line-height: 1;
+  }
+}
+
+/* Edit Page Overlay */
+.edit-page {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #FFFBF5;
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+}
+
+.nav-header {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  background: #fff;
+  border-bottom: 1px solid #eee;
+  
+  .title {
+    font-size: 16px;
+    font-weight: bold;
+  }
+  
+  .cancel {
+    font-size: 14px;
+    color: #999;
+  }
+  
+  .save {
+    font-size: 14px;
+    color: #FF8E3C;
+    font-weight: bold;
+  }
+}
+
+.form-scroll {
+  flex: 1;
+  height: 0;
+}
+
+.form-content {
+  padding: 20px;
+}
+
+.form-item.center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 24px;
+  
+  .avatar-upload {
+    width: 80px;
+    height: 80px;
+    border-radius: 40px;
+    background: #f0f0f0;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 8px;
+    
+    image {
+      width: 100%;
+      height: 100%;
+    }
+    
+    .camera-icon {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 24px;
+      background: rgba(0,0,0,0.3);
+      color: #fff;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+  }
+  
+  .hint {
+    font-size: 12px;
+    color: #999;
+  }
+}
+
+.card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 0 16px;
+  margin-bottom: 16px;
+  
+  & > .label {
+    display: block;
+    padding-top: 16px;
+    font-size: 14px;
+    color: #666;
+  }
+}
+
+.form-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 50px;
+  
+  .label {
+    font-size: 14px;
+    color: #333;
+    width: 80px;
+  }
+  
+  .input {
+    flex: 1;
+    text-align: right;
+    font-size: 14px;
+  }
+}
+
+.form-column {
+  padding: 16px 0;
+  
+  .label {
+    font-size: 14px;
+    color: #333;
+    display: block;
+    margin-bottom: 12px;
+  }
+}
+
+.divider {
+  height: 1px;
+  background: #f5f5f5;
+}
+
+.radio-group {
+  display: flex;
+  gap: 12px;
+  
+  .radio-item {
+    padding: 6px 12px;
+    background: #f5f5f5;
+    border-radius: 16px;
+    font-size: 13px;
+    color: #666;
+    border: 1px solid transparent;
+    
+    &.active {
+      background: #FFF0E5;
+      color: #FF8E3C;
+      border-color: #FF8E3C;
+    }
+  }
+}
+
+.size-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  
+  .size-item {
+    background: #f9f9f9;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    
+    &.active {
+      background: #FFF0E5;
+      border-color: #FF8E3C;
+    }
+    
+    .size-name {
+      display: block;
+      font-size: 14px;
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 4px;
+    }
+    
+    .size-desc {
+      display: block;
+      font-size: 12px;
+      color: #999;
+    }
+  }
+}
+
+.textarea {
+  width: 100%;
+  min-height: 80px;
+  font-size: 14px;
+  padding: 16px 0;
+}
+
+.delete-btn {
+  text-align: center;
+  color: #ff4d4f;
+  font-size: 14px;
+  padding: 16px;
+  background: #fff;
+  border-radius: 12px;
+  margin-top: 24px;
+}
+
+.spacer {
+  height: 40px;
+}
+
+.mb-2 {
+  margin-bottom: 8px;
+}
+</style>

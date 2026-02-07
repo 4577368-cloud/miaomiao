@@ -1,0 +1,69 @@
+// 品牌色系
+$color-primary: #FF8E3C;
+$color-primary-light: #FFF0E5;
+$color-primary-gradient: linear-gradient(135deg, #FF8E3C 0%, #FF6B6B 100%);
+
+// 辅助色系
+$color-secondary: #FFD1DC;
+$color-secondary-light: #FFF5F7;
+
+// 功能色
+$color-success: #52C41A;
+$color-warning: #FAAD14;
+$color-error: #FF4D4F;
+$color-blue: #1890FF;
+$color-price: #FF4D4F;
+
+// Mixins
+@mixin text-ellipsis {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+// 背景色系
+$color-bg: #FFFBF5; // 品牌奶油米白，温暖且护眼
+$color-bg-card: #FFFFFF;
+$color-bg-page: #FFFBF5;
+
+// 文字色系
+$color-text-main: #2C2C2C;      // 接近纯黑但柔和
+$color-text-regular: #595959;   // 正文
+$color-text-secondary: #8C8C8C; // 次要信息
+$color-text-placeholder: #BFBFBF;
+
+// 交互反馈
+$color-active-opacity: 0.8;
+
+// 阴影系统 (弥散/发光)
+$shadow-sm: 0 4rpx 16rpx rgba(0, 0, 0, 0.04);
+$shadow-md: 0 12rpx 32rpx rgba(0, 0, 0, 0.06);
+$shadow-lg: 0 24rpx 64rpx rgba(0, 0, 0, 0.08);
+$shadow-float: 0 16rpx 48rpx rgba(255, 142, 60, 0.2); // 悬浮发光
+$shadow-card: 0 8rpx 24rpx rgba(0, 0, 0, 0.03);
+$shadow-primary: 0 8rpx 24rpx rgba(255, 142, 60, 0.25);
+$shadow-inner: inset 0 2rpx 6rpx rgba(0, 0, 0, 0.02);
+
+// 圆角系统 (更圆润)
+$radius-sm: 16rpx;
+$radius-md: 24rpx;
+$radius-lg: 32rpx;
+$radius-xl: 48rpx;
+$radius-full: 9999rpx;
+
+// 间距
+$spacing-xs: 8rpx;
+$spacing-sm: 16rpx;
+$spacing-md: 24rpx;
+$spacing-lg: 32rpx;
+$spacing-xl: 48rpx;
+$spacing-xxl: 64rpx;
+
+// 兼容旧变量名
+$bg-color: $color-bg;
+$text-primary: $color-text-main;
+
+// 玻璃拟态
+$glass-bg: rgba(255, 255, 255, 0.7);
+$glass-border: 1px solid rgba(255, 255, 255, 0.3);
+$glass-blur: blur(20px);
