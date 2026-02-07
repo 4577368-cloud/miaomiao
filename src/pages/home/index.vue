@@ -292,20 +292,33 @@ const toggleFilter = () => {
     else currentFilter.value = 'all';
 }
 
-const handleClaimCoupon = () => {
-  uni.showModal({
-    title: '领取成功',
-    content: '已放到我的优惠',
-    cancelText: '稍后使用',
-    confirmText: '发布任务',
-    success: (res) => {
-      if (res.confirm) {
-        uni.navigateTo({
-          url: '/pages/publish/index'
-        });
+const handleClaimCoupon = async () => {
+  if (!userStore.isLoggedIn) {
+     uni.navigateTo({ url: '/pages/login/index' });
+     return;
+  }
+
+  uni.showLoading({ title: '领取中...' });
+  const success = await userStore.claimNewcomerCoupon();
+  uni.hideLoading();
+
+  if (success) {
+    uni.showModal({
+      title: '领取成功',
+      content: '新人专享红包（¥30）已放入您的账户',
+      cancelText: '稍后使用',
+      confirmText: '去发布',
+      success: (res) => {
+        if (res.confirm) {
+          uni.navigateTo({
+            url: '/pages/publish/index'
+          });
+        }
       }
-    }
-  });
+    });
+  } else {
+    uni.showToast({ title: '领取失败，请稍后重试', icon: 'none' });
+  }
 };
 
 // 页面显示时加载数据

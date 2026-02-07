@@ -496,6 +496,57 @@ export const useUserStore = defineStore('user', () => {
     }
   };
 
+  const claimNewcomerCoupon = async (): Promise<boolean> => {
+    if (!userInfo.value) return false;
+    
+    // Check if already claimed
+    const hasCoupon = userInfo.value.coupons?.some(c => c.name === '新人专享红包');
+    if (hasCoupon) return true; // Already claimed, treat as success
+
+    const newCoupon: Coupon = {
+      id: 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      }),
+      type: 'FIXED',
+      value: 30,
+      threshold: 0,
+      name: '新人专享红包',
+      expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30 days
+      status: 'UNUSED'
+    };
+
+    // Optimistic update
+    if (!userInfo.value.coupons) userInfo.value.coupons = [];
+    userInfo.value.coupons.push(newCoupon);
+    
+    try {
+      const { error } = await supabase
+        .from('coupons')
+        .insert({
+          id: newCoupon.id,
+          user_id: userInfo.value.id,
+          type: newCoupon.type,
+          value: newCoupon.value,
+          threshold: newCoupon.threshold,
+          name: newCoupon.name,
+          expires_at: new Date(newCoupon.expiresAt).toISOString(),
+          status: newCoupon.status
+        });
+
+      if (error) throw error;
+      
+      uni.setStorageSync('miaomiao_user', JSON.stringify(userInfo.value));
+      return true;
+    } catch (e) {
+      console.error('Claim coupon failed:', e);
+      // Rollback
+      userInfo.value.coupons = userInfo.value.coupons.filter(c => c.id !== newCoupon.id);
+      return false;
+    }
+  };
+
   
   const calculateSitterLevel = (years: number): SitterLevel => {
     if (years >= 5) return 'GOLD';
@@ -795,6 +846,7 @@ export const useUserStore = defineStore('user', () => {
     recharge,
     deductBalance,
     markCouponUsed,
+    claimNewcomerCoupon,
     registerAsSitter,
     fetchProfile,
     // New CRUD exports
