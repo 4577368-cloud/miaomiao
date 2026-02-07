@@ -268,6 +268,16 @@ export const useUserStore = defineStore('user', () => {
   };
 
   // ... (Keep other methods: useCoupon, addBalance, etc.) ...
+  const useCoupon = (couponId: string) => {
+    if (userInfo.value && userInfo.value.coupons) {
+      const coupon = userInfo.value.coupons.find(c => c.id === couponId);
+      if (coupon) {
+        coupon.status = 'USED';
+        // TODO: Update DB to mark coupon as used
+      }
+    }
+  };
+
   const updateUser = (updates: Partial<UserInfo>) => {
      updateProfile(updates);
   };
