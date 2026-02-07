@@ -375,7 +375,20 @@ export const useUserStore = defineStore('user', () => {
           uni.navigateTo({ url: '/pages/sitter-register/index' });
           return;
         }
-        // ...
+        
+        if (!userInfo.value.sitterProfile.isCertified) {
+          uni.showModal({
+            title: '未认证',
+            content: '切换为宠托师身份需要先通过实名认证',
+            confirmText: '去认证',
+            success: (res) => {
+              if (res.confirm) {
+                uni.navigateTo({ url: '/pages/profile/certification' });
+              }
+            }
+          });
+          return;
+        }
       }
 
       // 2. Check Active Orders
