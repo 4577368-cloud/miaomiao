@@ -109,8 +109,26 @@
                </view>
             </view>
 
-            <!-- 3. 联系人信息 (仅接单后可见) -->
-            <view class="info-section contact-section" v-if="!isOwner && ['ACCEPTED', 'IN_SERVICE'].includes(order.status) && order.contactPhone">
+            <!-- 3. 联系人信息 -->
+            <!-- 场景A: 铲屎官查看接单人 (新增) -->
+            <view class="info-section contact-section" v-if="isOwner && ['ACCEPTED', 'IN_SERVICE', 'COMPLETED', 'REVIEWED'].includes(order.status)">
+                <view class="contact-box">
+                    <view class="contact-left">
+                        <text class="label">服务宠托师</text>
+                        <view class="person">
+                            <text class="name">{{ getSitterName(order) }}</text>
+                            <text class="phone-link" @click.stop="makeCall(getSitterPhone(order))">{{ getSitterPhone(order) }}</text>
+                        </view>
+                    </view>
+                    <view class="call-btn" @click.stop="makeCall(getSitterPhone(order))">
+                        <text class="icon">📞</text>
+                        <text>联系TA</text>
+                    </view>
+                </view>
+            </view>
+
+            <!-- 场景B: 宠托师查看发布人 (现有) -->
+            <view class="info-section contact-section" v-if="!isOwner && ['ACCEPTED', 'IN_SERVICE', 'COMPLETED'].includes(order.status) && order.contactPhone">
                 <view class="contact-box">
                     <view class="contact-left">
                         <text class="label">联系人</text>
@@ -380,6 +398,10 @@ const goToDetail = (id: string) => {
 
 const getSitterName = (order: Order) => {
   return order.sitterSnapshot?.nickname || '爱宠小助手';
+};
+
+const getSitterPhone = (order: Order) => {
+  return order.sitterSnapshot?.phone || '13900000000';
 };
 
 const getSitterLevelClass = (order: Order) => {
@@ -861,15 +883,16 @@ const makeCall = (phone: string) => {
   .card-body {
     display: flex;
     flex-direction: column;
-    gap: 20rpx;
+    gap: 24rpx;
     
     .info-section {
-      background: #F9FAFB;
-      border-radius: 12rpx;
-      padding: 20rpx;
+      background: #F7F8FA;
+      border-radius: 16rpx;
+      padding: 24rpx;
       
       &.pet-section {
-        background: #FFF5EB; // Light orange bg
+        background: #FFFBF5; // Light orange bg
+        border: 1px solid rgba(255, 142, 60, 0.1);
         
         .pet-header-row {
           display: flex;

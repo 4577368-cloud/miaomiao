@@ -9,7 +9,7 @@
     {
       "path": "pages/home/index",
       "style": {
-        "navigationBarTitleText": "喵汪管家"
+        "navigationBarTitleText": "宠乐到家"
       }
     },
     {
@@ -63,7 +63,7 @@
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "喵汪管家",
+    "navigationBarTitleText": "宠乐到家",
     "navigationBarBackgroundColor": "#FFFBF5",
     "backgroundColor": "#FFFBF5"
   },

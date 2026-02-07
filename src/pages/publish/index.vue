@@ -938,7 +938,7 @@ const handleSubmit = () => {
         }
         
         .row-value {
-          font-size: 28rpx;
+          font-size: 26rpx;
           font-weight: 500;
           color: $color-text-main;
           line-height: 1.4;

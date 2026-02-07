@@ -2,7 +2,7 @@
   <view class="login-container">
     <view class="glass-card">
       <view class="header">
-        <text class="title">欢迎来到喵汪管家</text>
+        <text class="title">欢迎来到宠乐到家</text>
         <text class="subtitle">选择您的身份开始旅程</text>
       </view>
 
@@ -47,7 +47,7 @@
         </view>
       </view>
 
-      <button class="btn-primary" @click="handleLogin">进入喵汪世界</button>
+      <button class="btn-primary" @click="handleLogin">进入宠乐世界</button>
     </view>
   </view>
 </template>

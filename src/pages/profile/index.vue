@@ -33,7 +33,7 @@
              </view>
              <text class="label">余额</text>
           </view>
-          <view class="stat-item">
+          <view class="stat-item" @click="navigateTo('/pages/wallet/index')">
             <text class="num">{{ userInfo?.coupons?.length || 0 }}</text>
             <text class="label">优惠券</text>
           </view>
@@ -48,22 +48,25 @@
     <!-- 我的爱宠 -->
     <view class="section-title" v-if="currentRole === 'owner'">我的爱宠</view>
     <view class="pets-section" v-if="currentRole === 'owner'">
-      <scroll-view scroll-x class="pets-scroll">
-        <view class="pets-row">
-          <view class="pet-card" v-for="pet in userInfo?.pets" :key="pet.id" @click="navigateTo('/pages/pet/index')">
-            <image :src="pet.avatar || '/static/default-pet.png'" class="pet-avatar" mode="aspectFill" />
-            <view class="pet-info">
-              <text class="pet-name">{{ pet.name }}</text>
-              <text class="pet-desc">{{ pet.type === 'cat' ? '猫咪' : '狗狗' }} · {{ pet.age }}岁</text>
-            </view>
+      <view class="pet-card-long" v-for="pet in userInfo?.pets" :key="pet.id" @click="navigateTo('/pages/pet/index')">
+        <image :src="pet.avatar || '/static/default-pet.png'" class="pet-avatar" mode="aspectFill" />
+        <view class="pet-info">
+          <view class="pet-header">
+            <text class="pet-name">{{ pet.name }}</text>
+            <text class="pet-gender">{{ pet.gender === 'male' ? '♂' : '♀' }}</text>
           </view>
-          
-          <view class="add-pet-card" @click="navigateTo('/pages/pet/index')">
-            <text class="plus">+</text>
-            <text class="text">添加爱宠</text>
+          <view class="pet-details">
+            <text class="detail-tag">{{ pet.breed || (pet.type === 'cat' ? '猫咪' : '狗狗') }}</text>
+            <text class="detail-tag">{{ pet.age }}岁</text>
           </view>
         </view>
-      </scroll-view>
+        <view class="pet-arrow">></view>
+      </view>
+      
+      <view class="add-pet-btn" @click="navigateTo('/pages/pet/index')">
+        <text class="plus">+</text>
+        <text class="text">添加爱宠</text>
+      </view>
     </view>
 
     <!-- 常用功能 (Bento Grid 风格) -->
@@ -402,78 +405,88 @@ const handleSwitchRole = () => {
     padding: 0 $spacing-lg;
     margin-bottom: $spacing-xl;
     
-    .pets-scroll {
-      width: 100%;
-      white-space: nowrap;
-    }
-    
-    .pets-row {
+    .pet-card-long {
       display: flex;
-      padding-bottom: $spacing-sm;
-    }
-    
-    .pet-card {
-      display: inline-flex;
-      flex-direction: column;
       align-items: center;
-      width: 200rpx;
-      margin-right: $spacing-md;
       background: #FFFFFF;
       border-radius: $radius-lg;
       padding: $spacing-md;
+      margin-bottom: $spacing-md;
       box-shadow: $shadow-sm;
+      position: relative;
       
       .pet-avatar {
         width: 100rpx;
         height: 100rpx;
         border-radius: 50%;
-        margin-bottom: $spacing-sm;
+        margin-right: $spacing-md;
         background: #F5F6F8;
       }
       
       .pet-info {
-        text-align: center;
-        width: 100%;
+        flex: 1;
         
-        .pet-name {
-          font-size: 28rpx;
-          font-weight: 600;
-          color: $color-text-main;
-          display: block;
-          margin-bottom: 4rpx;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
+        .pet-header {
+          display: flex;
+          align-items: center;
+          margin-bottom: 8rpx;
+          
+          .pet-name {
+            font-size: 32rpx;
+            font-weight: 600;
+            color: $color-text-main;
+            margin-right: 12rpx;
+          }
+          
+          .pet-gender {
+            font-size: 24rpx;
+            color: $color-text-secondary;
+            background: #F5F6F8;
+            padding: 2rpx 10rpx;
+            border-radius: 20rpx;
+          }
         }
         
-        .pet-desc {
-          font-size: 22rpx;
-          color: $color-text-secondary;
+        .pet-details {
+          display: flex;
+          align-items: center;
+          
+          .detail-tag {
+            font-size: 24rpx;
+            color: $color-text-secondary;
+            background: #F9FAFB;
+            padding: 4rpx 12rpx;
+            border-radius: 8rpx;
+            margin-right: 12rpx;
+          }
         }
+      }
+      
+      .pet-arrow {
+        color: #BFBFBF;
+        font-size: 24rpx;
       }
     }
     
-    .add-pet-card {
-      display: inline-flex;
-      flex-direction: column;
+    .add-pet-btn {
+      display: flex;
       align-items: center;
       justify-content: center;
-      width: 200rpx;
-      height: 220rpx;
-      background: #F9FAFB;
+      background: #FFFFFF;
       border-radius: $radius-lg;
+      padding: $spacing-md;
       border: 2rpx dashed #E5E7EB;
-      margin-right: $spacing-md;
       
       .plus {
-        font-size: 48rpx;
-        color: $color-text-placeholder;
-        margin-bottom: 8rpx;
+        font-size: 32rpx;
+        color: $color-primary;
+        margin-right: 8rpx;
+        font-weight: bold;
       }
       
       .text {
-        font-size: 24rpx;
-        color: $color-text-secondary;
+        font-size: 28rpx;
+        color: $color-text-main;
       }
     }
   }

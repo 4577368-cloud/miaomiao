@@ -1,7 +1,7 @@
 {
   "name": "miaomiao",
   "version": "1.0.0",
-  "description": "喵汪管家 - 宠物上门服务平台",
+  "description": "宠乐到家 - 宠物上门服务平台",
   "scripts": {
     "dev:app": "uni -p app",
     "dev:app-android": "uni -p app-android",

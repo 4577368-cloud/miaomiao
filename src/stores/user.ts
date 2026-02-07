@@ -20,6 +20,7 @@ export interface PetInfo {
   name: string;
   avatar: string;
   type: 'cat' | 'dog';
+  breed?: string;
   gender: 'male' | 'female';
   size: PetSize;
   weight: number;
@@ -52,6 +53,7 @@ export interface UserInfo {
   id: string;
   nickname: string;
   avatar: string;
+  phone?: string; // 用户手机号
   role: UserRole;
   joinDate: number; // timestamp
   sitterProfile?: SitterProfile; // 只有当用户也是宠托师时才有
@@ -86,6 +88,36 @@ export const useUserStore = defineStore('user', () => {
   const ensureData = () => {
     if (userInfo.value) {
       if (!userInfo.value.addresses) userInfo.value.addresses = [];
+      if (!userInfo.value.pets) {
+        userInfo.value.pets = [
+          {
+            id: 'p1',
+            name: '奥利奥',
+            avatar: 'https://img.yzcdn.cn/vant/cat.jpeg',
+            type: 'cat',
+            gender: 'male',
+            size: PetSize.SMALL,
+            weight: 4,
+            age: 2,
+            breed: '英短蓝猫',
+            sterilized: true,
+            vaccine: true
+          },
+          {
+            id: 'p2',
+            name: '旺财',
+            avatar: 'https://img.yzcdn.cn/vant/dog.png', // Assuming a dog image exists or use a placeholder
+            type: 'dog',
+            gender: 'female',
+            size: PetSize.MEDIUM,
+            weight: 12,
+            age: 3,
+            breed: '柴犬',
+            sterilized: true,
+            vaccine: true
+          }
+        ];
+      }
       if (!userInfo.value.coupons) {
         // Mock Coupons for new feature
         userInfo.value.coupons = [

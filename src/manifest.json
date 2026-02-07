@@ -1,5 +1,5 @@
 {
-  "name": "miaomiao",
+  "name": "宠乐到家",
   "appid": "",
   "description": "",
   "versionName": "1.0.0",
@@ -43,8 +43,10 @@
   "h5": {
     "sdkConfigs": {
       "maps": {
-        "qqmap": {
-          "key": "3CEBZ-D3OCW-DUOR3-YGJUF-2FBKK-RIBFD" 
+        "amap": {
+          "key": "b785d85fbf0a8faf26934d832ace1c66",
+          "securityJsCode": "c33f0278b2ea9468634718e96a945ab9",
+          "serviceHost": ""
         }
       }
     }
