@@ -9,7 +9,9 @@ onLaunch(() => {
   const configStore = useConfigStore();
   userStore.initUser();
   configStore.initConfig();
-  uni.hideTabBar();
+  uni.hideTabBar({
+    fail: () => {}
+  });
 });
 onShow(() => {
   console.log("App Show");

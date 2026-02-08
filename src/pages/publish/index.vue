@@ -101,7 +101,10 @@
             <view class="info">
               <text class="label">上门喂养</text>
               <text class="desc">喂食 · 换水 · 铲屎</text>
-              <text class="price">标准价 ¥{{ getServiceBasePrice(ServiceType.FEEDING) }}/次</text>
+              <view class="price-line">
+                <text class="price" :class="{ strike: getServiceDiscountPercent(ServiceType.FEEDING) < 100 }">¥{{ getServiceStandardPrice(ServiceType.FEEDING) }}/次</text>
+                <text class="price discount" v-if="getServiceDiscountPercent(ServiceType.FEEDING) < 100">¥{{ getServiceDiscountedPrice(ServiceType.FEEDING) }}/次</text>
+              </view>
             </view>
             <view class="check-mark" v-if="form.serviceType === ServiceType.FEEDING">✓</view>
           </view>
@@ -114,7 +117,10 @@
             <view class="info">
               <text class="label">上门遛宠</text>
               <text class="desc">遛狗 · 陪玩 · 清洁</text>
-              <text class="price">标准价 ¥{{ getServiceBasePrice(ServiceType.WALKING) }}/次</text>
+              <view class="price-line">
+                <text class="price" :class="{ strike: getServiceDiscountPercent(ServiceType.WALKING) < 100 }">¥{{ getServiceStandardPrice(ServiceType.WALKING) }}/次</text>
+                <text class="price discount" v-if="getServiceDiscountPercent(ServiceType.WALKING) < 100">¥{{ getServiceDiscountedPrice(ServiceType.WALKING) }}/次</text>
+              </view>
             </view>
             <view class="check-mark" v-if="form.serviceType === ServiceType.WALKING">✓</view>
           </view>
@@ -459,7 +465,7 @@
                 <text class="symbol">¥</text>
                 <text class="amount">{{ finalPrice }}</text>
               </view>
-              <text class="original-price" v-if="finalPrice < rawTotalPrice">¥{{ rawTotalPrice }}</text>
+              <text class="original-price" v-if="standardTotalPrice > rawTotalPrice">¥{{ standardTotalPrice }}</text>
             </view>
             <view class="price-tags" v-if="priceBreakdown.holiday > 0 || priceBreakdown.rush > 0">
                <text class="tag holiday" v-if="priceBreakdown.holiday > 0">节日+{{ priceBreakdown.holiday }}</text>
@@ -482,10 +488,17 @@
             <view class="pd-list">
                <view class="pd-item">
                   <text class="pd-label">标准服务价</text>
-                  <text class="pd-val">¥{{ basePrice }}</text>
+                  <view class="pd-val-col">
+                     <text class="pd-origin" v-if="discountPercent < 100">¥{{ standardBasePrice }}</text>
+                     <text class="pd-discount">¥{{ discountedBasePrice }}</text>
+                  </view>
                </view>
                <view class="pd-item">
-                  <text class="pd-label">基础服务费</text>
+                  <text class="pd-label">宠物系数</text>
+                  <text class="pd-val">x{{ petCoefficient }}</text>
+               </view>
+               <view class="pd-item">
+                  <text class="pd-label">服务基础费</text>
                   <text class="pd-val">¥{{ priceBreakdown.base }}</text>
                </view>
                <view class="pd-item" v-if="priceBreakdown.pets > priceBreakdown.base">
@@ -509,6 +522,10 @@
                   <text class="pd-val">+¥{{ priceBreakdown.addOns }}</text>
                </view>
                <view class="pd-divider"></view>
+               <view class="pd-item total" v-if="standardTotalPrice > rawTotalPrice">
+                  <text class="pd-label">原价总计</text>
+                  <text class="pd-val strike">¥{{ standardTotalPrice }}</text>
+               </view>
                <view class="pd-item total">
                   <text class="pd-label">总计</text>
                   <text class="pd-val">¥{{ priceBreakdown.total }}</text>
@@ -610,13 +627,29 @@ const showSitterSelector = ref(false);
 
 const availableSitters = computed(() => sitterStore.availableSitters);
 const addOnPrices = computed(() => configStore.getAddOnPrices());
-const basePrice = computed(() => {
-  const price = configStore.getServicePrice(form.serviceType);
+const standardBasePrice = computed(() => {
+  const price = configStore.getServiceStandardPrice(form.serviceType);
   return price > 0 ? price : fallbackBasePrice;
 });
-const getServiceBasePrice = (type: ServiceType) => {
-  const price = configStore.getServicePrice(type);
+const discountPercent = computed(() => {
+  const value = configStore.getServiceDiscountPercent(form.serviceType);
+  return value > 0 ? value : 100;
+});
+const discountedBasePrice = computed(() => {
+  return Math.round(standardBasePrice.value * (discountPercent.value / 100) * 100) / 100;
+});
+const getServiceStandardPrice = (type: ServiceType) => {
+  const price = configStore.getServiceStandardPrice(type);
   return price > 0 ? price : fallbackBasePrice;
+};
+const getServiceDiscountPercent = (type: ServiceType) => {
+  const value = configStore.getServiceDiscountPercent(type);
+  return value > 0 ? value : 100;
+};
+const getServiceDiscountedPrice = (type: ServiceType) => {
+  const standard = getServiceStandardPrice(type);
+  const discount = getServiceDiscountPercent(type);
+  return Math.round(standard * (discount / 100) * 100) / 100;
 };
 const petSizeOptions = computed(() => [
   { value: PetSize.CAT, label: '猫咪', desc: '不限体重', coeff: configStore.getPetSizeCoefficient(PetSize.CAT), image: '/static/avatars/cat-british.jpg' },
@@ -624,6 +657,9 @@ const petSizeOptions = computed(() => [
   { value: PetSize.MEDIUM, label: '中型犬', desc: '10-25kg', coeff: configStore.getPetSizeCoefficient(PetSize.MEDIUM), image: '/static/avatars/dog-corgi.jpg' },
   { value: PetSize.LARGE, label: '大型犬', desc: '>25kg', coeff: configStore.getPetSizeCoefficient(PetSize.LARGE), image: '/static/avatars/dog-golden.jpg' }
 ]);
+const petCoefficient = computed(() => {
+  return Math.round(configStore.getPetSizeCoefficient(form.petSize) * 100) / 100;
+});
 const pricingOverrides = computed(() => ({
   petSizeCoefficients: configStore.getPetSizeCoefficients(),
   addOnPrices: addOnPrices.value,
@@ -857,7 +893,7 @@ const closePriceDetail = () => {
 };
 
 // Price Calculation
-const priceBreakdown = computed(() => {
+const standardPriceBreakdown = computed(() => {
   // Determine effective pet sizes
   let petSizes: PetSize[] = [];
   if (selectedPetIds.value.length > 0) {
@@ -872,7 +908,30 @@ const priceBreakdown = computed(() => {
   const serviceDate = form.date.split(' ')[0] || new Date().toISOString().split('T')[0];
 
   return calculateTotalPrice({
-    basePrice: basePrice.value,
+    basePrice: standardBasePrice.value,
+    petSizes: petSizes,
+    durationMarkup: durations.find(d => d.value === form.duration)?.markup || 0,
+    serviceDate: serviceDate,
+    serviceTime: form.time || '12:00',
+    addOns: form.addOns,
+    overrides: pricingOverrides.value
+  });
+});
+
+const priceBreakdown = computed(() => {
+  // Determine effective pet sizes
+  let petSizes: PetSize[] = [];
+  if (selectedPetIds.value.length > 0) {
+    const selectedPets = userStore.userInfo?.pets?.filter(p => selectedPetIds.value.includes(p.id)) || [];
+    petSizes = selectedPets.map(p => p.size);
+  } else {
+    petSizes = [form.petSize];
+  }
+
+  const serviceDate = form.date.split(' ')[0] || new Date().toISOString().split('T')[0];
+
+  return calculateTotalPrice({
+    basePrice: discountedBasePrice.value,
     petSizes: petSizes,
     durationMarkup: durations.find(d => d.value === form.duration)?.markup || 0,
     serviceDate: serviceDate,
@@ -883,6 +942,7 @@ const priceBreakdown = computed(() => {
 });
 
 const rawTotalPrice = computed(() => priceBreakdown.value.total);
+const standardTotalPrice = computed(() => standardPriceBreakdown.value.total);
 
 const finalPrice = computed(() => {
   let price = rawTotalPrice.value;
@@ -913,7 +973,7 @@ const handleSubmit = async () => {
     serviceType: form.serviceType,
     status: 'PENDING' as const,
     totalPrice: finalPrice.value,
-    originalPrice: rawTotalPrice.value,
+    originalPrice: standardTotalPrice.value,
     discountAmount: selectedCoupon.value ? selectedCoupon.value.value : 0,
     couponId: form.couponId,
     address: form.address,
@@ -937,9 +997,10 @@ const handleSubmit = async () => {
     setTimeout(() => {
       uni.switchTab({ url: '/pages/orders/index' });
     }, 1500);
-  } catch (e) {
+  } catch (e: any) {
     uni.hideLoading();
-    uni.showToast({ title: '发布失败，请重试', icon: 'none' });
+    const message = e?.message ? `发布失败：${e.message}` : '发布失败，请重试';
+    uni.showToast({ title: message, icon: 'none' });
     console.error(e);
   }
 };
@@ -1145,11 +1206,25 @@ onShow(async () => {
         color: $color-text-secondary;
         margin-top: 4rpx;
       }
+      .price-line {
+        display: flex;
+        align-items: baseline;
+        gap: 12rpx;
+        margin-top: 6rpx;
+      }
       .price {
         font-size: 22rpx;
-        color: $color-primary;
-        margin-top: 6rpx;
+        color: $color-text-secondary;
         font-weight: 600;
+        &.discount {
+          color: $color-primary;
+          font-size: 24rpx;
+        }
+        &.strike {
+          text-decoration: line-through;
+          color: #999;
+          font-weight: 500;
+        }
       }
     }
     
@@ -1982,6 +2057,25 @@ onShow(async () => {
          margin-bottom: 20rpx;
          font-size: 28rpx;
          color: $color-text-main;
+
+         .pd-val-col {
+            display: flex;
+            align-items: baseline;
+            gap: 12rpx;
+         }
+         .pd-origin {
+            color: #999;
+            text-decoration: line-through;
+            font-size: 24rpx;
+         }
+         .pd-discount {
+            color: $color-primary;
+            font-weight: 600;
+         }
+         .pd-val.strike {
+            color: #999;
+            text-decoration: line-through;
+         }
          
          &.total {
             font-weight: bold;

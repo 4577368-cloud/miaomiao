@@ -6,6 +6,7 @@ create table if not exists public.service_types (
   description text,
   cover_image text,
   base_price decimal(10, 2) default 0,
+  discount_percent decimal(5, 2) default 100,
   duration_minutes int default 30,
   is_active boolean default true,
   created_at timestamptz default now(),
@@ -46,10 +47,10 @@ alter table public.profiles drop constraint if exists profiles_role_check;
 alter table public.profiles add constraint profiles_role_check check (role in ('owner', 'sitter', 'admin'));
 
 -- Initial Data Seeding (Optional, but good for testing)
-insert into public.service_types (code, name, description, base_price, duration_minutes)
+insert into public.service_types (code, name, description, base_price, discount_percent, duration_minutes)
 values 
-('FEEDING', '上门喂养', '专业喂食 · 铲屎 · 陪玩', 50.00, 30),
-('WALKING', '上门遛宠', '专业遛狗 · 运动 · 捡屎', 60.00, 30)
+('FEEDING', '上门喂养', '专业喂食 · 铲屎 · 陪玩', 50.00, 100, 30),
+('WALKING', '上门遛宠', '专业遛狗 · 运动 · 捡屎', 60.00, 100, 30)
 on conflict (code) do nothing;
 
 insert into public.pricing_configs (category, key, value, type, description)

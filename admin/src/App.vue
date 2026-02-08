@@ -48,18 +48,29 @@ const checkSession = async () => {
 }
 
 const handleLogin = async () => {
-  if (username.value !== 'admin' || password.value !== '111111') {
-    ElMessage.error('账号或密码错误')
+  const input = username.value.trim()
+  if (!input) {
+    ElMessage.error('请输入账号')
     return
   }
+  if (!password.value) {
+    ElMessage.error('请输入密码')
+    return
+  }
+  const isEmail = input.includes('@')
+  if (!isEmail && input !== 'admin') {
+    ElMessage.error('账号仅支持 admin 或管理员邮箱')
+    return
+  }
+  const loginEmail = isEmail ? input : adminEmail
   loading.value = true
   const { error } = await supabase.auth.signInWithPassword({
-    email: adminEmail,
+    email: loginEmail,
     password: password.value
   })
   loading.value = false
   if (error) {
-    ElMessage.error('Supabase 登录失败，请确认已创建 admin 账号')
+    ElMessage.error('登录失败：' + error.message)
     return
   }
   loggedIn.value = true

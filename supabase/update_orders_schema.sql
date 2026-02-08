@@ -1,5 +1,8 @@
 -- Add missing columns to orders table
 ALTER TABLE public.orders 
+ADD COLUMN IF NOT EXISTS order_no text,
+ADD COLUMN IF NOT EXISTS latitude float,
+ADD COLUMN IF NOT EXISTS longitude float,
 ADD COLUMN IF NOT EXISTS pet_ids uuid[],
 ADD COLUMN IF NOT EXISTS pet_snapshots jsonb,
 ADD COLUMN IF NOT EXISTS sitter_snapshot jsonb,

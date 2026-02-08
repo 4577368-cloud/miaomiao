@@ -7,9 +7,14 @@
     <el-table :data="services" border style="width: 100%" v-loading="loading">
       <el-table-column prop="code" label="服务代码" width="120" />
       <el-table-column prop="name" label="服务名称" width="150" />
-      <el-table-column prop="base_price" label="基础价格" width="120">
+      <el-table-column prop="base_price" label="标准价格" width="120">
         <template #default="scope">
           ¥{{ scope.row.base_price }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="discount_percent" label="折扣(%)" width="110">
+        <template #default="scope">
+          {{ scope.row.discount_percent ?? 100 }}
         </template>
       </el-table-column>
       <el-table-column prop="duration_minutes" label="时长(分钟)" width="110" />
@@ -66,8 +71,11 @@
         <el-form-item label="服务名称">
           <el-input v-model="form.name" />
         </el-form-item>
-        <el-form-item label="基础价格">
+        <el-form-item label="标准价格">
           <el-input-number v-model="form.base_price" :precision="2" :step="1" />
+        </el-form-item>
+        <el-form-item label="折扣(%)">
+          <el-input-number v-model="form.discount_percent" :precision="0" :step="1" :min="0" :max="100" />
         </el-form-item>
         <el-form-item label="默认时长">
           <el-input-number v-model="form.duration_minutes" :step="5" :min="10" />
@@ -131,6 +139,7 @@ interface Service {
   code: string
   name: string
   base_price: number
+  discount_percent?: number
   duration_minutes: number
   description: string
   is_active: boolean
@@ -153,6 +162,7 @@ const form = ref<Service>({
   code: '',
   name: '',
   base_price: 0,
+  discount_percent: 100,
   duration_minutes: 30,
   description: '',
   is_active: true
@@ -204,7 +214,7 @@ const fetchPricingConfigs = async () => {
 
 const handleAdd = () => {
   isEdit.value = false
-  form.value = { code: '', name: '', base_price: 0, duration_minutes: 30, description: '', is_active: true }
+  form.value = { code: '', name: '', base_price: 0, discount_percent: 100, duration_minutes: 30, description: '', is_active: true }
   dialogVisible.value = true
 }
 

@@ -16,6 +16,7 @@ export interface ServiceType {
   name: string;
   description: string;
   base_price: number;
+  discount_percent?: number;
   duration_minutes: number;
 }
 
@@ -66,9 +67,20 @@ export const useConfigStore = defineStore('config', {
       }
     },
     
-    getServicePrice(code: string): number {
+    getServiceStandardPrice(code: string): number {
       const service = this.services.find(s => s.code === code);
       return service ? Number(service.base_price) : 0;
+    },
+    getServiceDiscountPercent(code: string): number {
+      const service = this.services.find(s => s.code === code);
+      const value = service?.discount_percent;
+      if (value === undefined || value === null) return 100;
+      return Number(value);
+    },
+    getServicePrice(code: string): number {
+      const standard = this.getServiceStandardPrice(code);
+      const discount = this.getServiceDiscountPercent(code);
+      return Math.round(standard * (discount / 100) * 100) / 100;
     },
     getPetSizeCoefficient(size: PetSize): number {
       const value = this.pricingRules?.PET_SIZE?.[size];
