@@ -61,10 +61,14 @@
         </view>
       </view>
     </view>
+    
+    <view style="height: 100px;"></view>
+    <CustomTabBar current-path="pages/wallet/index" />
   </view>
 </template>
 
 <script setup lang="ts">
+import CustomTabBar from '@/components/custom-tab-bar/index.vue';
 import { computed } from 'vue';
 import { useUserStore } from '@/stores/user';
 import { useOrderStore } from '@/stores/order';

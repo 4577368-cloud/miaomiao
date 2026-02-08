@@ -90,6 +90,7 @@ const switchTab = (item: any) => {
     'pages/home/index',
     'pages/orders/index',
     'pages/message/index',
+    'pages/wallet/index',
     'pages/profile/index'
   ];
 

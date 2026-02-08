@@ -116,6 +116,12 @@
         "selectedIconPath": "static/tab-order-active.svg"
       },
       {
+        "pagePath": "pages/wallet/index",
+        "text": "收益",
+        "iconPath": "static/tab-profile.svg",
+        "selectedIconPath": "static/tab-profile-active.svg"
+      },
+      {
         "pagePath": "pages/profile/index",
         "text": "我的",
         "iconPath": "static/tab-profile.svg",
