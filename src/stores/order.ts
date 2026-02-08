@@ -588,13 +588,73 @@ export const useOrderStore = defineStore('order', () => {
         
      if (error) throw error;
      
+     // Calculate Points based on Rating
+     // 5->20, 4->15, 3->10, 2->5, 1->0
+     let points = 0;
+     if (rating === 5) points = 20;
+     else if (rating === 4) points = 15;
+     else if (rating === 3) points = 10;
+     else if (rating === 2) points = 5;
+     
      const idx = orders.value.findIndex(o => o.id === orderId);
      if (idx > -1) {
+         const order = orders.value[idx];
          orders.value[idx].status = 'REVIEWED';
          orders.value[idx].review = { rating, content, createdAt: Date.now() };
          uni.setStorageSync('miaomiao_orders', JSON.stringify(orders.value));
+         
+         // Add points to Sitter
+         if (order.sitterId && points > 0) {
+             // Try RPC first
+             const { error: rpcError } = await supabase.rpc('add_points', { 
+                 user_id: order.sitterId, 
+                 amount: points 
+             });
+             
+             if (rpcError) {
+                 console.error('Add points RPC failed, trying direct update', rpcError);
+                 // Fallback: Direct Update (works if RLS allows)
+                 const { data: sitterProfile } = await supabase
+                    .from('profiles')
+                    .select('points')
+                    .eq('id', order.sitterId)
+                    .single();
+                 
+                 if (sitterProfile) {
+                     await supabase
+                        .from('profiles')
+                        .update({ points: (sitterProfile.points || 0) + points })
+                        .eq('id', order.sitterId);
+                 }
+             }
+         }
      }
      return true;
+  };
+
+  const inviteReview = async (orderId: string) => {
+      const order = orders.value.find(o => o.id === orderId);
+      if (!order || !order.creatorId) return false;
+      
+      const userStore = useUserStore();
+      const sitterName = userStore.userInfo?.nickname || '宠托师';
+      
+      const { error } = await supabase.from('notifications').insert({
+          user_id: order.creatorId,
+          type: 'order',
+          title: '评价邀请',
+          content: `${sitterName}邀请您对订单${order.orderNo || ''}的服务进行评价`,
+          link: `/pages/order-detail/index?id=${order.id}`,
+          order_id: order.id,
+          is_read: false,
+          created_at: new Date().toISOString()
+      });
+      
+      if (error) {
+          console.error('Invite review failed:', error);
+          return false;
+      }
+      return true;
   };
 
   const submitSitterReview = async (orderId: string, rating: number, content: string, tags: string[] = []) => {
@@ -652,6 +712,7 @@ export const useOrderStore = defineStore('order', () => {
     cancelOrder,
     updateOrderStatus,
     completeOrder,
+    inviteReview, // Export
     payOrder,
     subscribeToOrders,
     unsubscribeFromOrders

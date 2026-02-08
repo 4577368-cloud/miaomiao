@@ -232,6 +232,11 @@
             class="btn btn-success full-width" 
             @click="handleCompleteService"
         >完成服务</button>
+        <button 
+            v-if="order.status === 'COMPLETED' && !order.review" 
+            class="btn btn-primary full-width" 
+            @click="handleInviteReview"
+        >邀请评价</button>
         <view v-if="order.status === 'COMPLETED' || order.status === 'REVIEWED'" class="completed-actions">
             <text class="completed-text" @click="goToWallet">收益已到账</text>
             <button 
@@ -541,6 +546,18 @@ const handleCancel = () => {
             }
         }
     });
+};
+
+const handleInviteReview = async () => {
+    if (!order.value) return;
+    uni.showLoading({ title: '发送中...' });
+    const success = await orderStore.inviteReview(order.value.id);
+    uni.hideLoading();
+    if (success) {
+        uni.showToast({ title: '已发送邀请' });
+    } else {
+        uni.showToast({ title: '发送失败', icon: 'none' });
+    }
 };
 
 // Sitter Review Logic
