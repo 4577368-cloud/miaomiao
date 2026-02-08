@@ -88,9 +88,11 @@
         </el-form-item>
         <el-form-item label="等级">
           <el-select v-model="form.level" style="width: 100%">
+            <el-option label="TRAINEE" value="TRAINEE" />
             <el-option label="BRONZE" value="BRONZE" />
             <el-option label="SILVER" value="SILVER" />
             <el-option label="GOLD" value="GOLD" />
+            <el-option label="DIAMOND" value="DIAMOND" />
           </el-select>
         </el-form-item>
         <el-form-item label="评分">

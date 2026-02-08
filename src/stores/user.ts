@@ -5,7 +5,7 @@ import { PetSize } from '@/constants/pet';
 import { useOrderStore } from '@/stores/order';
 
 export type UserRole = 'owner' | 'sitter';
-export type SitterLevel = 'GOLD' | 'SILVER' | 'BRONZE';
+export type SitterLevel = 'DIAMOND' | 'GOLD' | 'SILVER' | 'BRONZE' | 'TRAINEE';
 
 // ... (Existing interfaces remain same)
 export interface SitterAvailability {
@@ -327,7 +327,7 @@ export const useUserStore = defineStore('user', () => {
        if (sitterData) {
          return {
            level: (sitterData.level as SitterLevel) || 'BRONZE',
-           completedOrders: 0,
+           completedOrders: sitterData.completed_orders || 0,
            rating: sitterData.rating || 5.0,
            experienceYears: sitterData.experience_years || 0,
            tags: sitterData.tags || [],
@@ -644,10 +644,32 @@ export const useUserStore = defineStore('user', () => {
   };
 
   
-  const calculateSitterLevel = (years: number): SitterLevel => {
-    if (years >= 5) return 'GOLD';
-    if (years >= 2) return 'SILVER';
-    return 'BRONZE';
+  const calculateSitterLevel = (points: number): SitterLevel => {
+    if (points > 5000) return 'DIAMOND';
+    if (points >= 1500) return 'GOLD';
+    if (points >= 500) return 'SILVER';
+    return 'TRAINEE';
+  };
+
+  const addPoints = async (amount: number) => {
+    if (!userInfo.value) return;
+    
+    // Optimistic update
+    const newPoints = (userInfo.value.points || 0) + amount;
+    userInfo.value.points = newPoints;
+    
+    // Check for level upgrade
+    if (userInfo.value.role === 'sitter' && userInfo.value.sitterProfile) {
+        const newLevel = calculateSitterLevel(newPoints);
+        if (newLevel !== userInfo.value.sitterProfile.level) {
+            userInfo.value.sitterProfile.level = newLevel;
+            // Update sitter profile level in DB
+            await supabase.from('sitter_profiles').update({ level: newLevel }).eq('user_id', userInfo.value.id);
+        }
+    }
+    
+    // Update points in DB (profiles table)
+    await supabase.from('profiles').update({ points: newPoints }).eq('id', userInfo.value.id);
   };
 
   const registerAsSitter = async (data: {
@@ -660,7 +682,7 @@ export const useUserStore = defineStore('user', () => {
   }) => {
     if (!userInfo.value) return;
     
-    const level = calculateSitterLevel(data.experienceYears);
+    const level = calculateSitterLevel(userInfo.value.points || 0);
     const newProfile: SitterProfile = {
       realName: data.realName,
       idCard: data.idCard,
@@ -1123,6 +1145,7 @@ export const useUserStore = defineStore('user', () => {
     claimNewcomerCoupon,
     registerAsSitter,
     fetchProfile,
+    addPoints, // Export this
     // New CRUD exports
     addPet,
     updatePet,

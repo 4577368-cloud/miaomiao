@@ -521,6 +521,21 @@ export const useOrderStore = defineStore('order', () => {
              user_id: order.sitterId, 
              amount: order.totalPrice 
          });
+         
+         // Add Points (100 + Order Price)
+         const pointsToAdd = 100 + Math.floor(order.totalPrice);
+         // If current user is the sitter (which they should be if they are completing it)
+         if (userStore.userInfo?.id === order.sitterId) {
+             await userStore.addPoints(pointsToAdd);
+             // Increment completed orders count
+             if (userStore.userInfo.sitterProfile) {
+                 userStore.userInfo.sitterProfile.completedOrders = (userStore.userInfo.sitterProfile.completedOrders || 0) + 1;
+                 // Sync to DB
+                 await supabase.from('sitter_profiles')
+                   .update({ completed_orders: userStore.userInfo.sitterProfile.completedOrders })
+                   .eq('user_id', order.sitterId);
+             }
+         }
     }
 
     const orderIndex = orders.value.findIndex(o => o.id === orderId);

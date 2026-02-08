@@ -18,7 +18,7 @@
               <view class="gender-icon" v-if="userInfo?.gender">
                  <text :class="['gender-symbol', userInfo.gender]">{{ userInfo.gender === 'male' ? '♂' : (userInfo.gender === 'female' ? '♀' : '') }}</text>
               </view>
-              <view class="role-badge" :class="currentRole">
+              <view class="role-badge" :class="[currentRole, currentLevel]">
                 <text>{{ roleLabel }}</text>
               </view>
             </view>
@@ -35,10 +35,10 @@
         <view class="stats-row">
           <view class="stat-item" @click="navigateTo('/pages/wallet/index')">
              <view class="num-row">
-               <text class="symbol">¥</text>
-              <text class="num">{{ displayBalance.toFixed(2) }}</text>
+               <text class="symbol" v-if="currentRole !== 'sitter'">¥</text>
+              <text class="num">{{ currentRole === 'sitter' ? displayBalance : displayBalance.toFixed(2) }}</text>
              </view>
-             <text class="label">{{ currentRole === 'sitter' ? '收益' : '余额' }}</text>
+             <text class="label">{{ currentRole === 'sitter' ? '服务单量' : '余额' }}</text>
           </view>
           <view class="stat-item" @click="navigateTo('/pages/wallet/index')">
             <text class="num">{{ secondaryStatValue }}</text>
@@ -168,13 +168,24 @@ const userStore = useUserStore();
 const userInfo = computed(() => userStore.userInfo);
 
 const currentRole = computed(() => userInfo.value?.role || 'owner');
+const currentLevel = computed(() => userInfo.value?.sitterProfile?.level || 'TRAINEE');
 const certificationStatus = computed(() => userInfo.value?.sitterProfile?.certificationStatus || 'none');
-const displayBalance = computed(() => currentRole.value === 'sitter' ? (userInfo.value?.laborBalance || 0) : (userInfo.value?.balance || 0));
-const availableCoupons = computed(() => userInfo.value?.coupons?.filter(c => c.status === 'UNUSED') || []);
+const displayBalance = computed(() => currentRole.value === 'sitter' ? (userInfo.value?.sitterProfile?.completedOrders || 0) : (userInfo.value?.balance || 0));
+const availableCoupons = computed(() => userInfo.value?.coupons?.filter((c: any) => c.status === 'UNUSED') || []);
 const secondaryStatValue = computed(() => currentRole.value === 'sitter' ? '查看' : String(availableCoupons.value.length));
 
 const roleLabel = computed(() => {
-  if (currentRole.value === 'sitter') return '宠托师';
+  if (currentRole.value === 'sitter') {
+      const level = userInfo.value?.sitterProfile?.level || 'TRAINEE';
+      const map: Record<string, string> = {
+          'TRAINEE': '见习宠托师',
+          'BRONZE': '铜牌宠托师',
+          'SILVER': '银牌宠托师',
+          'GOLD': '金牌宠托师',
+          'DIAMOND': '钻石宠托师'
+      };
+      return map[level] || '宠托师';
+  }
   return '铲屎官';
 });
 
@@ -327,6 +338,22 @@ const handleLogout = () => {
           
           &.sitter {
             background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+          }
+
+          &.TRAINEE {
+            background: linear-gradient(90deg, #56ab2f 0%, #a8e063 100%);
+          }
+          &.BRONZE {
+            background: linear-gradient(90deg, #B79891 0%, #94716B 100%);
+          }
+          &.SILVER {
+            background: linear-gradient(90deg, #E0E0E0 0%, #BDBDBD 100%);
+          }
+          &.GOLD {
+            background: linear-gradient(90deg, #FFD700 0%, #FDB931 100%);
+          }
+          &.DIAMOND {
+            background: linear-gradient(90deg, #b92b27 0%, #1565C0 100%);
           }
           
           text {

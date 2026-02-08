@@ -106,8 +106,9 @@ const userStore = useUserStore();
 
 const isLoading = ref(true);
 
-// Initial status from store
-const status = computed<'none' | 'pending' | 'verified' | 'rejected'>(() => userStore.userInfo?.sitterProfile?.certificationStatus || 'none');
+const status = computed(() => {
+  return userStore.userInfo?.sitterProfile?.certificationStatus || 'none';
+});
 
 const statusText = computed(() => {
   switch (status.value) {
@@ -199,17 +200,13 @@ const handleBack = () => {
 };
 
 onShow(async () => {
-  const userId = userStore.userInfo?.id;
-  if (!userId) return;
-  
   isLoading.value = true;
   try {
-    await userStore.fetchProfile(userId, userStore.userInfo?.email);
+    if (userStore.userInfo?.id) {
+       await userStore.fetchProfile(userStore.userInfo.id);
+    }
   } finally {
-    // Add a small delay to prevent flickering if the request is too fast
-    setTimeout(() => {
-      isLoading.value = false;
-    }, 300);
+    isLoading.value = false;
   }
 });
 
