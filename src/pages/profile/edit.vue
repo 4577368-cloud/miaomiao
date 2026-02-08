@@ -1,8 +1,9 @@
 <template>
   <view class="container">
     <view class="form-card">
-      <view class="avatar-section" @click="chooseAvatar">
+      <view class="avatar-section" @click="showAvatarPopup = true">
         <image :src="form.avatar || defaultAvatar" class="avatar" mode="aspectFill" />
+        <view class="camera-badge">📷</view>
       </view>
       <text class="hint">点击修改头像</text>
       
@@ -42,6 +43,31 @@
     <view class="btn-group">
       <button class="save-btn" @click="handleSave">保存</button>
     </view>
+
+    <!-- Avatar Selection Popup -->
+    <view class="popup-mask" v-if="showAvatarPopup" @click="showAvatarPopup = false">
+      <view class="popup-content" @click.stop>
+        <view class="popup-header">
+          <text class="popup-title">选择头像</text>
+          <text class="close-icon" @click="showAvatarPopup = false">×</text>
+        </view>
+        <scroll-view scroll-y class="avatar-grid">
+           <view 
+             class="grid-item" 
+             v-for="(img, index) in defaultAvatars" 
+             :key="index"
+             @click="selectAvatar(img)"
+           >
+             <image :src="img" class="grid-img" mode="aspectFill" />
+             <view class="selected-mark" v-if="form.avatar === img">✓</view>
+           </view>
+           <view class="grid-item upload-btn" @click="chooseImage">
+             <text class="plus">+</text>
+             <text class="text">上传</text>
+           </view>
+        </scroll-view>
+      </view>
+    </view>
   </view>
 </template>
 
@@ -51,6 +77,17 @@ import { useUserStore } from '@/stores/user';
 
 const userStore = useUserStore();
 const defaultAvatar = 'https://img.yzcdn.cn/vant/cat.jpeg';
+const showAvatarPopup = ref(false);
+
+const defaultAvatars = [
+  'https://img.yzcdn.cn/vant/cat.jpeg',
+  'https://imgus.tangbuy.com/static/images/2026-02-07/1f7527725fb54136931c6bf2919e7e0e-177045402956211314871683841080806.jpeg',
+  'https://imgus.tangbuy.com/static/images/2026-02-07/6dd4699cc43b4845906dc5911a6f6b11-177045526494810424765923383103569.jpeg',
+  'https://imgus.tangbuy.com/static/images/2026-02-07/fb3eeeb726ef43ea9a0020b18da5290e-177045207976112019662246898497843.jpeg',
+  'https://img.yzcdn.cn/vant/dog.jpeg', // Added generic dog
+  'https://img.yzcdn.cn/vant/apple-1.jpg',
+  'https://img.yzcdn.cn/vant/apple-2.jpg'
+];
 
 const form = ref({
   nickname: '',
@@ -68,13 +105,17 @@ onMounted(() => {
   }
 });
 
-const chooseAvatar = () => {
+const selectAvatar = (url: string) => {
+  form.value.avatar = url;
+  showAvatarPopup.value = false;
+};
+
+const chooseImage = () => {
   uni.chooseImage({
     count: 1,
     success: (res) => {
-      // In a real app, upload this file to storage and get URL
-      // For now, we use the local path
       form.value.avatar = res.tempFilePaths[0];
+      showAvatarPopup.value = false;
     }
   });
 };
@@ -116,43 +157,42 @@ const handleSave = async () => {
 
 .form-card {
   background: #fff;
-  border-radius: $radius-lg;
+  border-radius: 24rpx;
   padding: 40rpx 30rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
-  box-shadow: $shadow-sm;
+  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.02);
 }
 
 .avatar-section {
+  position: relative;
   width: 160rpx;
   height: 160rpx;
-  position: relative;
   margin-bottom: 20rpx;
   
   .avatar {
     width: 100%;
     height: 100%;
     border-radius: 50%;
-    background: #f5f5f5;
     border: 4rpx solid #fff;
     box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.1);
   }
   
-  .camera-icon {
+  .camera-badge {
     position: absolute;
     bottom: 0;
     right: 0;
-    background: $color-primary;
-    color: #fff;
     width: 48rpx;
     height: 48rpx;
+    background: $color-primary;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
+    color: #fff;
     font-size: 24rpx;
-    border: 2rpx solid #fff;
+    border: 4rpx solid #fff;
   }
 }
 
@@ -167,75 +207,60 @@ const handleSave = async () => {
   margin-bottom: 30rpx;
   
   .label {
-    display: block;
     font-size: 28rpx;
     color: $color-text-main;
-    margin-bottom: 16rpx;
     font-weight: bold;
+    margin-bottom: 16rpx;
+    display: block;
   }
   
   .input {
     width: 100%;
     height: 88rpx;
-    background: #F9FAFB;
-    border-radius: $radius-md;
+    background: #F9F9F9;
+    border-radius: 12rpx;
     padding: 0 24rpx;
     font-size: 28rpx;
-    color: $color-text-main;
+    box-sizing: border-box;
   }
   
   .textarea {
     width: 100%;
     min-height: 160rpx;
-    background: #F9FAFB;
-    border-radius: $radius-md;
+    background: #F9F9F9;
+    border-radius: 12rpx;
     padding: 24rpx;
     font-size: 28rpx;
-    color: $color-text-main;
+    box-sizing: border-box;
   }
+}
+
+.gender-options {
+  display: flex;
+  gap: 20rpx;
   
-  .gender-options {
+  .gender-opt {
+    flex: 1;
+    height: 80rpx;
+    background: #F9F9F9;
+    border-radius: 12rpx;
     display: flex;
-    gap: 30rpx;
+    align-items: center;
+    justify-content: center;
+    gap: 8rpx;
+    font-size: 28rpx;
+    color: $color-text-secondary;
+    border: 2rpx solid transparent;
+    transition: all 0.3s;
     
-    .gender-opt {
-      flex: 1;
-      height: 88rpx;
-      background: #F9FAFB;
-      border-radius: $radius-md;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: 2rpx solid transparent;
-      transition: all 0.3s;
-      
-      .icon {
-        font-size: 32rpx;
-        margin-right: 12rpx;
-        font-weight: bold;
-      }
-      
-      text {
-        font-size: 28rpx;
-        color: $color-text-secondary;
-      }
-      
-      &.active {
-        background: #fff;
-        box-shadow: $shadow-sm;
-        
-        &.male {
-          border-color: #1890ff;
-          .icon { color: #1890ff; }
-          text { color: #1890ff; font-weight: bold; }
-        }
-        
-        &.female {
-          border-color: #eb2f96;
-          .icon { color: #eb2f96; }
-          text { color: #eb2f96; font-weight: bold; }
-        }
-      }
+    &.active {
+      background: rgba(255, 142, 60, 0.1);
+      border-color: $color-primary;
+      color: $color-primary;
+    }
+    
+    .icon {
+      font-weight: bold;
     }
   }
 }
@@ -244,18 +269,139 @@ const handleSave = async () => {
   margin-top: 60rpx;
   
   .save-btn {
+    width: 100%;
+    height: 88rpx;
     background: $color-primary;
     color: #fff;
-    border-radius: $radius-full;
+    border-radius: 44rpx;
     font-size: 32rpx;
     font-weight: bold;
-    height: 88rpx;
-    line-height: 88rpx;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     box-shadow: 0 8rpx 20rpx rgba(255, 142, 60, 0.3);
+  }
+}
+
+// Popup Styles
+.popup-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 999;
+  display: flex;
+  align-items: flex-end;
+}
+
+.popup-content {
+  width: 100%;
+  background: #fff;
+  border-radius: 32rpx 32rpx 0 0;
+  padding: 30rpx;
+  padding-bottom: calc(30rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  
+  .popup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30rpx;
     
-    &:active {
-      transform: scale(0.98);
-      opacity: 0.9;
+    .popup-title {
+      font-size: 32rpx;
+      font-weight: bold;
+      color: $color-text-main;
+    }
+    
+    .close-icon {
+      font-size: 40rpx;
+      color: $color-text-secondary;
+      padding: 10rpx;
+    }
+  }
+  
+  .avatar-grid {
+    max-height: 600rpx;
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: row;
+    
+    // Use flex-flow for scroll-view content if needed, but grid is better on the container
+    // Since scroll-view has specific behavior, we put a wrapper inside if needed
+    // But flex wrap works if we style the inner content
+  }
+  
+  // Actually scroll-view content needs to be styled directly or via inner view
+  // Let's use a grid container inside scroll-view
+}
+
+.avatar-grid {
+  /* This targets the scroll-view component */
+  white-space: normal;
+  
+  :deep(.uni-scroll-view-content) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20rpx;
+    justify-content: flex-start;
+  }
+  
+  /* Fallback for H5/standard */
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24rpx;
+}
+
+.grid-item {
+  width: 150rpx;
+  height: 150rpx;
+  border-radius: 20rpx;
+  position: relative;
+  overflow: hidden;
+  background: #f5f5f5;
+  
+  .grid-img {
+    width: 100%;
+    height: 100%;
+  }
+  
+  .selected-mark {
+    position: absolute;
+    top: 10rpx;
+    right: 10rpx;
+    width: 36rpx;
+    height: 36rpx;
+    background: $color-primary;
+    border-radius: 50%;
+    color: #fff;
+    font-size: 24rpx;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2rpx solid #fff;
+  }
+  
+  &.upload-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 2rpx dashed $color-text-secondary;
+    background: #fff;
+    
+    .plus {
+      font-size: 48rpx;
+      color: $color-text-secondary;
+      line-height: 1;
+      margin-bottom: 10rpx;
+    }
+    
+    .text {
+      font-size: 24rpx;
+      color: $color-text-secondary;
     }
   }
 }

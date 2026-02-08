@@ -1621,18 +1621,19 @@ onShow(() => {
 }
 
 /* Footer Bar */
-.footer-bar-placeholder { height: 140rpx; }
+.footer-bar-placeholder { height: calc(140rpx + env(safe-area-inset-bottom)); }
 .footer-bar {
   position: fixed;
   bottom: 0;
   left: 0;
   width: 100%;
-  height: 120rpx;
+  height: calc(120rpx + env(safe-area-inset-bottom));
   background: #fff;
   box-shadow: 0 -4rpx 16rpx rgba(0,0,0,0.05);
   display: flex;
   align-items: center;
   padding: 0 30rpx;
+  padding-bottom: env(safe-area-inset-bottom);
   box-sizing: border-box;
   z-index: 100;
   

@@ -218,8 +218,8 @@
     </view>
 
   </view>
-  <view style="height: 50px;"></view>
-  <CustomTabBar current-path="pages/home/index" />
+  <view style="height: 100px;"></view>
+        <CustomTabBar current-path="pages/home/index" />
 </template>
 
 <script setup lang="ts">

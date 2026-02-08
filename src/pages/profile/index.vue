@@ -125,6 +125,15 @@
         </view>
         <text class="arrow">></text>
       </view>
+      
+      <!-- Logout Button -->
+      <view class="menu-item logout" @click="handleLogout">
+        <view class="item-left">
+          <text class="icon">🚪</text>
+          <text class="label">退出登录</text>
+        </view>
+        <text class="arrow">></text>
+      </view>
     </view>
 
     <!-- Brand Footer -->
@@ -132,7 +141,7 @@
        <image src="https://imgus.tangbuy.com/static/images/2026-02-07/fb3eeeb726ef43ea9a0020b18da5290e-177045207976112019662246898497843.jpeg" class="footer-logo" mode="heightFix" />
        <text class="footer-text">宠乐到家 · 您的贴心宠托伙伴</text>
     </view>
-    <view style="height: 50px;"></view>
+    <view style="height: 100px;"></view>
     <CustomTabBar current-path="pages/profile/index" />
   </view>
 </template>
@@ -175,6 +184,19 @@ const handleAvatarClick = () => {
 
 const handleCertificationClick = () => {
   uni.navigateTo({ url: '/pages/profile/certification' });
+};
+
+const handleLogout = () => {
+  uni.showModal({
+    title: '提示',
+    content: '确定要退出登录吗？',
+    success: (res) => {
+      if (res.confirm) {
+        userStore.logout();
+        uni.reLaunch({ url: '/pages/login/index' });
+      }
+    }
+  });
 };
 </script>
 
