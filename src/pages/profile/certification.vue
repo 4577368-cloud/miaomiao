@@ -1,91 +1,98 @@
 <template>
   <view class="container">
-    <view class="status-card" v-if="status !== 'none'">
-      <view class="status-icon-box" :class="status">
-        <text class="icon" v-if="status === 'verified'">✅</text>
-        <text class="icon" v-else-if="status === 'pending'">⏳</text>
-        <text class="icon" v-else>❌</text>
-      </view>
-      
-      <text class="title">{{ statusText }}</text>
-      <text class="desc">{{ statusDesc }}</text>
-      <view class="status-meta" v-if="showStatusMeta">
-        <text v-if="status === 'pending' && submittedAtText">提交时间：{{ submittedAtText }}</text>
-        <text v-else-if="reviewedAtText">审核时间：{{ reviewedAtText }}</text>
-      </view>
-      
-      <button class="btn-primary" v-if="status === 'rejected'" @click="resetStatus">重新提交</button>
-      <button class="btn-outline" v-if="status === 'verified'" @click="handleBack">返回个人中心</button>
+    <view class="loading-state" v-if="isLoading">
+      <view class="spinner"></view>
+      <text>加载中...</text>
     </view>
 
-    <view class="form-container" v-else>
-      <view class="header-tip">
-        <text class="tip-title">申请成为宠托师</text>
-        <text class="tip-desc">请填写真实信息，通过认证后即可接单赚钱</text>
-      </view>
-
-      <view class="card form-card">
-        <view class="section-title">身份信息</view>
-        <view class="form-item">
-          <text class="label">真实姓名</text>
-          <input class="input" v-model="form.realName" placeholder="请输入身份证姓名" />
-        </view>
-        <view class="form-item">
-          <text class="label">身份证号</text>
-          <input class="input" v-model="form.idCard" type="idcard" maxlength="18" placeholder="请输入身份证号码" />
+    <template v-else>
+      <view class="status-card" v-if="status !== 'none'">
+        <view class="status-icon-box" :class="status">
+          <text class="icon" v-if="status === 'verified'">✅</text>
+          <text class="icon" v-else-if="status === 'pending'">⏳</text>
+          <text class="icon" v-else>❌</text>
         </view>
         
-        <view class="upload-section">
-          <text class="label">证件照片</text>
-          <view class="upload-grid">
-            <view class="upload-item" @click="chooseImage('front')">
-              <image v-if="form.idCardFront" :src="form.idCardFront" mode="aspectFill" class="preview" />
-              <view v-else class="placeholder">
-                <text class="icon">📷</text>
-                <text class="text">人像面</text>
+        <text class="title">{{ statusText }}</text>
+        <text class="desc">{{ statusDesc }}</text>
+        <view class="status-meta" v-if="showStatusMeta">
+          <text v-if="status === 'pending' && submittedAtText">提交时间：{{ submittedAtText }}</text>
+          <text v-else-if="reviewedAtText">审核时间：{{ reviewedAtText }}</text>
+        </view>
+        
+        <button class="btn-primary" v-if="status === 'rejected'" @click="resetStatus">重新提交</button>
+        <button class="btn-outline" v-if="status === 'verified'" @click="handleBack">返回个人中心</button>
+      </view>
+
+      <view class="form-container" v-else>
+        <view class="header-tip">
+          <text class="tip-title">申请成为宠托师</text>
+          <text class="tip-desc">请填写真实信息，通过认证后即可接单赚钱</text>
+        </view>
+
+        <view class="card form-card">
+          <view class="section-title">身份信息</view>
+          <view class="form-item">
+            <text class="label">真实姓名</text>
+            <input class="input" v-model="form.realName" placeholder="请输入身份证姓名" />
+          </view>
+          <view class="form-item">
+            <text class="label">身份证号</text>
+            <input class="input" v-model="form.idCard" type="idcard" maxlength="18" placeholder="请输入身份证号码" />
+          </view>
+          
+          <view class="upload-section">
+            <text class="label">证件照片</text>
+            <view class="upload-grid">
+              <view class="upload-item" @click="chooseImage('front')">
+                <image v-if="form.idCardFront" :src="form.idCardFront" mode="aspectFill" class="preview" />
+                <view v-else class="placeholder">
+                  <text class="icon">📷</text>
+                  <text class="text">人像面</text>
+                </view>
               </view>
-            </view>
-            <view class="upload-item" @click="chooseImage('back')">
-              <image v-if="form.idCardBack" :src="form.idCardBack" mode="aspectFill" class="preview" />
-              <view v-else class="placeholder">
-                <text class="icon">📷</text>
-                <text class="text">国徽面</text>
+              <view class="upload-item" @click="chooseImage('back')">
+                <image v-if="form.idCardBack" :src="form.idCardBack" mode="aspectFill" class="preview" />
+                <view v-else class="placeholder">
+                  <text class="icon">📷</text>
+                  <text class="text">国徽面</text>
+                </view>
               </view>
             </view>
           </view>
         </view>
-      </view>
 
-      <view class="card form-card">
-        <view class="section-title">服务信息</view>
-        <view class="form-item">
-          <text class="label">养宠经验 (年)</text>
-          <input class="input" v-model="form.experienceYears" type="number" placeholder="请输入经验年限" />
+        <view class="card form-card">
+          <view class="section-title">服务信息</view>
+          <view class="form-item">
+            <text class="label">养宠经验 (年)</text>
+            <input class="input" v-model="form.experienceYears" type="number" placeholder="请输入经验年限" />
+          </view>
+          <view class="form-item">
+            <text class="label">个人简介</text>
+            <textarea 
+              class="textarea" 
+              v-model="form.bio" 
+              placeholder="介绍一下您的养宠经验、服务特长，让宠主更信任您..." 
+              maxlength="200"
+            />
+            <text class="word-count">{{ form.bio.length }}/200</text>
+          </view>
         </view>
-        <view class="form-item">
-          <text class="label">个人简介</text>
-          <textarea 
-            class="textarea" 
-            v-model="form.bio" 
-            placeholder="介绍一下您的养宠经验、服务特长，让宠主更信任您..." 
-            maxlength="200"
-          />
-          <text class="word-count">{{ form.bio.length }}/200</text>
-        </view>
-      </view>
 
-      <view class="action-bar">
-        <view class="agreement">
-          <checkbox-group @change="handleAgreementChange">
-             <label class="checkbox-label">
-                <checkbox value="agreed" :checked="isAgreed" color="#FF8E3C" style="transform:scale(0.7)" />
-                <text>我已阅读并同意《宠托师入驻协议》</text>
-             </label>
-          </checkbox-group>
+        <view class="action-bar">
+          <view class="agreement">
+            <checkbox-group @change="handleAgreementChange">
+               <label class="checkbox-label">
+                  <checkbox value="agreed" :checked="isAgreed" color="#FF8E3C" style="transform:scale(0.7)" />
+                  <text>我已阅读并同意《宠托师入驻协议》</text>
+               </label>
+            </checkbox-group>
+          </view>
+          <button class="btn-submit" :class="{ disabled: !canSubmit }" @click="handleSubmit">提交认证</button>
         </view>
-        <button class="btn-submit" :class="{ disabled: !canSubmit }" @click="handleSubmit">提交认证</button>
       </view>
-    </view>
+    </template>
   </view>
 </template>
 
@@ -96,6 +103,8 @@ import { useUserStore } from '@/stores/user';
 import { supabase } from '@/utils/supabase';
 
 const userStore = useUserStore();
+
+const isLoading = ref(true);
 
 // Initial status from store
 const status = computed<'none' | 'pending' | 'verified' | 'rejected'>(() => userStore.userInfo?.sitterProfile?.certificationStatus || 'none');
@@ -192,7 +201,16 @@ const handleBack = () => {
 onShow(async () => {
   const userId = userStore.userInfo?.id;
   if (!userId) return;
-  await userStore.fetchProfile(userId, userStore.userInfo?.email);
+  
+  isLoading.value = true;
+  try {
+    await userStore.fetchProfile(userId, userStore.userInfo?.email);
+  } finally {
+    // Add a small delay to prevent flickering if the request is too fast
+    setTimeout(() => {
+      isLoading.value = false;
+    }, 300);
+  }
 });
 
 const handleSubmit = async () => {
@@ -290,6 +308,33 @@ const handleSubmit = async () => {
   background-color: $color-bg-page;
   padding: 30rpx;
   padding-bottom: 120rpx;
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-top: 200rpx;
+  
+  .spinner {
+    width: 60rpx;
+    height: 60rpx;
+    border: 6rpx solid rgba($color-primary, 0.2);
+    border-top-color: $color-primary;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 20rpx;
+  }
+  
+  text {
+    font-size: 28rpx;
+    color: $color-text-secondary;
+  }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .status-card {

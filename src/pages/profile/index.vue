@@ -186,7 +186,18 @@ const joinedDays = computed(() => {
 });
 
 const navigateTo = (url: string) => {
-  uni.navigateTo({ url });
+  const tabPages = [
+    '/pages/home/index',
+    '/pages/orders/index',
+    '/pages/message/index',
+    '/pages/profile/index'
+  ];
+  
+  if (tabPages.some(path => url.includes(path))) {
+    uni.switchTab({ url });
+  } else {
+    uni.navigateTo({ url });
+  }
 };
 
 const handleAvatarClick = () => {

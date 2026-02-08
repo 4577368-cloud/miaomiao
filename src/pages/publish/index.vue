@@ -1026,14 +1026,15 @@ const applyCalendarRange = () => {
 
 // Address
 const formatAddressText = (addr: Address) => {
-  if (addr.detail && addr.name) return `${addr.detail} (${addr.name})`;
-  return addr.detail || addr.name || '';
+  // Only use detail address to avoid exposing tags like "Home" or "Company"
+  return addr.detail || '';
 };
 const chooseNewAddress = () => {
   showAddressPopup.value = false;
   uni.chooseLocation({
     success: (res) => {
-      form.address = res.address + (res.name ? ` (${res.name})` : '');
+      // Use address only to avoid exposing POI name or other info
+      form.address = res.address;
     },
     fail: () => {
        form.address = '北京市朝阳区三里屯SOHO';

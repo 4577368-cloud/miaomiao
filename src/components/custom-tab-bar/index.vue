@@ -85,9 +85,23 @@ const tabList = computed(() => {
 
 const switchTab = (item: any) => {
   if (props.currentPath === item.pagePath) return;
-  uni.switchTab({
-    url: '/' + item.pagePath
-  });
+  
+  const tabPages = [
+    'pages/home/index',
+    'pages/orders/index',
+    'pages/message/index',
+    'pages/profile/index'
+  ];
+
+  if (tabPages.includes(item.pagePath)) {
+    uni.switchTab({
+      url: '/' + item.pagePath
+    });
+  } else {
+    uni.navigateTo({
+      url: '/' + item.pagePath
+    });
+  }
 };
 </script>
 
