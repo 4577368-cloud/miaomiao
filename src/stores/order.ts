@@ -7,6 +7,7 @@ import { useUserStore } from '@/stores/user';
 
 export interface Order {
   id: string;
+  orderNo?: string; // 订单编号
   creatorId: string; // 发布者ID
   sitterId?: string; // 接单者ID
   sitterSnapshot?: UserInfo; // 接单者快照信息
@@ -36,6 +37,8 @@ export interface Order {
   originalPrice?: number;
 
   address: string;
+  latitude?: number;
+  longitude?: number;
   distance?: number; // 距离 (米)
   time: string; // e.g. "2023-10-01 14:00"
   remark?: string;
@@ -71,10 +74,33 @@ export const useOrderStore = defineStore('order', () => {
   const orders = ref<Order[]>([]);
   let realtimeChannel: any = null;
 
+  // Helper: Generate Order No
+  const generateOrderNo = (): string => {
+    const random = Math.floor(Math.random() * 10000000).toString().padStart(7, '0');
+    return `CI${random}`;
+  };
+
+  // Helper: Calculate Distance (Haversine)
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371e3; // metres
+    const φ1 = lat1 * Math.PI/180;
+    const φ2 = lat2 * Math.PI/180;
+    const Δφ = (lat2-lat1) * Math.PI/180;
+    const Δλ = (lon2-lon1) * Math.PI/180;
+
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ1) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    return Math.round(R * c); // in metres
+  };
+
   // Helper: Map DB row to Order object
   const mapDbOrderToLocal = (row: any): Order => {
     return {
       id: row.id,
+      orderNo: row.order_no,
       creatorId: row.creator_id,
       sitterId: row.sitter_id || undefined,
       sitterSnapshot: row.sitter_snapshot,
@@ -97,7 +123,21 @@ export const useOrderStore = defineStore('order', () => {
       originalPrice: Number(row.original_price || row.total_price),
 
       address: row.address,
-      distance: Number(row.distance || 0),
+      latitude: row.latitude,
+      longitude: row.longitude,
+      distance: (() => {
+         // Priority: DB distance > Calculated distance
+         if (row.distance) return Number(row.distance);
+         
+         const userStore = useUserStore();
+         if (row.latitude && row.longitude && userStore.userInfo?.addresses?.length) {
+             const myAddress = userStore.userInfo.addresses.find(a => a.isDefault) || userStore.userInfo.addresses[0];
+             if (myAddress?.latitude && myAddress?.longitude) {
+                 return calculateDistance(myAddress.latitude, myAddress.longitude, row.latitude, row.longitude);
+             }
+         }
+         return 0;
+      })(),
       time: row.scheduled_time ? new Date(row.scheduled_time).toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-') : '', // Simplified formatting
       remark: row.remark,
       status: row.status,
@@ -218,14 +258,19 @@ export const useOrderStore = defineStore('order', () => {
         scheduledTime = new Date(order.time.replace(/-/g, '/')).toISOString();
     }
 
+    const orderNo = generateOrderNo();
+
     const dbOrder = {
        creator_id: order.creatorId,
+       order_no: orderNo,
        sitter_id: order.sitterId || null,
        service_type: order.serviceType,
        pet_size: order.petSize,
        duration: order.duration,
        total_price: order.totalPrice,
        address: order.address,
+       latitude: order.latitude || null,
+       longitude: order.longitude || null,
        contact_name: order.contactName || userStore.userInfo?.nickname || '联系人',
        contact_phone: order.contactPhone || userStore.userInfo?.phone || '',
        scheduled_time: scheduledTime,

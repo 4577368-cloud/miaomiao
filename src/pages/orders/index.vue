@@ -70,7 +70,10 @@
                 <text class="label">地址</text>
               </view>
               <view class="content-box">
-                <text class="main-text address">{{ order.address }}</text>
+                <text class="main-text address">
+                  {{ order.address }}
+                </text>
+                <text class="distance-tag" v-if="!isOwner && order.distance">{{ formatDistance(order.distance) }}</text>
               </view>
             </view>
 
@@ -365,9 +368,17 @@ const getServiceItems = (type: ServiceType) => {
   return ['遛狗', '陪玩', '清洁', '拍摄反馈'];
 };
 
+const formatDistance = (m?: number) => {
+  if (!m) return '';
+  if (m < 1000) return `${m}m`;
+  return `${(m / 1000).toFixed(1)}km`;
+};
+
 const getServiceSummary = (order: Order) => {
   const parts = [];
-  parts.push(order.serviceType === ServiceType.FEEDING ? '上门喂养' : '上门遛狗');
+  const typeName = order.serviceType === ServiceType.FEEDING ? '上门喂养' : '上门遛狗';
+  parts.push(`${typeName} (${order.duration}分钟)`);
+  
   if (order.addOns?.play) parts.push('陪玩');
   if (order.addOns?.deepClean) parts.push('深度清洁');
   if (order.addOns?.medicine) parts.push('喂药');
@@ -379,7 +390,7 @@ const formatPetSize = (size: PetSize) => {
     [PetSize.SMALL]: '小型',
     [PetSize.MEDIUM]: '中型',
     [PetSize.LARGE]: '大型',
-    [PetSize.GIANT]: '巨型',
+    [PetSize.GIANT]: '超大型',
     [PetSize.CAT]: '猫咪'
   };
   return map[size] || size;
@@ -828,6 +839,19 @@ const makeCall = (phone: string) => {
       display: flex;
       align-items: center;
       
+      .order-no {
+        background: #F0F2F5;
+        border-radius: 4rpx;
+        padding: 2rpx 8rpx;
+        margin-right: 12rpx;
+        
+        .no-text {
+          font-size: 22rpx;
+          color: $color-text-secondary;
+          font-family: monospace;
+        }
+      }
+
       .service-tag {
         font-size: 22rpx;
         padding: 4rpx 12rpx;
@@ -886,6 +910,13 @@ const makeCall = (phone: string) => {
         display: flex;
         flex-direction: column;
         
+        // Allow horizontal layout for address row
+        &:has(.address) {
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        
         .main-text {
           font-size: 28rpx;
           color: $color-text-main;
@@ -898,7 +929,17 @@ const makeCall = (phone: string) => {
             display: -webkit-box;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
+            flex: 1;
+            padding-right: 12rpx;
           }
+        }
+        
+        .distance-tag {
+           font-size: 24rpx;
+           color: $color-primary;
+           font-weight: bold;
+           flex-shrink: 0;
+           margin-top: 4rpx;
         }
         
         .sub-text {
