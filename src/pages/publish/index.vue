@@ -101,6 +101,7 @@
             <view class="info">
               <text class="label">上门喂养</text>
               <text class="desc">喂食 · 换水 · 铲屎</text>
+              <text class="price">标准价 ¥{{ getServiceBasePrice(ServiceType.FEEDING) }}/次</text>
             </view>
             <view class="check-mark" v-if="form.serviceType === ServiceType.FEEDING">✓</view>
           </view>
@@ -113,6 +114,7 @@
             <view class="info">
               <text class="label">上门遛宠</text>
               <text class="desc">遛狗 · 陪玩 · 清洁</text>
+              <text class="price">标准价 ¥{{ getServiceBasePrice(ServiceType.WALKING) }}/次</text>
             </view>
             <view class="check-mark" v-if="form.serviceType === ServiceType.WALKING">✓</view>
           </view>
@@ -479,6 +481,10 @@
             </view>
             <view class="pd-list">
                <view class="pd-item">
+                  <text class="pd-label">标准服务价</text>
+                  <text class="pd-val">¥{{ basePrice }}</text>
+               </view>
+               <view class="pd-item">
                   <text class="pd-label">基础服务费</text>
                   <text class="pd-val">¥{{ priceBreakdown.base }}</text>
                </view>
@@ -608,6 +614,10 @@ const basePrice = computed(() => {
   const price = configStore.getServicePrice(form.serviceType);
   return price > 0 ? price : fallbackBasePrice;
 });
+const getServiceBasePrice = (type: ServiceType) => {
+  const price = configStore.getServicePrice(type);
+  return price > 0 ? price : fallbackBasePrice;
+};
 const petSizeOptions = computed(() => [
   { value: PetSize.CAT, label: '猫咪', desc: '不限体重', coeff: configStore.getPetSizeCoefficient(PetSize.CAT), image: '/static/avatars/cat-british.jpg' },
   { value: PetSize.SMALL, label: '小型犬', desc: '<10kg', coeff: configStore.getPetSizeCoefficient(PetSize.SMALL), image: '/static/avatars/dog-small.jpg' },
@@ -1134,6 +1144,12 @@ onShow(async () => {
         font-size: 22rpx;
         color: $color-text-secondary;
         margin-top: 4rpx;
+      }
+      .price {
+        font-size: 22rpx;
+        color: $color-primary;
+        margin-top: 6rpx;
+        font-weight: 600;
       }
     }
     
