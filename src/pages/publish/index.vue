@@ -1635,7 +1635,7 @@ onShow(() => {
   padding: 0 30rpx;
   padding-bottom: env(safe-area-inset-bottom);
   box-sizing: border-box;
-  z-index: 100;
+  z-index: 10000;
   
   .price-container {
     flex: 1;
@@ -1703,7 +1703,7 @@ onShow(() => {
    width: 100%;
    height: 100%;
    background: rgba(0,0,0,0.5);
-   z-index: 999;
+   z-index: 10002;
    display: flex;
    align-items: flex-end;
 }
@@ -1914,7 +1914,7 @@ onShow(() => {
    width: 100%;
    height: 100%;
    background: rgba(0,0,0,0.5);
-   z-index: 200;
+   z-index: 10001;
    display: flex;
    align-items: flex-end;
 }
