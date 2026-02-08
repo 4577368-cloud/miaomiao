@@ -16,6 +16,22 @@
       </view>
     </view>
 
+    <view class="notice-banner" v-if="bannerMessages.length > 0">
+      <view class="banner-left">
+        <text class="icon">🔔</text>
+      </view>
+      <swiper class="banner-swiper-vertical" vertical autoplay circular interval="3000" duration="500">
+        <swiper-item v-for="msg in bannerMessages" :key="msg.id">
+          <view class="notice-banner-item" @click="handleBannerClick(msg)">
+            <text class="notice-banner-title">{{ msg.title }}</text>
+            <text class="notice-banner-content">{{ msg.content }}</text>
+          </view>
+        </swiper-item>
+      </swiper>
+      <view class="banner-right">
+        <text class="banner-count">{{ bannerMessages.length }}</text>
+      </view>
+    </view>
     <!-- 铲屎官视图 -->
     <view v-if="isOwner">
       <!-- 顶部 Banner -->
@@ -236,6 +252,7 @@ const orderStore = useOrderStore();
 
 const locationName = ref('点击定位');
 const isMounted = ref(false);
+const bannerMessages = ref<any[]>([]);
 
 type SortType = 'distance' | 'amount' | 'date';
 const currentSort = ref<SortType>('distance');
@@ -321,8 +338,30 @@ const handleClaimCoupon = async () => {
   }
 };
 
+const refreshBanner = () => {
+  bannerMessages.value = userStore.getUnreadNotifications();
+};
+
+const openLink = (link?: string) => {
+  if (!link) return;
+  const tabPages = ['/pages/home/index', '/pages/orders/index', '/pages/profile/index', '/pages/message/index', '/pages/wallet/index'];
+  if (tabPages.includes(link)) {
+    uni.switchTab({ url: link });
+  } else {
+    uni.navigateTo({ url: link });
+  }
+};
+
+const handleBannerClick = (msg: any) => {
+  if (msg?.id) {
+    userStore.markNotificationRead(msg.id);
+    refreshBanner();
+  }
+  if (msg?.link) openLink(msg.link);
+};
+
 // 页面显示时加载数据
-onShow(() => {
+onShow(async () => {
   isMounted.value = true;
   if (!userStore.isLoggedIn) {
     uni.reLaunch({ url: '/pages/login/index' });
@@ -331,6 +370,9 @@ onShow(() => {
 
   // 刷新订单数据
   orderStore.loadOrders();
+  await userStore.syncNotifications();
+  await userStore.syncAnnouncements();
+  refreshBanner();
 
   // 尝试自动定位
   if (locationName.value === '点击定位') {
@@ -633,6 +675,54 @@ const handleAcceptOrder = async (orderId: string) => {
       animation: float 4s ease-in-out infinite;
     }
   }
+}
+
+.notice-banner {
+  margin: 20rpx $spacing-lg 10rpx;
+  background: #fff7e6;
+  border: 1px solid #ffe7ba;
+  border-radius: 12rpx;
+  padding: 16rpx 20rpx;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.banner-left {
+  width: 40rpx;
+}
+
+.banner-swiper-vertical {
+  flex: 1;
+  height: 56rpx;
+}
+
+.notice-banner-item {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.notice-banner-title {
+  font-size: 28rpx;
+  color: #8d6b00;
+  font-weight: 600;
+}
+
+.notice-banner-content {
+  font-size: 24rpx;
+  color: #8d6b00;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.banner-right {
+  background: #ff9f0a;
+  color: #fff;
+  border-radius: 20rpx;
+  padding: 4rpx 12rpx;
+  font-size: 22rpx;
 }
 
 .sitter-action-card {

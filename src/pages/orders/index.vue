@@ -1,5 +1,21 @@
 <template>
   <view class="container">
+    <view class="notice-banner" v-if="bannerMessages.length > 0">
+      <view class="banner-left">
+        <text class="icon">🔔</text>
+      </view>
+      <swiper class="banner-swiper-vertical" vertical autoplay circular interval="3000" duration="500">
+        <swiper-item v-for="msg in bannerMessages" :key="msg.id">
+          <view class="notice-banner-item" @click="handleBannerClick(msg)">
+            <text class="notice-banner-title">{{ msg.title }}</text>
+            <text class="notice-banner-content">{{ msg.content }}</text>
+          </view>
+        </swiper-item>
+      </swiper>
+      <view class="banner-right">
+        <text class="banner-count">{{ bannerMessages.length }}</text>
+      </view>
+    </view>
     <!-- 顶部固定 Tabs -->
     <view class="tabs-wrapper">
       <view class="tabs">
@@ -261,6 +277,7 @@ const tempTasks = ref<string[]>(['feed', 'clean']);
 const foldedOrders = ref<Record<string, boolean>>({});
 const countdowns = ref<Record<string, string>>({});
 let timer: ReturnType<typeof setInterval> | null = null;
+const bannerMessages = ref<any[]>([]);
 
 const isOwner = computed(() => userStore.userInfo?.role === 'owner');
 
@@ -312,8 +329,11 @@ const currentTabs = computed(() => {
   }
 });
 
-onShow(() => {
+onShow(async () => {
   orderStore.loadOrders();
+  await userStore.syncNotifications();
+  await userStore.syncAnnouncements();
+  refreshBanner();
   // Start countdown timer
   if (timer) clearInterval(timer);
   timer = setInterval(updateCountdowns, 1000);
@@ -356,6 +376,28 @@ const filteredOrders = computed(() => {
   
   return all.filter(o => o.status === tab.value);
 });
+
+const refreshBanner = () => {
+  bannerMessages.value = userStore.getUnreadNotifications();
+};
+
+const openLink = (link?: string) => {
+  if (!link) return;
+  const tabPages = ['/pages/home/index', '/pages/orders/index', '/pages/profile/index', '/pages/message/index', '/pages/wallet/index'];
+  if (tabPages.includes(link)) {
+    uni.switchTab({ url: link });
+  } else {
+    uni.navigateTo({ url: link });
+  }
+};
+
+const handleBannerClick = (msg: any) => {
+  if (msg?.id) {
+    userStore.markNotificationRead(msg.id);
+    refreshBanner();
+  }
+  if (msg?.link) openLink(msg.link);
+};
 
 const formatServiceType = (type: ServiceType) => {
   return type === ServiceType.FEEDING ? '上门喂养' : '上门遛狗';
@@ -792,6 +834,54 @@ const makeCall = (phone: string) => {
   min-height: 100vh;
   background-color: $color-bg-page;
   padding-bottom: 40rpx;
+}
+
+.notice-banner {
+  margin: 20rpx $spacing-lg 10rpx;
+  background: #fff7e6;
+  border: 1px solid #ffe7ba;
+  border-radius: 12rpx;
+  padding: 16rpx 20rpx;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.banner-left {
+  width: 40rpx;
+}
+
+.banner-swiper-vertical {
+  flex: 1;
+  height: 56rpx;
+}
+
+.notice-banner-item {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.notice-banner-title {
+  font-size: 28rpx;
+  color: #8d6b00;
+  font-weight: 600;
+}
+
+.notice-banner-content {
+  font-size: 24rpx;
+  color: #8d6b00;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.banner-right {
+  background: #ff9f0a;
+  color: #fff;
+  border-radius: 20rpx;
+  padding: 4rpx 12rpx;
+  font-size: 22rpx;
 }
 
 /* Tabs */

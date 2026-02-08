@@ -9,6 +9,10 @@
       
       <text class="title">{{ statusText }}</text>
       <text class="desc">{{ statusDesc }}</text>
+      <view class="status-meta" v-if="showStatusMeta">
+        <text v-if="status === 'pending' && submittedAtText">提交时间：{{ submittedAtText }}</text>
+        <text v-else-if="reviewedAtText">审核时间：{{ reviewedAtText }}</text>
+      </view>
       
       <button class="btn-primary" v-if="status === 'rejected'" @click="resetStatus">重新提交</button>
       <button class="btn-outline" v-if="status === 'verified'" @click="handleBack">返回个人中心</button>
@@ -87,13 +91,14 @@
 
 <script setup lang="ts">
 import { ref, computed, reactive } from 'vue';
+import { onShow } from '@dcloudio/uni-app';
 import { useUserStore } from '@/stores/user';
 import { supabase } from '@/utils/supabase';
 
 const userStore = useUserStore();
 
 // Initial status from store
-const status = computed(() => userStore.userInfo?.sitterProfile?.certificationStatus || 'none');
+const status = computed<'none' | 'pending' | 'verified' | 'rejected'>(() => userStore.userInfo?.sitterProfile?.certificationStatus || 'none');
 
 const statusText = computed(() => {
   switch (status.value) {
@@ -114,6 +119,20 @@ const statusDesc = computed(() => {
     }
     default: return '';
   }
+});
+
+const showStatusMeta = computed(() => status.value !== 'none');
+
+const submittedAtText = computed(() => {
+  const ts = userStore.userInfo?.sitterProfile?.certificationSubmittedAt;
+  if (!ts) return '';
+  return new Date(ts).toLocaleString();
+});
+
+const reviewedAtText = computed(() => {
+  const ts = userStore.userInfo?.sitterProfile?.certificationReviewedAt;
+  if (!ts) return '';
+  return new Date(ts).toLocaleString();
 });
 
 const form = reactive({
@@ -170,6 +189,12 @@ const handleBack = () => {
     uni.navigateBack();
 };
 
+onShow(async () => {
+  const userId = userStore.userInfo?.id;
+  if (!userId) return;
+  await userStore.fetchProfile(userId, userStore.userInfo?.email);
+});
+
 const handleSubmit = async () => {
   if (!canSubmit.value) {
     if (!isAgreed.value) {
@@ -183,24 +208,30 @@ const handleSubmit = async () => {
   uni.showLoading({ title: '提交中...' });
   try {
     const userId = userStore.userInfo.id;
-    let frontUrl = form.idCardFront;
-    let backUrl = form.idCardBack;
-    try {
-      const frontRes = await fetch(form.idCardFront);
-      const frontBlob = await frontRes.blob();
-      const { data: upFront } = await supabase.storage.from('evidence').upload(`${userId}/id_front_${Date.now()}.jpg`, frontBlob, { upsert: true });
-      if (upFront?.path) {
-        const { data: pubUrl } = supabase.storage.from('evidence').getPublicUrl(upFront.path);
-        frontUrl = pubUrl.publicUrl || frontUrl;
-      }
-      const backRes = await fetch(form.idCardBack);
-      const backBlob = await backRes.blob();
-      const { data: upBack } = await supabase.storage.from('evidence').upload(`${userId}/id_back_${Date.now()}.jpg`, backBlob, { upsert: true });
-      if (upBack?.path) {
-        const { data: pubUrl2 } = supabase.storage.from('evidence').getPublicUrl(upBack.path);
-        backUrl = pubUrl2.publicUrl || backUrl;
-      }
-    } catch (_) {}
+    const readFile = (path: string) => {
+      return new Promise<ArrayBuffer>((resolve, reject) => {
+        const fs = uni.getFileSystemManager();
+        fs.readFile({
+          filePath: path,
+          success: (res: any) => resolve(res.data as ArrayBuffer),
+          fail: reject
+        });
+      });
+    };
+    const uploadLocal = async (path: string, side: 'front' | 'back') => {
+      if (!path || path.startsWith('http')) return path;
+      const ext = path.split('.').pop() || 'jpg';
+      const fileKey = `${userId}/id_${side}_${Date.now()}.${ext}`;
+      const buffer = await readFile(path);
+      const contentType = ext ? `image/${ext}` : 'image/jpeg';
+      const { error } = await supabase.storage.from('evidence').upload(fileKey, buffer, { upsert: true, contentType });
+      if (error) throw error;
+      const { data } = supabase.storage.from('evidence').getPublicUrl(fileKey);
+      if (!data.publicUrl) throw new Error('上传失败');
+      return data.publicUrl;
+    };
+    const frontUrl = await uploadLocal(form.idCardFront, 'front');
+    const backUrl = await uploadLocal(form.idCardBack, 'back');
     await supabase.from('profiles').update({ role: 'sitter' }).eq('id', userId);
     const { error } = await supabase
       .from('sitter_profiles')
@@ -212,6 +243,9 @@ const handleSubmit = async () => {
         bio: form.bio,
         is_certified: false,
         certification_status: 'pending',
+        certification_reject_reason: '',
+        certification_reviewed_at: null,
+        certification_submitted_at: new Date().toISOString(),
         id_card_front: frontUrl,
         id_card_back: backUrl
       }, { onConflict: 'user_id' });
@@ -231,9 +265,14 @@ const handleSubmit = async () => {
     const profile = userStore.userInfo.sitterProfile;
     profile.realName = form.realName;
     profile.idCard = form.idCard;
+    profile.idCardFront = frontUrl;
+    profile.idCardBack = backUrl;
     profile.experienceYears = parseInt(form.experienceYears) || 0;
     profile.bio = form.bio;
     profile.certificationStatus = 'pending';
+    profile.certificationRejectReason = '';
+    profile.certificationSubmittedAt = Date.now();
+    profile.certificationReviewedAt = undefined;
     userStore.updateUser(userStore.userInfo);
     uni.hideLoading();
     uni.showToast({ title: '已提交，审核中', icon: 'success' });
@@ -293,6 +332,12 @@ const handleSubmit = async () => {
     text-align: center;
     margin-bottom: 60rpx;
     line-height: 1.5;
+  }
+  
+  .status-meta {
+    font-size: 26rpx;
+    color: $color-text-secondary;
+    margin-bottom: 40rpx;
   }
   
   .btn-primary, .btn-outline {

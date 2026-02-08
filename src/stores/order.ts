@@ -154,6 +154,101 @@ export const useOrderStore = defineStore('order', () => {
     };
   };
 
+  const buildOrderLink = (orderId: string) => `/pages/order-detail/index?id=${orderId}`;
+
+  const pushOrderNotification = (prevStatus: Order['status'] | undefined, record: any) => {
+    const nextStatus = record?.status as Order['status'] | undefined;
+    if (!nextStatus || prevStatus === nextStatus) return;
+    const userStore = useUserStore();
+    const userId = userStore.userInfo?.id;
+    if (!userId) return;
+    const isOwner = record.creator_id === userId;
+    const isSitter = record.sitter_id === userId;
+    if (!isOwner && !isSitter) return;
+    const orderNoText = record.order_no ? `订单${record.order_no}` : '订单';
+    const sitterName = record.sitter_snapshot?.nickname || '宠托师';
+    const link = buildOrderLink(record.id);
+    const time = new Date().toLocaleString();
+
+    if (nextStatus === 'ACCEPTED') {
+      if (isOwner) {
+        userStore.addNotification({
+          id: `order_${record.id}_accepted_owner`,
+          type: 'order',
+          title: '订单已被接单',
+          content: `${sitterName}已接单${orderNoText}，可查看详情`,
+          time,
+          link,
+          orderId: record.id
+        });
+      }
+      if (isSitter) {
+        userStore.addNotification({
+          id: `order_${record.id}_accepted_sitter`,
+          type: 'order',
+          title: '接单成功',
+          content: `${orderNoText}已进入待服务`,
+          time,
+          link,
+          orderId: record.id
+        });
+      }
+    }
+
+    if (nextStatus === 'COMPLETED') {
+      if (isOwner) {
+        userStore.addNotification({
+          id: `order_${record.id}_completed_owner`,
+          type: 'order',
+          title: '服务已完成',
+          content: `${orderNoText}服务完成，请及时评价`,
+          time,
+          link,
+          orderId: record.id
+        });
+      }
+      if (isSitter) {
+        userStore.addNotification({
+          id: `order_${record.id}_completed_sitter`,
+          type: 'order',
+          title: '服务已完成',
+          content: `${orderNoText}已完成，等待对方评价`,
+          time,
+          link,
+          orderId: record.id
+        });
+      }
+    }
+
+    if (nextStatus === 'REVIEWED') {
+      if (isSitter) {
+        userStore.addNotification({
+          id: `order_${record.id}_reviewed_sitter`,
+          type: 'order',
+          title: '收到评价',
+          content: `${orderNoText}已完成评价`,
+          time,
+          link,
+          orderId: record.id
+        });
+      }
+    }
+
+    if (nextStatus === 'CANCELLED') {
+      if (isOwner || isSitter) {
+        userStore.addNotification({
+          id: `order_${record.id}_cancelled`,
+          type: 'order',
+          title: '订单已取消',
+          content: `${orderNoText}已取消`,
+          time,
+          link,
+          orderId: record.id
+        });
+      }
+    }
+  };
+
   const handleRealtimeUpdate = (payload: any) => {
     const { eventType, new: newRecord } = payload;
     const userStore = useUserStore();
@@ -163,6 +258,7 @@ export const useOrderStore = defineStore('order', () => {
 
     if (eventType === 'UPDATE') {
        const index = orders.value.findIndex(o => o.id === newRecord.id);
+       const prevStatus = index > -1 ? orders.value[index].status : undefined;
        
        if (index > -1) {
          const updatedOrder = mapDbOrderToLocal(newRecord);
@@ -181,6 +277,7 @@ export const useOrderStore = defineStore('order', () => {
             orders.value.unshift(mapDbOrderToLocal(newRecord));
          }
        }
+       pushOrderNotification(prevStatus, newRecord);
     } else if (eventType === 'INSERT') {
        // New order created
        if (newRecord.creator_id === userId) {

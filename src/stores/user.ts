@@ -77,6 +77,17 @@ export interface Coupon {
   status: 'UNUSED' | 'USED' | 'EXPIRED';
 }
 
+export interface NotificationItem {
+  id: string;
+  type: 'order' | 'system' | 'coupon' | 'other' | 'announcement';
+  title: string;
+  content: string;
+  time: string;
+  read: boolean;
+  link?: string;
+  orderId?: string;
+}
+
 export interface UserInfo {
   id: string;
   email?: string;
@@ -213,20 +224,17 @@ export const useUserStore = defineStore('user', () => {
         const currentStatus = sitterProfile?.certificationStatus;
         if (currentStatus && currentStatus !== prevStatus) {
           if (currentStatus === 'verified' || currentStatus === 'rejected') {
-            const notiKey = `miaomiao_notifications_${data.id}`;
-            const list = (uni.getStorageSync(notiKey) || []) as any[];
             const title = currentStatus === 'verified' ? '宠托师认证通过' : '宠托师认证未通过';
             const content = currentStatus === 'verified'
               ? '您的实名认证已通过审核，可以开始接单了'
               : `很遗憾，您的认证未通过${sitterProfile?.certificationRejectReason ? '，原因：' + sitterProfile.certificationRejectReason : ''}`;
-            list.unshift({
-              id: `cert_${Date.now()}`,
+            addNotification({
+              id: `cert_${currentStatus}_${data.id}_${Date.now()}`,
               type: 'system',
               title,
               content,
               time: new Date().toLocaleString()
             });
-            uni.setStorageSync(notiKey, list);
           }
           uni.setStorageSync(statusKey, currentStatus);
         }
@@ -376,22 +384,40 @@ export const useUserStore = defineStore('user', () => {
     uni.setStorageSync('miaomiao_user', JSON.stringify(userInfo.value));
     
     // Update Supabase
+    const payload = {
+      nickname: updates.nickname,
+      avatar: updates.avatar,
+      bio: updates.bio,
+      gender: updates.gender,
+      role: updates.role
+    };
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({
-          nickname: updates.nickname,
-          avatar: updates.avatar,
-          bio: updates.bio,
-          gender: updates.gender,
-          role: updates.role
-        })
+        .update(payload)
         .eq('id', userInfo.value.id);
         
       if (error) throw error;
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.message && String(e.message).includes('bio') && String(e.message).includes('schema cache')) {
+        const fallbackPayload = {
+          nickname: updates.nickname,
+          avatar: updates.avatar,
+          gender: updates.gender,
+          role: updates.role
+        };
+        const { error: fallbackError } = await supabase
+          .from('profiles')
+          .update(fallbackPayload)
+          .eq('id', userInfo.value.id);
+        if (fallbackError) {
+          console.error('Update profile failed', fallbackError);
+          throw fallbackError;
+        }
+        return;
+      }
       console.error('Update profile failed', e);
-      throw e; // Re-throw to let caller handle UI feedback
+      throw e;
     }
   };
 
@@ -600,6 +626,14 @@ export const useUserStore = defineStore('user', () => {
       if (error) throw error;
       
       uni.setStorageSync('miaomiao_user', JSON.stringify(userInfo.value));
+      addNotification({
+        id: `coupon_${newCoupon.id}`,
+        type: 'coupon',
+        title: '优惠券到账',
+        content: `您已领取优惠券「${newCoupon.name}」，快去下单使用吧`,
+        time: new Date().toLocaleString(),
+        link: '/pages/wallet/index'
+      });
       return true;
     } catch (e) {
       console.error('Claim coupon failed:', e);
@@ -893,6 +927,183 @@ export const useUserStore = defineStore('user', () => {
       .neq('id', excludeId || '00000000-0000-0000-0000-000000000000'); // safe check
   };
 
+  const getNotificationKey = (userId: string) => `miaomiao_notifications_${userId}`;
+
+  const getNotifications = (userId?: string): NotificationItem[] => {
+    const uid = userId || userInfo.value?.id;
+    if (!uid) return [];
+    const list = uni.getStorageSync(getNotificationKey(uid)) || [];
+    return Array.isArray(list) ? (list as NotificationItem[]) : [];
+  };
+
+  const setNotifications = (userId: string, list: NotificationItem[]) => {
+    uni.setStorageSync(getNotificationKey(userId), list);
+  };
+
+  const addNotification = (item: Omit<NotificationItem, 'read'> & { read?: boolean }) => {
+    const uid = userInfo.value?.id;
+    if (!uid) return;
+    const list = getNotifications(uid);
+    if (list.some(n => n.id === item.id)) return;
+    const nextItem: NotificationItem = {
+      read: false,
+      ...item
+    };
+    list.unshift(nextItem);
+    setNotifications(uid, list);
+    void supabase.from('notifications').insert({
+      id: nextItem.id,
+      user_id: uid,
+      type: nextItem.type,
+      title: nextItem.title,
+      content: nextItem.content,
+      link: nextItem.link || null,
+      order_id: nextItem.orderId || null,
+      is_read: nextItem.read,
+      created_at: new Date().toISOString()
+    });
+    return nextItem;
+  };
+
+  const markNotificationRead = (id: string) => {
+    const uid = userInfo.value?.id;
+    if (!uid) return;
+    const list = getNotifications(uid);
+    const idx = list.findIndex(n => n.id === id);
+    if (idx > -1) {
+      list[idx].read = true;
+      setNotifications(uid, list);
+    }
+    void supabase.from('notifications').update({ is_read: true }).eq('user_id', uid).eq('id', id);
+  };
+
+  const markNotificationsRead = (ids: string[]) => {
+    const uid = userInfo.value?.id;
+    if (!uid) return;
+    const list = getNotifications(uid);
+    let changed = false;
+    list.forEach(n => {
+      if (ids.includes(n.id) && !n.read) {
+        n.read = true;
+        changed = true;
+      }
+    });
+    if (changed) setNotifications(uid, list);
+    if (ids.length > 0) {
+      void supabase.from('notifications').update({ is_read: true }).eq('user_id', uid).in('id', ids);
+    }
+  };
+
+  const upsertNotificationFromDb = (row: any) => {
+    const uid = userInfo.value?.id;
+    if (!uid || !row?.id) return;
+    const list = getNotifications(uid);
+    const idx = list.findIndex(n => n.id === row.id);
+    const item: NotificationItem = {
+      id: row.id,
+      type: row.type || 'system',
+      title: row.title || '',
+      content: row.content || '',
+      time: row.created_at ? new Date(row.created_at).toLocaleString() : new Date().toLocaleString(),
+      read: !!row.is_read,
+      link: row.link || undefined,
+      orderId: row.order_id || undefined
+    };
+    if (idx > -1) {
+      list[idx] = item;
+      setNotifications(uid, list);
+    } else {
+      setNotifications(uid, [item, ...list]);
+    }
+  };
+
+  const removeNotificationById = (id: string) => {
+    const uid = userInfo.value?.id;
+    if (!uid) return;
+    const list = getNotifications(uid).filter(n => n.id !== id);
+    setNotifications(uid, list);
+  };
+
+  const getUnreadNotifications = (userId?: string) => {
+    return getNotifications(userId).filter(n => !n.read);
+  };
+
+  const clearNotifications = (userId?: string) => {
+    const uid = userId || userInfo.value?.id;
+    if (!uid) return;
+    setNotifications(uid, []);
+    void supabase.from('notifications').delete().eq('user_id', uid);
+  };
+
+  const syncNotifications = async () => {
+    const uid = userInfo.value?.id;
+    if (!uid) return;
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', uid)
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.error('Load notifications failed:', error);
+      return;
+    }
+    const list: NotificationItem[] = (data || []).map((row: any) => ({
+      id: row.id,
+      type: row.type || 'system',
+      title: row.title || '',
+      content: row.content || '',
+      time: row.created_at ? new Date(row.created_at).toLocaleString() : '',
+      read: !!row.is_read,
+      link: row.link || undefined,
+      orderId: row.order_id || undefined
+    }));
+    setNotifications(uid, list);
+  };
+
+  const syncAnnouncements = async () => {
+    const uid = userInfo.value?.id;
+    if (!uid) return;
+    const { data, error } = await supabase
+      .from('announcements')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.error('Load announcements failed:', error);
+      return;
+    }
+    const existing = getNotifications(uid);
+    const existsIds = new Set(existing.map(n => n.id));
+    const added: NotificationItem[] = [];
+    (data || []).forEach((row: any) => {
+      const nid = `announcement_${row.id}_${uid}`;
+      if (!existsIds.has(nid)) {
+        const item: NotificationItem = {
+          id: nid,
+          type: 'announcement',
+          title: row.title || '系统公告',
+          content: row.content || '',
+          time: new Date(row.created_at).toLocaleString(),
+          read: false,
+          link: row.link || undefined
+        };
+        added.push(item);
+      }
+    });
+    if (added.length > 0) {
+      setNotifications(uid, [...added, ...existing]);
+      void supabase.from('notifications').insert(added.map(item => ({
+        id: item.id,
+        user_id: uid,
+        type: item.type,
+        title: item.title,
+        content: item.content,
+        link: item.link || null,
+        is_read: item.read,
+        created_at: item.time ? new Date(item.time).toISOString() : new Date().toISOString()
+      })));
+    }
+  };
+
   return {
     userInfo,
     isLoggedIn,
@@ -918,6 +1129,16 @@ export const useUserStore = defineStore('user', () => {
     removePet,
     addAddress,
     updateAddress,
-    removeAddress
+    removeAddress,
+    getNotifications,
+    getUnreadNotifications,
+    addNotification,
+    markNotificationRead,
+    markNotificationsRead,
+    clearNotifications,
+    syncAnnouncements,
+    syncNotifications,
+    upsertNotificationFromDb,
+    removeNotificationById
   };
 });

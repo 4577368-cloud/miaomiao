@@ -71,10 +71,20 @@
           <el-input v-model="form.id_card" />
         </el-form-item>
         <el-form-item label="证件照(人像)">
-          <el-input v-model="form.id_card_front" placeholder="证件照链接" />
+          <el-upload drag :show-file-list="false" :http-request="handleUploadFront" accept="image/*">
+            <div class="upload-box">
+              <el-image v-if="form.id_card_front" :src="form.id_card_front" fit="cover" class="upload-preview" />
+              <div v-else class="upload-placeholder">拖拽或点击上传</div>
+            </div>
+          </el-upload>
         </el-form-item>
         <el-form-item label="证件照(国徽)">
-          <el-input v-model="form.id_card_back" placeholder="证件照链接" />
+          <el-upload drag :show-file-list="false" :http-request="handleUploadBack" accept="image/*">
+            <div class="upload-box">
+              <el-image v-if="form.id_card_back" :src="form.id_card_back" fit="cover" class="upload-preview" />
+              <div v-else class="upload-placeholder">拖拽或点击上传</div>
+            </div>
+          </el-upload>
         </el-form-item>
         <el-form-item label="等级">
           <el-select v-model="form.level" style="width: 100%">
@@ -131,6 +141,7 @@ import { ref, onMounted } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import { supabase } from '@/utils/supabase'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import type { UploadRequestOptions } from 'element-plus'
 
 interface SitterRow {
   user_id: string
@@ -350,6 +361,32 @@ const handleSubmit = async () => {
   }
 }
 
+const uploadIdCard = async (file: File, side: 'front' | 'back') => {
+  if (!form.value.user_id) {
+    ElMessage.warning('请先填写用户ID')
+    return
+  }
+  const ext = file.name.split('.').pop() || 'jpg'
+  const path = `${form.value.user_id}/id_${side}_${Date.now()}.${ext}`
+  const { error } = await supabase.storage.from('evidence').upload(path, file, { upsert: true })
+  if (error) {
+    ElMessage.error('上传失败: ' + error.message)
+    return
+  }
+  const { data } = supabase.storage.from('evidence').getPublicUrl(path)
+  const url = data.publicUrl || ''
+  if (side === 'front') form.value.id_card_front = url
+  if (side === 'back') form.value.id_card_back = url
+}
+
+const handleUploadFront = async (options: UploadRequestOptions) => {
+  await uploadIdCard(options.file as File, 'front')
+}
+
+const handleUploadBack = async (options: UploadRequestOptions) => {
+  await uploadIdCard(options.file as File, 'back')
+}
+
 const handleApprove = async (row: SitterRow) => {
   const { error } = await supabase
     .from('sitter_profiles')
@@ -364,6 +401,16 @@ const handleApprove = async (row: SitterRow) => {
     return
   }
   await supabase.from('profiles').update({ role: 'sitter' }).eq('id', row.user_id)
+  await supabase.from('notifications').insert({
+    id: `cert_verified_${row.user_id}_${Date.now()}`,
+    user_id: row.user_id,
+    type: 'system',
+    title: '宠托师认证通过',
+    content: '您的实名认证已通过审核，可以开始接单了',
+    link: '/pages/profile/certification',
+    is_read: false,
+    created_at: new Date().toISOString()
+  })
   ElMessage.success('已通过认证')
   fetchSitters()
 }
@@ -388,6 +435,16 @@ const handleReject = async (row: SitterRow) => {
     ElMessage.error('操作失败: ' + error.message)
     return
   }
+  await supabase.from('notifications').insert({
+    id: `cert_rejected_${row.user_id}_${Date.now()}`,
+    user_id: row.user_id,
+    type: 'system',
+    title: '宠托师认证未通过',
+    content: reason ? `很遗憾，您的认证未通过，原因：${reason}` : '很遗憾，您的认证未通过',
+    link: '/pages/profile/certification',
+    is_read: false,
+    created_at: new Date().toISOString()
+  })
   ElMessage.success('已拒绝认证')
   fetchSitters()
 }
@@ -403,5 +460,20 @@ onMounted(fetchSitters)
 }
 .toolbar {
   margin-bottom: 20px;
+}
+.upload-box {
+  width: 160px;
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.upload-preview {
+  width: 160px;
+  height: 100px;
+  border-radius: 6px;
+}
+.upload-placeholder {
+  color: #909399;
 }
 </style>

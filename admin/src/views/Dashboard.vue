@@ -32,6 +32,10 @@
           <el-icon><Ticket /></el-icon>
           <span>优惠券管理</span>
         </el-menu-item>
+        <el-menu-item index="/dashboard/announcements">
+          <el-icon><Bell /></el-icon>
+          <span>系统公告</span>
+        </el-menu-item>
       </el-menu>
     </el-aside>
     <el-container>

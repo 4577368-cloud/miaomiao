@@ -45,6 +45,12 @@ const router = createRouter({
           name: 'Coupons',
           component: () => import('../views/CouponList.vue'),
           meta: { title: '优惠券管理' }
+        },
+        {
+          path: 'announcements',
+          name: 'Announcements',
+          component: () => import('../views/AnnouncementList.vue'),
+          meta: { title: '系统公告' }
         }
       ]
     }

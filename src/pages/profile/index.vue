@@ -117,6 +117,19 @@
           <text class="arrow">></text>
         </view>
       </view>
+      
+      <view class="menu-item" v-if="certificationStatus !== 'none'" @click="navigateTo('/pages/profile/certification')">
+        <view class="item-left">
+          <text class="icon">🧾</text>
+          <text class="label">我的认证记录</text>
+        </view>
+        <view class="item-right">
+          <text class="status-tag" v-if="certificationStatus === 'verified'">已通过</text>
+          <text class="status-tag pending" v-else-if="certificationStatus === 'pending'">审核中</text>
+          <text class="status-tag gray" v-else>未通过</text>
+          <text class="arrow">></text>
+        </view>
+      </view>
 
       <view class="menu-item" @click="navigateTo('/pages/settings/index')">
         <view class="item-left">

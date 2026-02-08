@@ -26,6 +26,18 @@
         系统消息
         <view class="indicator" v-if="currentTab === 'system'"></view>
       </view>
+      <view 
+        class="tab-item" 
+        :class="{ active: currentTab === 'announcement' }"
+        @click="currentTab = 'announcement'"
+      >
+        系统公告
+        <view class="indicator" v-if="currentTab === 'announcement'"></view>
+      </view>
+    </view>
+    <view class="actions">
+      <button class="action-btn" @click="markAllRead" v-if="notifications.some(n => !n.read)">全部已读</button>
+      <button class="action-btn danger" @click="clearAll" v-if="notifications.length > 0">清空</button>
     </view>
 
     <!-- Message List -->
@@ -39,7 +51,9 @@
           <view class="icon-box" :class="msg.type">
             <text class="icon" v-if="msg.type === 'order'">📦</text>
             <text class="icon" v-else-if="msg.type === 'system'">🔔</text>
-            <text class="icon" v-else>💬</text>
+            <text class="icon" v-else-if="msg.type === 'announcement'">�</text>
+            <text class="icon" v-else>�</text>
+            <view class="unread-dot" v-if="!msg.read"></view>
           </view>
           
           <view class="content-box">
@@ -70,116 +84,21 @@
 <script setup lang="ts">
 import CustomTabBar from '@/components/custom-tab-bar/index.vue';
 import { ref, computed } from 'vue';
-import { onShow } from '@dcloudio/uni-app';
-import { useOrderStore } from '@/stores/order';
+import { onShow, onUnload } from '@dcloudio/uni-app';
 import { useUserStore } from '@/stores/user';
+import { supabase } from '@/utils/supabase';
 
-const orderStore = useOrderStore();
 const userStore = useUserStore();
 const currentTab = ref('all');
-const storedNotifications = ref<Notification[]>([]);
+const storedNotifications = ref<any[]>([]);
+let realtimeChannel: any = null;
+let notificationChannel: any = null;
+let announcementChannel: any = null;
 
-interface Notification {
-  id: string;
-  type: 'order' | 'system' | 'other';
-  title: string;
-  content: string;
-  time: string;
-  action?: () => void;
-}
-
-const notifications = computed<Notification[]>(() => {
-    const msgs: Notification[] = [];
+const notifications = computed<any[]>(() => {
     const userId = userStore.userInfo?.id;
-    
-    // 1. Mock System Notifications (Always present for demo)
-    msgs.push({
-      id: 'sys_1',
-      type: 'system',
-      title: '新用户优惠券到账',
-      content: '恭喜您获得“新用户首单立减”优惠券，快去使用吧！',
-      time: '1小时前',
-      action: () => uni.showToast({ title: '优惠券已在卡包中', icon: 'none' })
-    });
-
-    msgs.push({
-      id: 'sys_2',
-      type: 'system',
-      title: '系统维护通知',
-      content: '我们将于今晚 02:00 进行系统升级，预计耗时 30 分钟。',
-      time: '昨天',
-      action: () => {}
-    });
-
-    if (userStore.userInfo?.role === 'sitter' && userStore.userInfo?.sitterProfile) {
-      const status = userStore.userInfo.sitterProfile.certificationStatus;
-      if (status === 'pending') {
-        msgs.unshift({
-          id: 'cert_pending',
-          type: 'system',
-          title: '认证已提交，审核中',
-          content: '工作人员会在1个工作日内完成审核',
-          time: '刚刚'
-        });
-      }
-    }
-    if (!userId) return msgs;
-    
-    if (storedNotifications.value.length > 0) {
-      msgs.unshift(...storedNotifications.value);
-    }
-
-    // 2. Order Notifications (Owner)
-    if (userStore.userInfo?.role === 'owner') {
-        // Pending Reviews
-        const pendingReviews = orderStore.orders.filter(o => 
-            o.creatorId === userId && o.status === 'COMPLETED'
-        );
-        pendingReviews.forEach(o => {
-            msgs.unshift({ // Add to top
-                id: 'review_' + o.id,
-                type: 'order',
-                title: '订单待评价',
-                content: `您的订单 ${o.serviceType === 'FEEDING' ? '上门喂养' : '上门遛狗'} 已完成，请对宠托师进行评价`,
-                time: '刚刚',
-                action: () => uni.switchTab({ url: '/pages/orders/index' })
-            });
-        });
-        
-        // Accepted Orders
-        const acceptedOrders = orderStore.orders.filter(o => 
-            o.creatorId === userId && o.status === 'ACCEPTED'
-        );
-        acceptedOrders.forEach(o => {
-            msgs.unshift({
-                id: 'accepted_' + o.id,
-                type: 'order',
-                title: '宠托师已接单',
-                content: `您的订单已被接单，宠托师将准时为您服务。`,
-                time: '刚刚',
-                action: () => uni.switchTab({ url: '/pages/orders/index' })
-            });
-        });
-    }
-    
-    // 3. Order Notifications (Sitter)
-    if (userStore.userInfo?.role === 'sitter') {
-        const acceptedOrders = orderStore.orders.filter(o =>
-            o.sitterId === userId && o.status === 'ACCEPTED'
-        );
-        acceptedOrders.forEach(o => {
-             msgs.unshift({
-                id: 'start_' + o.id,
-                type: 'order',
-                title: '即将开始服务',
-                content: `您有一个预约 ${o.time} 的订单需要服务，请准时到达。`,
-                time: '10分钟前',
-                action: () => uni.switchTab({ url: '/pages/orders/index' })
-             });
-        });
-    }
-    
-    return msgs;
+    if (!userId) return [];
+    return storedNotifications.value || [];
 });
 
 onShow(async () => {
@@ -189,8 +108,102 @@ onShow(async () => {
     return;
   }
   await userStore.fetchProfile(userId, userStore.userInfo?.email);
-  const list = (uni.getStorageSync(`miaomiao_notifications_${userId}`) || []) as Notification[];
-  storedNotifications.value = list;
+  await userStore.syncNotifications();
+  await userStore.syncAnnouncements();
+  storedNotifications.value = userStore.getNotifications(userId);
+  if (realtimeChannel) {
+    supabase.removeChannel(realtimeChannel);
+    realtimeChannel = null;
+  }
+  if (notificationChannel) {
+    supabase.removeChannel(notificationChannel);
+    notificationChannel = null;
+  }
+  if (announcementChannel) {
+    supabase.removeChannel(announcementChannel);
+    announcementChannel = null;
+  }
+  const role = userStore.userInfo?.role;
+  if (role === 'sitter') {
+    realtimeChannel = supabase.channel(`sitter_profiles_${userId}`).on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'sitter_profiles', filter: `user_id=eq.${userId}` },
+      (payload: any) => {
+        const next = payload?.new || {};
+        const status = next.certification_status as string | undefined;
+        const validStatuses = ['none', 'pending', 'verified', 'rejected'] as const;
+        if (!status || !validStatuses.includes(status as any)) return;
+        const statusKey = `miaomiao_cert_status_${userId}`;
+        const prevStatus = uni.getStorageSync(statusKey);
+        if (status === prevStatus) return;
+        if (status === 'verified' || status === 'rejected') {
+          const title = status === 'verified' ? '宠托师认证通过' : '宠托师认证未通过';
+          const content = status === 'verified'
+            ? '您的实名认证已通过审核，可以开始接单了'
+            : `很遗憾，您的认证未通过${next.certification_reject_reason ? '，原因：' + next.certification_reject_reason : ''}`;
+          userStore.addNotification({
+            id: `cert_${status}_${Date.now()}`,
+            type: 'system',
+            title,
+            content,
+            time: new Date().toLocaleString(),
+            link: '/pages/profile/certification'
+          });
+          storedNotifications.value = userStore.getNotifications(userId);
+        }
+        if (userStore.userInfo?.sitterProfile) {
+          userStore.userInfo.sitterProfile.certificationStatus = status as typeof validStatuses[number];
+          userStore.userInfo.sitterProfile.isCertified = status === 'verified';
+          userStore.userInfo.sitterProfile.certificationRejectReason = next.certification_reject_reason || '';
+          userStore.userInfo.sitterProfile.certificationReviewedAt = next.certification_reviewed_at ? new Date(next.certification_reviewed_at).getTime() : undefined;
+          uni.setStorageSync('miaomiao_user', JSON.stringify(userStore.userInfo));
+        }
+        uni.setStorageSync(statusKey, status);
+      }
+    ).subscribe();
+  }
+
+  notificationChannel = supabase.channel(`notifications_${userId}`).on(
+    'postgres_changes',
+    { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
+    (payload: any) => {
+      const eventType = payload?.eventType;
+      if (eventType === 'DELETE') {
+        const oldRow = payload?.old || {};
+        if (oldRow?.id) {
+          userStore.removeNotificationById(oldRow.id);
+        }
+      } else {
+        const row = payload?.new || {};
+        userStore.upsertNotificationFromDb(row);
+      }
+      storedNotifications.value = userStore.getNotifications(userId);
+    }
+  ).subscribe();
+
+  announcementChannel = supabase.channel('announcements').on(
+    'postgres_changes',
+    { event: 'INSERT', schema: 'public', table: 'announcements' },
+    async () => {
+      await userStore.syncAnnouncements();
+      storedNotifications.value = userStore.getNotifications(userId);
+    }
+  ).subscribe();
+});
+
+onUnload(() => {
+  if (realtimeChannel) {
+    supabase.removeChannel(realtimeChannel);
+    realtimeChannel = null;
+  }
+  if (notificationChannel) {
+    supabase.removeChannel(notificationChannel);
+    notificationChannel = null;
+  }
+  if (announcementChannel) {
+    supabase.removeChannel(announcementChannel);
+    announcementChannel = null;
+  }
 });
 
 const filteredNotifications = computed(() => {
@@ -198,13 +211,36 @@ const filteredNotifications = computed(() => {
   return notifications.value.filter(msg => msg.type === currentTab.value);
 });
 
-const handleMessageClick = (msg: Notification) => {
-  if (msg.action) {
-    msg.action();
+const openLink = (link?: string) => {
+  if (!link) return;
+  const tabPages = ['/pages/home/index', '/pages/orders/index', '/pages/profile/index', '/pages/message/index', '/pages/wallet/index'];
+  if (tabPages.includes(link)) {
+    uni.switchTab({ url: link });
   } else {
-    // Default action (expand or show detail)
-    // For now, just show toast if no specific action
+    uni.navigateTo({ url: link });
   }
+};
+
+const handleMessageClick = (msg: any) => {
+  if (msg?.id) {
+    userStore.markNotificationRead(msg.id);
+    const userId = userStore.userInfo?.id;
+    if (userId) storedNotifications.value = userStore.getNotifications(userId);
+  }
+  if (msg?.link) openLink(msg.link);
+};
+
+const markAllRead = () => {
+  const ids = notifications.value.filter(n => !n.read).map(n => n.id);
+  userStore.markNotificationsRead(ids);
+  const userId = userStore.userInfo?.id;
+  if (userId) storedNotifications.value = userStore.getNotifications(userId);
+};
+
+const clearAll = () => {
+  userStore.clearNotifications();
+  const userId = userStore.userInfo?.id;
+  if (userId) storedNotifications.value = userStore.getNotifications(userId);
 };
 </script>
 
@@ -253,6 +289,26 @@ const handleMessageClick = (msg: Notification) => {
   }
 }
 
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16rpx;
+  background: #fff;
+  padding: 10rpx 30rpx 20rpx;
+}
+.action-btn {
+  height: 56rpx;
+  line-height: 56rpx;
+  padding: 0 20rpx;
+  border-radius: 28rpx;
+  font-size: 24rpx;
+  color: #fff;
+  background: $color-primary;
+}
+.action-btn.danger {
+  background: #ff4d4f;
+}
+
 .msg-list {
   flex: 1;
   padding: 20rpx 30rpx;
@@ -283,6 +339,17 @@ const handleMessageClick = (msg: Notification) => {
     flex-shrink: 0;
     
     .icon { font-size: 40rpx; }
+    position: relative;
+    .unread-dot {
+      position: absolute;
+      right: 6rpx;
+      top: 6rpx;
+      width: 14rpx;
+      height: 14rpx;
+      border-radius: 50%;
+      background: #ff4d4f;
+      box-shadow: 0 0 0 2rpx rgba(255, 77, 79, 0.2);
+    }
     
     &.order { background: rgba($color-primary, 0.1); }
     &.system { background: rgba($color-secondary, 0.2); }
@@ -314,6 +381,7 @@ const handleMessageClick = (msg: Notification) => {
       font-size: 26rpx;
       color: $color-text-secondary;
       line-height: 1.5;
+      line-clamp: 2;
       display: -webkit-box;
       -webkit-box-orient: vertical;
       -webkit-line-clamp: 2;

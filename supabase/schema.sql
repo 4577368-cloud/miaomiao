@@ -6,7 +6,8 @@ create table public.profiles (
   id uuid references auth.users not null primary key,
   nickname text,
   avatar text,
-  role text check (role in ('owner', 'sitter')) default 'owner',
+  bio text default '',
+  role text check (role in ('owner', 'sitter', 'admin')) default 'owner',
   balance decimal(10, 2) default 0.00,
   labor_balance decimal(10, 2) default 0.00,
   created_at timestamptz default now(),
@@ -147,11 +148,16 @@ alter table public.reviews enable row level security;
 -- Profiles: Public read, Owner write
 create policy "Public profiles are viewable by everyone" on public.profiles for select using (true);
 create policy "Users can update own profile" on public.profiles for update using (auth.uid() = id);
+create policy "Admins can update any profile" on public.profiles for update using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'));
 
 -- Sitter Profiles: Public read, Owner write
 create policy "Sitter profiles are viewable by everyone" on public.sitter_profiles for select using (true);
 create policy "Sitters can update own profile" on public.sitter_profiles for update using (auth.uid() = user_id);
 create policy "Sitters can insert own profile" on public.sitter_profiles for insert with check (auth.uid() = user_id);
+create policy "Admins can manage sitter profiles" on public.sitter_profiles
+  for all
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'))
+  with check (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'));
 
 -- Pets: Owner read/write, Sitter read (if related to order - simplified to public read for MVP or authenticated)
 create policy "Users can view own pets" on public.pets for select using (auth.uid() = owner_id);
@@ -163,6 +169,45 @@ create policy "Users can delete own pets" on public.pets for delete using (auth.
 create policy "Users can view own orders" on public.orders for select using (auth.uid() = creator_id or auth.uid() = sitter_id);
 create policy "Users can create orders" on public.orders for insert with check (auth.uid() = creator_id);
 create policy "Users can update own orders" on public.orders for update using (auth.uid() = creator_id or auth.uid() = sitter_id);
+
+-- 8. Announcements (System messages)
+create table public.announcements (
+  id uuid default uuid_generate_v4() primary key,
+  title text not null,
+  content text,
+  link text,
+  created_at timestamptz default now()
+);
+alter table public.announcements enable row level security;
+create policy "Announcements are viewable by everyone" on public.announcements for select using (true);
+create policy "Admins can manage announcements" on public.announcements
+  for all
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'))
+  with check (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'));
+
+create table public.notifications (
+  id text primary key,
+  user_id uuid references public.profiles(id) not null,
+  type text,
+  title text,
+  content text,
+  link text,
+  order_id uuid,
+  is_read boolean default false,
+  created_at timestamptz default now()
+);
+alter table public.notifications enable row level security;
+create policy "Users can view own notifications" on public.notifications for select using (auth.uid() = user_id);
+create policy "Users can insert own notifications" on public.notifications for insert with check (auth.uid() = user_id);
+create policy "Users can update own notifications" on public.notifications for update using (auth.uid() = user_id);
+create policy "Users can delete own notifications" on public.notifications for delete using (auth.uid() = user_id);
+create policy "Admins can manage notifications" on public.notifications
+  for all
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'))
+  with check (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'));
+
+alter table public.sitter_profiles replica identity full;
+alter table public.notifications replica identity full;
 
 -- Storage Buckets (for Avatars / Evidence)
 -- Note: You need to create buckets 'avatars' and 'evidence' in Supabase Storage dashboard
