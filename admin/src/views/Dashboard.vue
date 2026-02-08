@@ -53,7 +53,7 @@
             </span>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item>退出登录</el-dropdown-item>
+                <el-dropdown-item @click="handleLogout">退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
@@ -68,11 +68,26 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { useUserStore } from '../stores/user'
+import { ElMessage } from 'element-plus'
 
 const route = useRoute()
+const router = useRouter()
+const userStore = useUserStore()
+
 const activeMenu = computed(() => route.path)
 const currentRouteName = computed(() => route.meta.title || '管理')
+
+const handleLogout = async () => {
+  try {
+    await userStore.logout()
+    router.push('/login')
+    ElMessage.success('已退出登录')
+  } catch (error) {
+    console.error(error)
+  }
+}
 </script>
 
 <style scoped>
