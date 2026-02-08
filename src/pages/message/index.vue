@@ -70,12 +70,14 @@
 <script setup lang="ts">
 import CustomTabBar from '@/components/custom-tab-bar/index.vue';
 import { ref, computed } from 'vue';
+import { onShow } from '@dcloudio/uni-app';
 import { useOrderStore } from '@/stores/order';
 import { useUserStore } from '@/stores/user';
 
 const orderStore = useOrderStore();
 const userStore = useUserStore();
 const currentTab = ref('all');
+const storedNotifications = ref<Notification[]>([]);
 
 interface Notification {
   id: string;
@@ -109,7 +111,23 @@ const notifications = computed<Notification[]>(() => {
       action: () => {}
     });
 
+    if (userStore.userInfo?.role === 'sitter' && userStore.userInfo?.sitterProfile) {
+      const status = userStore.userInfo.sitterProfile.certificationStatus;
+      if (status === 'pending') {
+        msgs.unshift({
+          id: 'cert_pending',
+          type: 'system',
+          title: '认证已提交，审核中',
+          content: '工作人员会在1个工作日内完成审核',
+          time: '刚刚'
+        });
+      }
+    }
     if (!userId) return msgs;
+    
+    if (storedNotifications.value.length > 0) {
+      msgs.unshift(...storedNotifications.value);
+    }
 
     // 2. Order Notifications (Owner)
     if (userStore.userInfo?.role === 'owner') {
@@ -162,6 +180,17 @@ const notifications = computed<Notification[]>(() => {
     }
     
     return msgs;
+});
+
+onShow(async () => {
+  const userId = userStore.userInfo?.id;
+  if (!userId) {
+    storedNotifications.value = [];
+    return;
+  }
+  await userStore.fetchProfile(userId, userStore.userInfo?.email);
+  const list = (uni.getStorageSync(`miaomiao_notifications_${userId}`) || []) as Notification[];
+  storedNotifications.value = list;
 });
 
 const filteredNotifications = computed(() => {

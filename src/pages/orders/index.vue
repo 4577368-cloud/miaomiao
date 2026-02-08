@@ -260,7 +260,7 @@ const tempPhotos = ref<string[]>([]);
 const tempTasks = ref<string[]>(['feed', 'clean']);
 const foldedOrders = ref<Record<string, boolean>>({});
 const countdowns = ref<Record<string, string>>({});
-let timer: number | null = null;
+let timer: ReturnType<typeof setInterval> | null = null;
 
 const isOwner = computed(() => userStore.userInfo?.role === 'owner');
 
@@ -478,6 +478,7 @@ const showSitterProfile = (order: Order) => {
       nickname: '爱宠小助手',
       avatar: '',
       role: 'sitter',
+      joinDate: Date.now(),
       sitterProfile: {
         level: 'BRONZE',
         completedOrders: 10,
@@ -525,9 +526,9 @@ const handleCancel = (order: Order) => {
   uni.showModal({
     title: '提示',
     content: '确定要取消订单吗？',
-    success: (res) => {
+    success: async (res) => {
       if (res.confirm) {
-        if (orderStore.cancelOrder(order.id, 'owner')) {
+        if (await orderStore.cancelOrder(order.id, 'owner')) {
              uni.showToast({ title: '已取消' });
              // No need to switch tab if viewing ALL, but if viewing specific status, list will update
         } else {
@@ -540,9 +541,9 @@ const handleCancel = (order: Order) => {
 
 const handlePay = (order: Order) => {
   uni.showLoading({ title: '支付中...' });
-  setTimeout(() => {
+  setTimeout(async () => {
     uni.hideLoading();
-    if (orderStore.payOrder(order.id)) {
+    if (await orderStore.payOrder(order.id)) {
         uni.showToast({ title: '支付成功', icon: 'success' });
         switchToTab('PENDING');
     } else {
@@ -551,17 +552,30 @@ const handlePay = (order: Order) => {
   }, 1000);
 };
 
-const handleConfirmStart = (order: Order) => {
+const handleConfirmStart = async (order: Order) => {
     // 铲屎官确认开始
-    if (orderStore.startService(order.id)) {
+    if (await orderStore.startService(order.id)) {
         uni.showToast({ title: '已确认开始服务', icon: 'success' });
         switchToTab('IN_SERVICE');
     }
 };
 
-const handleSitterAccept = (order: Order) => {
+const handleSitterAccept = async (order: Order) => {
   if (!userStore.userInfo) return;
-  const success = orderStore.acceptOrder(order.id, userStore.userInfo);
+  if (!userStore.userInfo.sitterProfile?.isCertified) {
+    uni.showModal({
+      title: '未认证',
+      content: '完成宠托师认证后才能接单',
+      confirmText: '去认证',
+      success: (res) => {
+        if (res.confirm) {
+          uni.navigateTo({ url: '/pages/profile/certification' });
+        }
+      }
+    });
+    return;
+  }
+  const success = await orderStore.acceptOrder(order.id, userStore.userInfo);
   if (success) {
     uni.showToast({ title: '接单成功', icon: 'success' });
   } else {
@@ -573,10 +587,14 @@ const handleSitterReject = (order: Order) => {
   uni.showModal({
     title: '提示',
     content: '确定要婉拒这个订单吗？',
-    success: (res) => {
+    success: async (res) => {
       if (res.confirm) {
-        orderStore.updateOrderStatus(order.id, 'CANCELLED');
-        uni.showToast({ title: '已婉拒', icon: 'none' });
+        const updated = await orderStore.updateOrderStatus(order.id, 'CANCELLED');
+        if (updated) {
+          uni.showToast({ title: '已婉拒', icon: 'none' });
+        } else {
+          uni.showToast({ title: '操作失败', icon: 'none' });
+        }
       }
     }
   });
@@ -586,10 +604,14 @@ const handleStartService = (order: Order) => {
     uni.showModal({
         title: '开始服务',
         content: '确认到达现场并开始服务？',
-        success: (res) => {
+    success: async (res) => {
             if (res.confirm) {
-                orderStore.updateOrderStatus(order.id, 'IN_SERVICE');
-                switchToTab('IN_SERVICE');
+                const updated = await orderStore.updateOrderStatus(order.id, 'IN_SERVICE');
+                if (updated) {
+                  switchToTab('IN_SERVICE');
+                } else {
+                  uni.showToast({ title: '操作失败', icon: 'none' });
+                }
             }
         }
     });
@@ -646,16 +668,19 @@ const choosePhoto = () => {
     });
 };
 
-const submitComplete = () => {
+const submitComplete = async () => {
     if (processingOrder.value) {
-        orderStore.completeOrder(processingOrder.value.id, {
+        const success = await orderStore.completeOrder(processingOrder.value.id, {
             photos: tempPhotos.value,
             items: tempTasks.value,
             confirmedAt: Date.now()
         });
-        uni.showToast({ title: '服务已完成' });
-        // Sitter completed: Switch to COMPLETED
-        switchToTab('COMPLETED');
+        if (success) {
+          uni.showToast({ title: '服务已完成' });
+          switchToTab('COMPLETED');
+        } else {
+          uni.showToast({ title: '提交失败', icon: 'none' });
+        }
     }
     closeCompleteModal();
 };
@@ -672,15 +697,19 @@ const handleConfirmComplete = (order: Order) => {
     uni.showModal({
         title: '确认完成',
         content: '确认宠托师已完成服务？',
-        success: (res) => {
+    success: async (res) => {
             if (res.confirm) {
                 // If Sitter hasn't uploaded evidence yet, we might just set status to COMPLETED (Wait for Review)
                 // Or maybe we require Sitter to do it first.
                 // Assuming Owner can force complete.
                 if (order.status === 'IN_SERVICE') {
-                   orderStore.updateOrderStatus(order.id, 'COMPLETED');
-                   uni.showToast({ title: '订单已完成' });
-                   switchToTab('COMPLETED');
+                   const updated = await orderStore.updateOrderStatus(order.id, 'COMPLETED');
+                   if (updated) {
+                     uni.showToast({ title: '订单已完成' });
+                     switchToTab('COMPLETED');
+                   } else {
+                     uni.showToast({ title: '操作失败', icon: 'none' });
+                   }
                 }
             }
         }
@@ -718,18 +747,22 @@ const getRatingText = (rating: number) => {
     return map[rating - 1] || '满意';
 };
 
-const submitReview = () => {
-    if (reviewingOrder.value) {
-        orderStore.updateOrderStatus(reviewingOrder.value.id, 'REVIEWED');
+const submitReview = async () => {
+    if (!reviewingOrder.value) return;
+    uni.showLoading({ title: '提交中...' });
+    try {
+        await orderStore.submitOwnerReview(
+            reviewingOrder.value.id,
+            reviewRating.value,
+            reviewContent.value
+        );
+        uni.hideLoading();
         uni.showToast({ title: '评价成功' });
-        // Optionally save review content to store/backend
-        console.log('Review submitted:', {
-            orderId: reviewingOrder.value.id,
-            rating: reviewRating.value,
-            content: reviewContent.value
-        });
+        closeReviewModal();
+    } catch (e) {
+        uni.hideLoading();
+        uni.showToast({ title: '评价失败，请稍后重试', icon: 'none' });
     }
-    closeReviewModal();
 };
 
 const handleReorder = (order: Order) => {

@@ -109,12 +109,12 @@
           <view class="card">
             <view class="form-row">
               <text class="label">是否绝育</text>
-              <switch :checked="form.sterilized" @change="e => form.sterilized = e.detail.value" color="#FF8E3C" style="transform:scale(0.8)"/>
+              <switch :checked="form.sterilized" @change="e => form.sterilized = (e as any).detail.value" color="#FF8E3C" style="transform:scale(0.8)"/>
             </view>
             <view class="divider"></view>
             <view class="form-row">
               <text class="label">是否免疫</text>
-              <switch :checked="form.vaccine" @change="e => form.vaccine = e.detail.value" color="#FF8E3C" style="transform:scale(0.8)"/>
+              <switch :checked="form.vaccine" @change="e => form.vaccine = (e as any).detail.value" color="#FF8E3C" style="transform:scale(0.8)"/>
             </view>
           </view>
 

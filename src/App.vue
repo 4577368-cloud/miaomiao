@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { onLaunch, onShow, onHide } from "@dcloudio/uni-app";
 import { useUserStore } from '@/stores/user';
+import { useConfigStore } from '@/stores/config';
 
 onLaunch(() => {
   console.log("App Launch");
   const userStore = useUserStore();
+  const configStore = useConfigStore();
   userStore.initUser();
+  configStore.initConfig();
   uni.hideTabBar();
 });
 onShow(() => {

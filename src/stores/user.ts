@@ -17,6 +17,8 @@ export interface SitterAvailability {
 export interface SitterProfile {
   realName?: string;
   idCard?: string;
+  idCardFront?: string;
+  idCardBack?: string;
   level: SitterLevel;
   completedOrders: number;
   rating: number;
@@ -25,6 +27,9 @@ export interface SitterProfile {
   bio: string;
   isCertified: boolean;
   certificationStatus?: 'none' | 'pending' | 'verified' | 'rejected';
+  certificationRejectReason?: string;
+  certificationSubmittedAt?: number;
+  certificationReviewedAt?: number;
   availability?: SitterAvailability;
 }
 
@@ -191,27 +196,47 @@ export const useUserStore = defineStore('user', () => {
       userInfo.value = currentInfo;
 
       // 并行获取关联数据
-      const promises = [
+      const [sitterProfile, pets, addresses, coupons] = await Promise.all([
         fetchSitterProfile(data.id),
         fetchUserPets(data.id),
         fetchUserAddresses(data.id),
         fetchUserCoupons(data.id)
-      ];
-
-      const [sitterProfile, pets, addresses, coupons] = await Promise.all(promises);
+      ] as const);
       
       if (userInfo.value) {
         if (sitterProfile) userInfo.value.sitterProfile = sitterProfile;
         if (pets) userInfo.value.pets = pets;
         if (addresses) userInfo.value.addresses = addresses;
         if (coupons) userInfo.value.coupons = coupons;
+        const statusKey = `miaomiao_cert_status_${data.id}`;
+        const prevStatus = uni.getStorageSync(statusKey);
+        const currentStatus = sitterProfile?.certificationStatus;
+        if (currentStatus && currentStatus !== prevStatus) {
+          if (currentStatus === 'verified' || currentStatus === 'rejected') {
+            const notiKey = `miaomiao_notifications_${data.id}`;
+            const list = (uni.getStorageSync(notiKey) || []) as any[];
+            const title = currentStatus === 'verified' ? '宠托师认证通过' : '宠托师认证未通过';
+            const content = currentStatus === 'verified'
+              ? '您的实名认证已通过审核，可以开始接单了'
+              : `很遗憾，您的认证未通过${sitterProfile?.certificationRejectReason ? '，原因：' + sitterProfile.certificationRejectReason : ''}`;
+            list.unshift({
+              id: `cert_${Date.now()}`,
+              type: 'system',
+              title,
+              content,
+              time: new Date().toLocaleString()
+            });
+            uni.setStorageSync(notiKey, list);
+          }
+          uni.setStorageSync(statusKey, currentStatus);
+        }
         
         ensureData(); 
         uni.setStorageSync('miaomiao_user', JSON.stringify(userInfo.value));
       }
   };
 
-  const fetchUserPets = async (userId: string) => {
+  const fetchUserPets = async (userId: string): Promise<PetInfo[]> => {
     const { data, error } = await supabase
       .from('pets')
       .select('*')
@@ -239,7 +264,7 @@ export const useUserStore = defineStore('user', () => {
     })) as PetInfo[];
   };
 
-  const fetchUserAddresses = async (userId: string) => {
+  const fetchUserAddresses = async (userId: string): Promise<Address[]> => {
     const { data, error } = await supabase
       .from('addresses')
       .select('*')
@@ -262,7 +287,7 @@ export const useUserStore = defineStore('user', () => {
     })) as Address[];
   };
 
-  const fetchUserCoupons = async (userId: string) => {
+  const fetchUserCoupons = async (userId: string): Promise<Coupon[]> => {
     const { data, error } = await supabase
       .from('coupons')
       .select('*')
@@ -284,7 +309,7 @@ export const useUserStore = defineStore('user', () => {
     })) as Coupon[];
   };
 
-  const fetchSitterProfile = async (userId: string) => {
+  const fetchSitterProfile = async (userId: string): Promise<SitterProfile | undefined> => {
        const { data: sitterData } = await supabase
          .from('sitter_profiles')
          .select('*')
@@ -300,6 +325,12 @@ export const useUserStore = defineStore('user', () => {
            tags: sitterData.tags || [],
            bio: sitterData.bio || '',
            isCertified: sitterData.is_certified || false,
+           certificationStatus: sitterData.certification_status || 'none',
+           certificationRejectReason: sitterData.certification_reject_reason || '',
+           certificationSubmittedAt: sitterData.certification_submitted_at ? new Date(sitterData.certification_submitted_at).getTime() : undefined,
+           certificationReviewedAt: sitterData.certification_reviewed_at ? new Date(sitterData.certification_reviewed_at).getTime() : undefined,
+           idCardFront: sitterData.id_card_front,
+           idCardBack: sitterData.id_card_back,
            availability: sitterData.availability
          };
        }
@@ -377,6 +408,24 @@ export const useUserStore = defineStore('user', () => {
         }
         
         if (!userInfo.value.sitterProfile.isCertified) {
+          const status = userInfo.value.sitterProfile.certificationStatus || 'none';
+          if (status === 'pending') {
+            uni.showToast({ title: '认证审核中', icon: 'none' });
+            return;
+          }
+          if (status === 'rejected') {
+            uni.showModal({
+              title: '认证未通过',
+              content: '请修改资料后重新提交',
+              confirmText: '去认证',
+              success: (res) => {
+                if (res.confirm) {
+                  uni.navigateTo({ url: '/pages/profile/certification' });
+                }
+              }
+            });
+            return;
+          }
           uni.showModal({
             title: '未认证',
             content: '切换为宠托师身份需要先通过实名认证',
@@ -587,8 +636,8 @@ export const useUserStore = defineStore('user', () => {
       experienceYears: data.experienceYears,
       tags: data.tags,
       bio: data.bio,
-      isCertified: true,
-      certificationStatus: 'verified',
+      isCertified: false,
+      certificationStatus: 'none',
       availability: data.availability
     };
     
@@ -606,7 +655,7 @@ export const useUserStore = defineStore('user', () => {
          experience_years: data.experienceYears,
          tags: data.tags,
          bio: data.bio,
-         is_certified: true,
+         is_certified: false,
          availability: data.availability
        });
        
@@ -851,6 +900,7 @@ export const useUserStore = defineStore('user', () => {
     login,
     logout,
     switchRole,
+    updateProfile,
     updateUser,
     useCoupon,
     addBalance,

@@ -36,13 +36,13 @@
           <view class="stat-item" @click="navigateTo('/pages/wallet/index')">
              <view class="num-row">
                <text class="symbol">¥</text>
-               <text class="num">{{ userInfo?.balance?.toFixed(2) || '0.00' }}</text>
+              <text class="num">{{ displayBalance.toFixed(2) }}</text>
              </view>
-             <text class="label">余额</text>
+             <text class="label">{{ currentRole === 'sitter' ? '收益' : '余额' }}</text>
           </view>
           <view class="stat-item" @click="navigateTo('/pages/wallet/index')">
-            <text class="num">{{ userInfo?.coupons?.length || 0 }}</text>
-            <text class="label">优惠券</text>
+            <text class="num">{{ secondaryStatValue }}</text>
+            <text class="label">{{ currentRole === 'sitter' ? '收益明细' : '优惠券' }}</text>
           </view>
           <view class="stat-item">
             <text class="num">{{ userInfo?.points || 0 }}</text>
@@ -108,7 +108,7 @@
       <view class="menu-item" @click="handleCertificationClick">
         <view class="item-left">
           <text class="icon">🎓</text>
-          <text class="label">{{ isSitter ? '宠托师中心' : '成为宠托师' }}</text>
+          <text class="label">{{ currentRole === 'sitter' ? '宠托师认证' : '成为宠托师' }}</text>
         </view>
         <view class="item-right">
           <text class="status-tag" v-if="certificationStatus === 'verified'">已认证</text>
@@ -155,8 +155,10 @@ const userStore = useUserStore();
 const userInfo = computed(() => userStore.userInfo);
 
 const currentRole = computed(() => userInfo.value?.role || 'owner');
-const isSitter = computed(() => userInfo.value?.sitterProfile?.isCertified);
 const certificationStatus = computed(() => userInfo.value?.sitterProfile?.certificationStatus || 'none');
+const displayBalance = computed(() => currentRole.value === 'sitter' ? (userInfo.value?.laborBalance || 0) : (userInfo.value?.balance || 0));
+const availableCoupons = computed(() => userInfo.value?.coupons?.filter(c => c.status === 'UNUSED') || []);
+const secondaryStatValue = computed(() => currentRole.value === 'sitter' ? '查看' : String(availableCoupons.value.length));
 
 const roleLabel = computed(() => {
   if (currentRole.value === 'sitter') return '宠托师';
@@ -183,7 +185,11 @@ const handleAvatarClick = () => {
 };
 
 const handleCertificationClick = () => {
-  uni.navigateTo({ url: '/pages/profile/certification' });
+  if (currentRole.value === 'sitter') {
+    uni.navigateTo({ url: '/pages/profile/certification' });
+  } else {
+    uni.navigateTo({ url: '/pages/sitter-register/index' });
+  }
 };
 
 const handleLogout = () => {

@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 // 获取环境变量
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL;
+const supabaseAnonKey = (import.meta as any).env.VITE_SUPABASE_ANON_KEY;
 
 // 自定义 Storage Adapter 以支持 Uni-app (非H5环境)
 const UniStorageAdapter = {

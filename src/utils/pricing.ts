@@ -26,7 +26,7 @@ const isHoliday = (dateStr: string): boolean => {
 };
 
 // Check for rush order
-const isRushOrder = (serviceDateStr: string, serviceTimeStr: string): boolean => {
+const isRushOrder = (serviceDateStr: string, serviceTimeStr: string, thresholdHours: number): boolean => {
   // Combine date and time
   // serviceDateStr: YYYY-MM-DD
   // serviceTimeStr: HH:mm or HH:mm-HH:mm
@@ -36,7 +36,7 @@ const isRushOrder = (serviceDateStr: string, serviceTimeStr: string): boolean =>
   const now = Date.now();
   
   const diffHours = (serviceTime - now) / (1000 * 60 * 60);
-  return diffHours > 0 && diffHours < RUSH_THRESHOLD_HOURS;
+  return diffHours > 0 && diffHours < thresholdHours;
 };
 
 export interface PricingParams {
@@ -50,6 +50,7 @@ export interface PricingParams {
     deepClean?: boolean;
     medicine?: boolean;
   };
+  overrides?: PricingOverrides;
 }
 
 export interface PriceBreakdown {
@@ -62,26 +63,45 @@ export interface PriceBreakdown {
   total: number;
 }
 
+export interface PricingOverrides {
+  petSizeCoefficients?: Record<PetSize, number>;
+  addOnPrices?: {
+    PLAY_15_MIN: number;
+    DEEP_CLEAN: number;
+    MEDICINE: number;
+  };
+  holidayMultiplier?: number;
+  rushMultiplier?: number;
+  rushThresholdHours?: number;
+  multiPetDiscount?: number;
+}
+
 /**
  * 计算服务总价
  * 公式: 总价 = (基础服务费 * 宠物系数 * (1 + 时长加价)) * (节日系数) * (急单系数) + 附加费
  * 多宠逻辑: 第一只全价，后续半价
  */
 export function calculateTotalPrice(params: PricingParams): PriceBreakdown {
-  const { basePrice, petSizes, durationMarkup, addOns, serviceDate, serviceTime } = params;
+  const { basePrice, petSizes, durationMarkup, addOns, serviceDate, serviceTime, overrides } = params;
+  const petCoefficients = overrides?.petSizeCoefficients || PET_SIZE_COEFFICIENTS;
+  const addOnPrices = overrides?.addOnPrices || ADD_ON_PRICES;
+  const holidayMultiplier = overrides?.holidayMultiplier ?? HOLIDAY_MULTIPLIER;
+  const rushMultiplier = overrides?.rushMultiplier ?? RUSH_FEE_MULTIPLIER;
+  const rushThresholdHours = overrides?.rushThresholdHours ?? RUSH_THRESHOLD_HOURS;
+  const multiPetDiscount = overrides?.multiPetDiscount ?? MULTI_PET_DISCOUNT;
 
   // 1. 宠物基础费计算 (多宠优惠)
   // Sort sizes by coefficient desc to apply full price to most expensive pet
-  const sortedSizes = [...petSizes].sort((a, b) => PET_SIZE_COEFFICIENTS[b] - PET_SIZE_COEFFICIENTS[a]);
+  const sortedSizes = [...petSizes].sort((a, b) => petCoefficients[b] - petCoefficients[a]);
   
   let petBaseTotal = 0;
   if (sortedSizes.length > 0) {
     // First pet: 100%
-    petBaseTotal += basePrice * PET_SIZE_COEFFICIENTS[sortedSizes[0]];
+    petBaseTotal += basePrice * petCoefficients[sortedSizes[0]];
     
     // Subsequent pets: 50%
     for (let i = 1; i < sortedSizes.length; i++) {
-      petBaseTotal += basePrice * PET_SIZE_COEFFICIENTS[sortedSizes[i]] * MULTI_PET_DISCOUNT;
+      petBaseTotal += basePrice * petCoefficients[sortedSizes[i]] * multiPetDiscount;
     }
   }
 
@@ -94,20 +114,20 @@ export function calculateTotalPrice(params: PricingParams): PriceBreakdown {
   let rushFee = 0;
 
   if (isHoliday(serviceDate)) {
-    holidayFee = priceWithDuration * (HOLIDAY_MULTIPLIER - 1);
+    holidayFee = priceWithDuration * (holidayMultiplier - 1);
   }
 
-  if (isRushOrder(serviceDate, serviceTime)) {
-    rushFee = priceWithDuration * (RUSH_FEE_MULTIPLIER - 1);
+  if (isRushOrder(serviceDate, serviceTime, rushThresholdHours)) {
+    rushFee = priceWithDuration * (rushMultiplier - 1);
   }
   
   const serviceSubtotal = priceWithDuration + holidayFee + rushFee;
 
   // 4. 附加服务 (Per order for now, could be per pet)
   let addOnTotal = 0;
-  if (addOns.play) addOnTotal += ADD_ON_PRICES.PLAY_15_MIN;
-  if (addOns.deepClean) addOnTotal += ADD_ON_PRICES.DEEP_CLEAN;
-  if (addOns.medicine) addOnTotal += ADD_ON_PRICES.MEDICINE;
+  if (addOns.play) addOnTotal += addOnPrices.PLAY_15_MIN;
+  if (addOns.deepClean) addOnTotal += addOnPrices.DEEP_CLEAN;
+  if (addOns.medicine) addOnTotal += addOnPrices.MEDICINE;
 
   // 5. 总价
   const totalRaw = serviceSubtotal + addOnTotal;

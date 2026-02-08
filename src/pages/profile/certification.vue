@@ -88,6 +88,7 @@
 <script setup lang="ts">
 import { ref, computed, reactive } from 'vue';
 import { useUserStore } from '@/stores/user';
+import { supabase } from '@/utils/supabase';
 
 const userStore = useUserStore();
 
@@ -107,7 +108,10 @@ const statusDesc = computed(() => {
   switch (status.value) {
     case 'verified': return '恭喜！您已获得宠托师身份标识，快去接单吧！';
     case 'pending': return '您的资料正在审核中，预计1个工作日内完成';
-    case 'rejected': return '抱歉，您的资料未通过审核，请修改后重新提交';
+    case 'rejected': {
+      const reason = userStore.userInfo?.sitterProfile?.certificationRejectReason;
+      return reason ? `抱歉，您的资料未通过审核，原因：${reason}` : '抱歉，您的资料未通过审核，请修改后重新提交';
+    }
     default: return '';
   }
 });
@@ -147,64 +151,97 @@ const chooseImage = (side: 'front' | 'back') => {
   });
 };
 
-const resetStatus = () => {
-    // In a real app, this would probably reset form fields or fetch reject reason
-    // For now, we just mock resetting the status locally via store update
-    if (userStore.userInfo?.sitterProfile) {
-        userStore.userInfo.sitterProfile.certificationStatus = 'none';
-    }
+const resetStatus = async () => {
+  if (!userStore.userInfo?.id) return;
+  await supabase
+    .from('sitter_profiles')
+    .update({
+      certification_status: 'none',
+      is_certified: false
+    })
+    .eq('user_id', userStore.userInfo.id);
+  if (userStore.userInfo?.sitterProfile) {
+    userStore.userInfo.sitterProfile.certificationStatus = 'none';
+    userStore.userInfo.sitterProfile.isCertified = false;
+  }
 };
 
 const handleBack = () => {
     uni.navigateBack();
 };
 
-const handleSubmit = () => {
+const handleSubmit = async () => {
   if (!canSubmit.value) {
-      if (!isAgreed.value) return uni.showToast({ title: '请先同意入驻协议', icon: 'none' });
-      return uni.showToast({ title: '请完善所有信息', icon: 'none' });
-  }
-  
-  uni.showLoading({ title: '提交中...' });
-  
-  setTimeout(() => {
-    uni.hideLoading();
-    
-    if (userStore.userInfo) {
-      // Ensure sitterProfile structure exists
-      if (!userStore.userInfo.sitterProfile) {
-        userStore.userInfo.sitterProfile = {
-          level: 'BRONZE',
-          completedOrders: 0,
-          rating: 5.0,
-          experienceYears: 0,
-          tags: [],
-          bio: '',
-          isCertified: false,
-          certificationStatus: 'none'
-        };
-      }
-      
-      // Update store with form data
-      const profile = userStore.userInfo.sitterProfile;
-      profile.realName = form.realName;
-      profile.idCard = form.idCard;
-      profile.experienceYears = parseInt(form.experienceYears) || 0;
-      profile.bio = form.bio;
-      profile.certificationStatus = 'pending'; // Set to pending
-      
-      // Simulate auto-approval for demo purposes after a short delay or immediately?
-      // Let's keep it 'pending' to show the state, or verify immediately for better UX in demo.
-      // For this demo, let's Verify Immediately so user can see result.
-      profile.certificationStatus = 'verified'; 
-      profile.isCertified = true;
-      profile.tags = ['经验丰富', '有爱心']; // Mock tags
-
-      userStore.updateUser(userStore.userInfo);
-      
-      uni.showToast({ title: '认证成功', icon: 'success' });
+    if (!isAgreed.value) {
+      uni.showToast({ title: '请先同意入驻协议', icon: 'none' });
+      return;
     }
-  }, 1500);
+    uni.showToast({ title: '请完善所有信息', icon: 'none' });
+    return;
+  }
+  if (!userStore.userInfo) return;
+  uni.showLoading({ title: '提交中...' });
+  try {
+    const userId = userStore.userInfo.id;
+    let frontUrl = form.idCardFront;
+    let backUrl = form.idCardBack;
+    try {
+      const frontRes = await fetch(form.idCardFront);
+      const frontBlob = await frontRes.blob();
+      const { data: upFront } = await supabase.storage.from('evidence').upload(`${userId}/id_front_${Date.now()}.jpg`, frontBlob, { upsert: true });
+      if (upFront?.path) {
+        const { data: pubUrl } = supabase.storage.from('evidence').getPublicUrl(upFront.path);
+        frontUrl = pubUrl.publicUrl || frontUrl;
+      }
+      const backRes = await fetch(form.idCardBack);
+      const backBlob = await backRes.blob();
+      const { data: upBack } = await supabase.storage.from('evidence').upload(`${userId}/id_back_${Date.now()}.jpg`, backBlob, { upsert: true });
+      if (upBack?.path) {
+        const { data: pubUrl2 } = supabase.storage.from('evidence').getPublicUrl(upBack.path);
+        backUrl = pubUrl2.publicUrl || backUrl;
+      }
+    } catch (_) {}
+    await supabase.from('profiles').update({ role: 'sitter' }).eq('id', userId);
+    const { error } = await supabase
+      .from('sitter_profiles')
+      .upsert({
+        user_id: userId,
+        real_name: form.realName,
+        id_card: form.idCard,
+        experience_years: parseInt(form.experienceYears) || 0,
+        bio: form.bio,
+        is_certified: false,
+        certification_status: 'pending',
+        id_card_front: frontUrl,
+        id_card_back: backUrl
+      }, { onConflict: 'user_id' });
+    if (error) throw error;
+    if (!userStore.userInfo.sitterProfile) {
+      userStore.userInfo.sitterProfile = {
+        level: 'BRONZE',
+        completedOrders: 0,
+        rating: 5,
+        experienceYears: 0,
+        tags: [],
+        bio: '',
+        isCertified: false,
+        certificationStatus: 'pending'
+      };
+    }
+    const profile = userStore.userInfo.sitterProfile;
+    profile.realName = form.realName;
+    profile.idCard = form.idCard;
+    profile.experienceYears = parseInt(form.experienceYears) || 0;
+    profile.bio = form.bio;
+    profile.certificationStatus = 'pending';
+    userStore.updateUser(userStore.userInfo);
+    uni.hideLoading();
+    uni.showToast({ title: '已提交，审核中', icon: 'success' });
+    uni.navigateBack();
+  } catch (e) {
+    uni.hideLoading();
+    uni.showToast({ title: '提交失败', icon: 'none' });
+  }
 };
 </script>
 

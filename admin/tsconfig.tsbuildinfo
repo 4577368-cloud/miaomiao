@@ -1,0 +1,1 @@
+{"root":["./src/env.d.ts","./src/main.ts","./src/router/index.ts","./src/utils/supabase.ts","./src/app.vue","./src/components/helloworld.vue","./src/views/couponlist.vue","./src/views/dashboard.vue","./src/views/overview.vue","./src/views/servicelist.vue","./src/views/sitterlist.vue","./src/views/userlist.vue"],"version":"5.9.3"}

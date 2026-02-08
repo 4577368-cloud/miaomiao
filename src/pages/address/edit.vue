@@ -42,7 +42,7 @@
       </view>
       <view class="form-item switch-item">
         <text class="label">设为默认地址</text>
-        <switch :checked="form.isDefault" color="#FF8E3C" @change="e => form.isDefault = e.detail.value" />
+        <switch :checked="form.isDefault" color="#FF8E3C" @change="e => form.isDefault = (e as any).detail.value" />
       </view>
     </view>
     

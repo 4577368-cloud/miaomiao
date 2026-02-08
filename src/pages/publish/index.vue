@@ -303,7 +303,7 @@
           <view class="grid-overlay" v-if="selectedPetIds.length > 0"></view>
           
           <view 
-            v-for="size in petSizes" 
+            v-for="size in petSizeOptions" 
             :key="size.value"
             :class="['pet-card', { active: form.petSize === size.value }]"
             @click="selectedPetIds.length === 0 && (form.petSize = size.value)"
@@ -355,7 +355,7 @@
           >
             <view class="addon-info">
               <text class="addon-name">陪玩15分钟</text>
-              <text class="addon-price">+¥{{ ADD_ON_PRICES.PLAY_15_MIN }}</text>
+              <text class="addon-price">+¥{{ addOnPrices.PLAY_15_MIN }}</text>
             </view>
             <view class="checkbox" :class="{ checked: form.addOns.play }"></view>
           </view>
@@ -366,7 +366,7 @@
           >
             <view class="addon-info">
               <text class="addon-name">深度清洁</text>
-              <text class="addon-price">+¥{{ ADD_ON_PRICES.DEEP_CLEAN }}</text>
+              <text class="addon-price">+¥{{ addOnPrices.DEEP_CLEAN }}</text>
             </view>
             <view class="checkbox" :class="{ checked: form.addOns.deepClean }"></view>
           </view>
@@ -377,7 +377,7 @@
           >
             <view class="addon-info">
               <text class="addon-name">喂药服务</text>
-              <text class="addon-price">+¥{{ ADD_ON_PRICES.MEDICINE }}</text>
+              <text class="addon-price">+¥{{ addOnPrices.MEDICINE }}</text>
             </view>
             <view class="checkbox" :class="{ checked: form.addOns.medicine }"></view>
           </view>
@@ -582,16 +582,18 @@
 import CustomTabBar from '@/components/custom-tab-bar/index.vue';
 import { reactive, computed, ref, onUnmounted } from 'vue';
 import { onLoad, onShow } from '@dcloudio/uni-app';
-import { PetSize, ServiceType, ADD_ON_PRICES, PET_SIZE_COEFFICIENTS } from '@/constants/pet';
+import { PetSize, ServiceType } from '@/constants/pet';
 import { calculateTotalPrice, type PriceBreakdown } from '@/utils/pricing';
 import { useOrderStore } from '@/stores/order';
 import { useUserStore, type PetInfo, type Address } from '@/stores/user';
 import { useSitterStore } from '@/stores/sitter';
+import { useConfigStore } from '@/stores/config';
 
 const orderStore = useOrderStore();
 const userStore = useUserStore();
 const sitterStore = useSitterStore();
-const BASE_PRICE = 50; 
+const configStore = useConfigStore();
+const fallbackBasePrice = 50; 
 
 // OWNER LOGIC
 const selectedPetIds = ref<string[]>([]);
@@ -601,6 +603,25 @@ const lastPetCount = ref(0);
 const showSitterSelector = ref(false);
 
 const availableSitters = computed(() => sitterStore.availableSitters);
+const addOnPrices = computed(() => configStore.getAddOnPrices());
+const basePrice = computed(() => {
+  const price = configStore.getServicePrice(form.serviceType);
+  return price > 0 ? price : fallbackBasePrice;
+});
+const petSizeOptions = computed(() => [
+  { value: PetSize.CAT, label: '猫咪', desc: '不限体重', coeff: configStore.getPetSizeCoefficient(PetSize.CAT), image: '/static/avatars/cat-british.jpg' },
+  { value: PetSize.SMALL, label: '小型犬', desc: '<10kg', coeff: configStore.getPetSizeCoefficient(PetSize.SMALL), image: '/static/avatars/dog-small.jpg' },
+  { value: PetSize.MEDIUM, label: '中型犬', desc: '10-25kg', coeff: configStore.getPetSizeCoefficient(PetSize.MEDIUM), image: '/static/avatars/dog-corgi.jpg' },
+  { value: PetSize.LARGE, label: '大型犬', desc: '>25kg', coeff: configStore.getPetSizeCoefficient(PetSize.LARGE), image: '/static/avatars/dog-golden.jpg' }
+]);
+const pricingOverrides = computed(() => ({
+  petSizeCoefficients: configStore.getPetSizeCoefficients(),
+  addOnPrices: addOnPrices.value,
+  holidayMultiplier: configStore.getHolidayMultiplier(),
+  rushMultiplier: configStore.getRushMultiplier(),
+  rushThresholdHours: configStore.getRushThresholdHours(),
+  multiPetDiscount: configStore.getMultiPetDiscount()
+}));
 
 const form = reactive({
   targetSitterId: undefined as string | undefined,
@@ -785,13 +806,6 @@ const selectMyPet = (pet: PetInfo) => {
    }
 };
 
-const petSizes = [
-  { value: PetSize.CAT, label: '猫咪', desc: '不限体重', coeff: PET_SIZE_COEFFICIENTS[PetSize.CAT], image: '/static/avatars/cat-british.jpg' },
-  { value: PetSize.SMALL, label: '小型犬', desc: '<10kg', coeff: PET_SIZE_COEFFICIENTS[PetSize.SMALL], image: '/static/avatars/dog-small.jpg' },
-  { value: PetSize.MEDIUM, label: '中型犬', desc: '10-25kg', coeff: PET_SIZE_COEFFICIENTS[PetSize.MEDIUM], image: '/static/avatars/dog-corgi.jpg' },
-  { value: PetSize.LARGE, label: '大型犬', desc: '>25kg', coeff: PET_SIZE_COEFFICIENTS[PetSize.LARGE], image: '/static/avatars/dog-golden.jpg' }
-];
-
 // Duration
 const durations = [
   { value: 30, markup: 0 },
@@ -848,12 +862,13 @@ const priceBreakdown = computed(() => {
   const serviceDate = form.date.split(' ')[0] || new Date().toISOString().split('T')[0];
 
   return calculateTotalPrice({
-    basePrice: BASE_PRICE,
+    basePrice: basePrice.value,
     petSizes: petSizes,
     durationMarkup: durations.find(d => d.value === form.duration)?.markup || 0,
     serviceDate: serviceDate,
     serviceTime: form.time || '12:00',
-    addOns: form.addOns
+    addOns: form.addOns,
+    overrides: pricingOverrides.value
   });
 });
 
@@ -928,11 +943,12 @@ onLoad((options: any) => {
   }
 });
 
-onShow(() => {
+onShow(async () => {
   if (!userStore.isLoggedIn) {
     uni.reLaunch({ url: '/pages/login/index' });
     return;
   }
+  await configStore.initConfig(true);
   
   // Sitter Mode Check
   if (userStore.userInfo?.role === 'sitter') {

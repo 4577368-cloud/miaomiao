@@ -201,7 +201,8 @@ const userInfo = reactive<UserInfo>({
   id: '',
   nickname: getRandomNickname(),
   avatar: 'https://img.yzcdn.cn/vant/cat.jpeg',
-  role: 'owner'
+  role: 'owner',
+  joinDate: Date.now()
 });
 
 const showAvatarPopup = ref(false);

@@ -432,6 +432,19 @@ const handleAcceptOrder = async (orderId: string) => {
   }
   
   if (!userStore.userInfo) return;
+  if (!userStore.userInfo.sitterProfile?.isCertified) {
+    uni.showModal({
+      title: '未认证',
+      content: '完成宠托师认证后才能接单',
+      confirmText: '去认证',
+      success: (res) => {
+        if (res.confirm) {
+          uni.navigateTo({ url: '/pages/profile/certification' });
+        }
+      }
+    });
+    return;
+  }
 
   if (await orderStore.acceptOrder(orderId, userStore.userInfo)) {
     uni.showToast({

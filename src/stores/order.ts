@@ -168,7 +168,7 @@ export const useOrderStore = defineStore('order', () => {
          const updatedOrder = mapDbOrderToLocal(newRecord);
          
          // Sitter Logic: If order is taken by someone else, remove it from my list
-         if (userStore.userInfo.role === 'sitter' && 
+        if (userStore.userInfo?.role === 'sitter' && 
              newRecord.sitter_id && 
              newRecord.sitter_id !== userId) {
             orders.value.splice(index, 1);
@@ -187,7 +187,7 @@ export const useOrderStore = defineStore('order', () => {
           if (!orders.value.some(o => o.id === newRecord.id)) {
              orders.value.unshift(mapDbOrderToLocal(newRecord));
           }
-       } else if (userStore.userInfo.role === 'sitter' && newRecord.status === 'PENDING' && !newRecord.sitter_id) {
+       } else if (userStore.userInfo?.role === 'sitter' && newRecord.status === 'PENDING' && !newRecord.sitter_id) {
           orders.value.unshift(mapDbOrderToLocal(newRecord));
        }
     }
@@ -345,6 +345,7 @@ export const useOrderStore = defineStore('order', () => {
   };
 
   const acceptOrder = async (orderId: string, sitterInfo: UserInfo) => {
+    if (!sitterInfo.sitterProfile?.isCertified) return false;
     const { error } = await supabase
         .from('orders')
         .update({
@@ -443,24 +444,39 @@ export const useOrderStore = defineStore('order', () => {
       return true;
   };
 
+  const updateOrderStatus = async (orderId: string, status: Order['status']) => {
+      const { error } = await supabase
+        .from('orders')
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq('id', orderId);
+
+      if (error) return false;
+
+      const orderIndex = orders.value.findIndex(o => o.id === orderId);
+      if (orderIndex > -1) {
+          orders.value[orderIndex].status = status;
+          uni.setStorageSync('miaomiao_orders', JSON.stringify(orders.value));
+      }
+      return true;
+  };
+
   // Reviews - Simplified (Keep local for now or implement full DB)
   // Since we have 'reviews' table, we should insert there.
   const submitOwnerReview = async (orderId: string, rating: number, content: string) => {
-     // TODO: Insert into reviews table
-     // Update Order status
      const { error } = await supabase
         .from('orders')
         .update({ status: 'REVIEWED' })
         .eq('id', orderId);
         
-     if (!error) {
-         const idx = orders.value.findIndex(o => o.id === orderId);
-         if (idx > -1) {
-             orders.value[idx].status = 'REVIEWED';
-             orders.value[idx].review = { rating, content, createdAt: Date.now() };
-             uni.setStorageSync('miaomiao_orders', JSON.stringify(orders.value));
-         }
+     if (error) throw error;
+     
+     const idx = orders.value.findIndex(o => o.id === orderId);
+     if (idx > -1) {
+         orders.value[idx].status = 'REVIEWED';
+         orders.value[idx].review = { rating, content, createdAt: Date.now() };
+         uni.setStorageSync('miaomiao_orders', JSON.stringify(orders.value));
      }
+     return true;
   };
 
   const submitSitterReview = async (orderId: string, rating: number, content: string, tags: string[] = []) => {
@@ -471,6 +487,12 @@ export const useOrderStore = defineStore('order', () => {
           orders.value[idx].sitterReview = { rating, content, tags, createdAt: Date.now() };
           uni.setStorageSync('miaomiao_orders', JSON.stringify(orders.value));
       }
+  };
+
+  const completeOrder = async (orderId: string, evidence: { photos: string[], items?: string[], confirmedAt: number }) => {
+      const updated = await updateOrderEvidence(orderId, evidence);
+      if (!updated) return false;
+      return await completeService(orderId);
   };
 
   const updateOrderEvidence = async (orderId: string, evidence: { photos: string[], items?: string[], confirmedAt: number }) => {
@@ -489,7 +511,7 @@ export const useOrderStore = defineStore('order', () => {
 
      const idx = orders.value.findIndex(o => o.id === orderId);
      if (idx > -1) {
-         orders.value[idx].serviceEvidence = evidence;
+         orders.value[idx].serviceEvidence = { photos: evidence.photos, items: evidence.items || [], confirmedAt: evidence.confirmedAt };
          uni.setStorageSync('miaomiao_orders', JSON.stringify(orders.value));
      }
      return true;
@@ -510,6 +532,8 @@ export const useOrderStore = defineStore('order', () => {
     submitOwnerReview,
     submitSitterReview,
     cancelOrder,
+    updateOrderStatus,
+    completeOrder,
     payOrder,
     subscribeToOrders,
     unsubscribeFromOrders

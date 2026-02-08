@@ -26,7 +26,7 @@
           <text class="label">养宠经验 (年)</text>
           <slider 
             :value="form.experienceYears" 
-            @change="e => form.experienceYears = e.detail.value" 
+            @change="form.experienceYears = ($event as any).detail.value" 
             min="0" max="20" show-value 
             activeColor="#FF8E3C"
           />
@@ -164,10 +164,10 @@ const handleSubmit = () => {
     availability: form.availability
   });
 
-  uni.showToast({ title: '认证通过，身份已切换', icon: 'success' });
+  uni.showToast({ title: '资料已提交，请完成认证', icon: 'success' });
   
   setTimeout(() => {
-    uni.switchTab({ url: '/pages/home/index' });
+    uni.navigateTo({ url: '/pages/profile/certification' });
   }, 1500);
 };
 </script>

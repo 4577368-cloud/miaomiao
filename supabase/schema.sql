@@ -18,12 +18,18 @@ create table public.sitter_profiles (
   user_id uuid references public.profiles(id) primary key,
   real_name text,
   id_card text,
+  id_card_front text,
+  id_card_back text,
   level text default 'BRONZE',
   rating decimal(3, 1) default 5.0,
   experience_years int default 0,
   bio text,
   tags text[], -- Array of strings
   is_certified boolean default false,
+  certification_status text default 'none',
+  certification_reject_reason text,
+  certification_submitted_at timestamptz,
+  certification_reviewed_at timestamptz,
   availability jsonb, -- { time: string, services: string[] }
   created_at timestamptz default now(),
   updated_at timestamptz default now()

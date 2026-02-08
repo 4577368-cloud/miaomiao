@@ -233,7 +233,7 @@
             @click="handleCompleteService"
         >完成服务</button>
         <view v-if="order.status === 'COMPLETED' || order.status === 'REVIEWED'" class="completed-actions">
-            <text class="completed-text">收益已到账</text>
+            <text class="completed-text" @click="goToWallet">收益已到账</text>
             <button 
                 class="btn btn-outline small" 
                 v-if="!order.sitterReview"
@@ -346,7 +346,7 @@ const orderStore = useOrderStore();
 const userStore = useUserStore();
 const orderId = ref('');
 const order = computed(() => orderStore.orders.find(o => o.id === orderId.value) || null);
-const timer = ref<number | null>(null);
+const timer = ref<ReturnType<typeof setInterval> | null>(null);
 const countdown = ref('');
 
 // Watch for status changes to handle timer
@@ -457,12 +457,25 @@ const handleUploadEvidence = () => {
 
 const handleAccept = () => {
     if (!order.value || !userStore.userInfo) return;
+    if (!userStore.userInfo.sitterProfile?.isCertified) {
+        uni.showModal({
+            title: '未认证',
+            content: '完成宠托师认证后才能接单',
+            confirmText: '去认证',
+            success: (res) => {
+                if (res.confirm) {
+                    uni.navigateTo({ url: '/pages/profile/certification' });
+                }
+            }
+        });
+        return;
+    }
     uni.showModal({
         title: '确认抢单',
         content: '确定要接下这个订单吗？',
-        success: (res) => {
+        success: async (res) => {
             if (res.confirm) {
-                if (orderStore.acceptOrder(order.value!.id, userStore.userInfo!)) {
+                if (await orderStore.acceptOrder(order.value!.id, userStore.userInfo!)) {
                     uni.showToast({ title: '抢单成功' });
                     
                 } else {
@@ -477,10 +490,10 @@ const handleStartService = () => {
     if (!order.value) return;
     uni.showLoading({ title: '定位打卡中...' });
     // Mock Location Check
-    setTimeout(() => {
+    setTimeout(async () => {
         uni.hideLoading();
         // Simulate checking if location matches (mock success)
-        if (orderStore.startService(order.value!.id)) {
+        if (await orderStore.startService(order.value!.id)) {
              uni.showToast({ title: '已开启服务' });
              
         } else {
@@ -500,9 +513,9 @@ const handleCompleteService = () => {
     uni.showModal({
         title: '确认完成',
         content: '确认服务已完成并通知主人？',
-        success: (res) => {
+        success: async (res) => {
             if (res.confirm) {
-                if (orderStore.completeService(order.value!.id)) {
+                if (await orderStore.completeService(order.value!.id)) {
                     uni.showToast({ title: '订单完成，收益已到账' });
                     
                 }
@@ -516,10 +529,10 @@ const handleCancel = () => {
     uni.showModal({
         title: '取消订单',
         content: '确定要取消吗？',
-        success: (res) => {
+        success: async (res) => {
             if (res.confirm) {
                 const role = isOwner.value ? 'owner' : 'sitter';
-                if (orderStore.cancelOrder(order.value!.id, role)) {
+                if (await orderStore.cancelOrder(order.value!.id, role)) {
                     uni.showToast({ title: '已取消' });
                     uni.navigateBack();
                 } else {
@@ -578,16 +591,26 @@ const closeOwnerReviewModal = () => {
     ownerReviewContent.value = '';
 };
 
-const submitOwnerReview = () => {
+const submitOwnerReview = async () => {
     if (!order.value) return;
-    orderStore.submitOwnerReview(
-        order.value.id, 
-        ownerReviewRating.value, 
-        ownerReviewContent.value
-    );
-    uni.showToast({ title: '评价成功' });
-    closeOwnerReviewModal();
-    
+    uni.showLoading({ title: '提交中...' });
+    try {
+        await orderStore.submitOwnerReview(
+            order.value.id, 
+            ownerReviewRating.value, 
+            ownerReviewContent.value
+        );
+        uni.hideLoading();
+        uni.showToast({ title: '评价成功' });
+        closeOwnerReviewModal();
+    } catch (e) {
+        uni.hideLoading();
+        uni.showToast({ title: '评价失败，请稍后重试', icon: 'none' });
+    }
+};
+
+const goToWallet = () => {
+  uni.navigateTo({ url: '/pages/wallet/index' });
 };
 
 const previewImage = (index: number) => {
@@ -1089,5 +1112,48 @@ const formatTime = (time: number | string) => {
       font-size: 28rpx;
       font-weight: 500;
   }
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  animation: fadeIn 0.2s forwards;
+}
+
+.modal-content {
+  width: 600rpx;
+  background: #fff;
+  border-radius: $radius-lg;
+  overflow: hidden;
+  transform: scale(0.9);
+  animation: scaleIn 0.2s forwards;
+  box-shadow: $shadow-lg;
+}
+
+.review-modal {
+  padding: 40rpx 30rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.9); }
+  to { transform: scale(1); }
 }
 </style>
