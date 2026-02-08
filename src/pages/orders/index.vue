@@ -16,126 +16,218 @@
         <text class="banner-count">{{ bannerMessages.length }}</text>
       </view>
     </view>
-    <!-- 顶部固定 Tabs -->
-    <view class="tabs-wrapper">
-      <view class="tabs">
-        <view 
-          v-for="(tab, index) in currentTabs" 
-          :key="index"
-          class="tab-item"
-          :class="{ active: currentTab === index }"
-          @click="currentTab = index"
-        >
-          <text class="tab-text">{{ tab.label }}</text>
-          <view class="tab-line" v-if="currentTab === index"></view>
+    <view class="view-switch">
+      <view class="switch-item" :class="{ active: viewMode === 'list' }" @click="viewMode = 'list'">列表</view>
+      <view class="switch-item" :class="{ active: viewMode === 'calendar' }" @click="viewMode = 'calendar'">日历</view>
+    </view>
+    
+    <view v-if="viewMode === 'calendar'" class="calendar-wrapper">
+      <view class="calendar-panel">
+        <view class="calendar-header">
+          <text class="calendar-nav" @click="changeCalendarMonth(-1)">‹</text>
+          <text class="calendar-title">{{ calendarTitle }}</text>
+          <text class="calendar-nav" @click="changeCalendarMonth(1)">›</text>
         </view>
+        <view class="calendar-week">
+          <text v-for="d in calendarWeekDays" :key="d" class="week-item">{{ d }}</text>
+        </view>
+        <view class="calendar-grid">
+          <view 
+            v-for="day in calendarDays" 
+            :key="day.key"
+            class="calendar-day"
+            :class="{
+              out: !day.inMonth,
+              selected: day.key === selectedDateKey,
+              has: day.orders.length > 0
+            }"
+            @click="selectCalendarDay(day)"
+          >
+            <text class="day-num">{{ day.date.getDate() }}</text>
+            <view class="day-orders" v-if="day.orders.length > 0">
+              <view 
+                v-for="(order, idx) in day.orders" 
+                :key="order.id"
+                class="day-order"
+                :class="getOrderStatusClass(order)"
+                @click.stop="showCalendarOrderPopup(order)"
+              >
+                <text class="line-text">{{ getOrderLine(order) }}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+      
+      <view class="calendar-detail">
+        <view class="detail-header">
+          <text class="detail-date">{{ selectedDateKey || '请选择日期' }}</text>
+          <text class="detail-count">{{ selectedDayOrders.length }}单</text>
+        </view>
+        <view v-if="selectedDayOrders.length > 0" class="detail-list">
+          <view class="detail-card" v-for="order in selectedDayOrders" :key="order.id">
+            <view class="detail-main" @click="focusOrderFromCalendar(order.id)">
+              <view class="detail-title">
+                <view class="service-tag" :class="order.serviceType">{{ formatServiceType(order.serviceType) }}</view>
+                <text class="status-text" :class="order.status.toLowerCase()">{{ formatStatus(order.status) }}</text>
+              </view>
+              <text class="detail-time">{{ formatTime(order.time) }}</text>
+              <text class="detail-pets">{{ formatPetsMain(order) }}</text>
+              <text class="detail-address">{{ order.address }}</text>
+            </view>
+            <view class="detail-evidence" v-if="order.serviceEvidence?.photos?.length || order.serviceEvidence?.items?.length">
+              <text class="detail-sub">服务完成内容</text>
+              <view class="evidence-items" v-if="order.serviceEvidence?.items?.length">
+                <text class="evidence-tag" v-for="item in order.serviceEvidence.items" :key="item">{{ item }}</text>
+              </view>
+              <view class="evidence-photos" v-if="order.serviceEvidence?.photos?.length">
+                <image 
+                  v-for="(p, i) in order.serviceEvidence.photos.slice(0, 4)" 
+                  :key="p + i"
+                  :src="p"
+                  class="evidence-photo"
+                  mode="aspectFill"
+                  @click.stop="previewEvidence(order, i)"
+                />
+              </view>
+            </view>
+            <view class="detail-pending" v-else>
+              <text class="pending-text">待服务</text>
+            </view>
+          </view>
+        </view>
+        <view v-else class="calendar-empty">该日期暂无订单</view>
       </view>
     </view>
     
-    <!-- 订单列表 -->
-    <view class="order-list">
-      <view v-if="filteredOrders.length > 0" class="list-content">
-        <view class="order-card" v-for="order in filteredOrders" :key="order.id" @click="goToDetail(order.id)">
-          <!-- 卡片头部：状态与服务类型 -->
-          <view class="card-header">
-            <view class="header-left">
-              <view class="service-tag" :class="order.serviceType">
-                {{ formatServiceType(order.serviceType) }}
-              </view>
-              <text class="order-time">{{ formatTime(order.time) }}</text>
-            </view>
-            <view class="header-right">
-              <text class="status-text" :class="order.status.toLowerCase()">
-                {{ formatStatus(order.status) }}
-              </text>
-            </view>
-          </view>
-          
-          <!-- 分割线 -->
-          <view class="divider"></view>
-
-          <!-- 卡片内容 -->
-          <view class="card-body">
-            <!-- 宠物信息 -->
-            <view class="info-row">
-              <view class="label-box">
-                <text class="icon">🐾</text>
-                <text class="label">宠物</text>
-              </view>
-              <view class="content-box">
-                <text class="main-text">{{ order.petName }}</text>
-                <text class="sub-text">{{ order.petBreed }} · {{ order.petAge }}岁 · {{ order.petGender === 'male' ? '弟弟' : '妹妹' }}</text>
-              </view>
-            </view>
-
-            <!-- 服务内容 (新增) -->
-            <view class="info-row">
-              <view class="label-box">
-                <text class="icon">🏷️</text>
-                <text class="label">服务</text>
-              </view>
-              <view class="content-box">
-                <text class="main-text">{{ getServiceSummary(order) }}</text>
-              </view>
-            </view>
-
-            <!-- 地址信息 -->
-            <view class="info-row">
-              <view class="label-box">
-                <text class="icon">📍</text>
-                <text class="label">地址</text>
-              </view>
-              <view class="content-box">
-                <text class="main-text address">
-                  {{ order.address }}
-                </text>
-                <text class="distance-tag" v-if="!isOwner && order.distance">{{ formatDistance(order.distance) }}</text>
-              </view>
-            </view>
-
-            <!-- 服务人员 (仅显示) -->
-            <view class="info-row" v-if="isOwner && order.sitterId && order.status !== 'PENDING'">
-               <view class="label-box">
-                <text class="icon">👤</text>
-                <text class="label">宠托师</text>
-              </view>
-              <view class="content-box sitter-row" @click.stop="showSitterProfile(order)">
-                <text class="main-text">{{ getSitterName(order) }}</text>
-                <view class="level-tag" :class="getSitterLevelClass(order)">{{ getSitterLevelText(order) }}</view>
-                <text class="arrow">></text>
-              </view>
-            </view>
-          </view>
-          
-          <!-- 卡片底部：价格与操作 -->
-          <view class="card-footer">
-            <view class="price-section">
-              <text class="currency">¥</text>
-              <text class="amount">{{ formatPrice(order.totalPrice) }}</text>
-            </view>
-            <view class="action-group">
-              <!-- 铲屎官视角 -->
-              <template v-if="isOwner">
-                <button class="action-btn outline" v-if="order.status === 'PENDING'" @click.stop="handleCancel(order)">取消订单</button>
-                <button class="action-btn primary" v-if="order.status === 'UNPAID'" @click.stop="handlePay(order)">去支付</button>
-                <button class="action-btn primary" v-if="order.status === 'ACCEPTED'" @click.stop="handleConfirmStart(order)">确认开始</button>
-                <button class="action-btn primary" v-if="order.status === 'IN_SERVICE'" @click.stop="handleConfirmComplete(order)">确认完成</button>
-                <button class="action-btn outline" v-if="order.status === 'COMPLETED'" @click.stop="openReviewModal(order)">去评价</button>
-                <button class="action-btn outline" v-if="['COMPLETED', 'REVIEWED'].includes(order.status)" @click.stop="handleReorder(order)">再来一单</button>
-</template>
-              
-              <!-- 宠托师视角 -->
-              <template v-else>
-                <button class="action-btn primary" v-if="order.status === 'PENDING_ACCEPTANCE'" @click.stop="handleSitterAccept(order)">确认接单</button>
-                <button class="action-btn outline" v-if="order.status === 'PENDING_ACCEPTANCE'" @click.stop="handleSitterReject(order)">婉拒</button>
-                <button class="action-btn primary" v-if="order.status === 'ACCEPTED'" @click.stop="handleStartService(order)">开始服务</button>
-                <button class="action-btn primary" v-if="order.status === 'IN_SERVICE'" @click.stop="handleCompleteService(order)">完成服务</button>
-                <button class="action-btn outline" v-if="order.status === 'COMPLETED'" @click.stop="handleInviteReview(order)">邀请评价</button>
-              </template>
-            </view>
+    <view v-else>
+      <!-- 顶部固定 Tabs -->
+      <view class="tabs-wrapper">
+        <view class="tabs">
+          <view 
+            v-for="(tab, index) in currentTabs" 
+            :key="index"
+            class="tab-item"
+            :class="{ active: currentTab === index }"
+            @click="currentTab = index"
+          >
+            <text class="tab-text">{{ tab.label }}</text>
+            <view class="tab-line" v-if="currentTab === index"></view>
           </view>
         </view>
       </view>
+      
+      <!-- 订单列表 -->
+      <view class="order-list">
+        <view v-if="filteredOrders.length > 0" class="list-content">
+          <view 
+            class="order-card" 
+            v-for="order in filteredOrders" 
+            :key="order.id" 
+            :id="`order-${order.id}`"
+            :class="{ highlight: highlightOrderId === order.id }"
+            @click="goToDetail(order.id)"
+          >
+            <!-- 卡片头部：状态与服务类型 -->
+            <view class="card-header">
+              <view class="header-left">
+                <view class="service-tag" :class="order.serviceType">
+                  {{ formatServiceType(order.serviceType) }}
+                </view>
+                <text class="order-time">{{ formatTime(order.time) }}</text>
+              </view>
+              <view class="header-right">
+                <text class="status-text" :class="order.status.toLowerCase()">
+                  {{ formatStatus(order.status) }}
+                </text>
+              </view>
+            </view>
+            
+            <!-- 分割线 -->
+            <view class="divider"></view>
+
+            <!-- 卡片内容 -->
+            <view class="card-body">
+              <!-- 宠物信息 -->
+              <view class="info-row">
+                <view class="label-box">
+                  <text class="icon">🐾</text>
+                  <text class="label">宠物</text>
+                </view>
+                <view class="content-box">
+                  <text class="main-text">{{ formatPetsMain(order) }}</text>
+                  <text class="sub-text">{{ formatPetsSub(order) }}</text>
+                </view>
+              </view>
+
+              <!-- 服务内容 (新增) -->
+              <view class="info-row">
+                <view class="label-box">
+                  <text class="icon">🏷️</text>
+                  <text class="label">服务</text>
+                </view>
+                <view class="content-box">
+                  <text class="main-text">{{ getServiceSummary(order) }}</text>
+                </view>
+              </view>
+
+              <!-- 地址信息 -->
+              <view class="info-row">
+                <view class="label-box">
+                  <text class="icon">📍</text>
+                  <text class="label">地址</text>
+                </view>
+                <view class="content-box">
+                  <text class="main-text address">
+                    {{ order.address }}
+                  </text>
+                  <text class="distance-tag" v-if="!isOwner && order.distance">{{ formatDistance(order.distance) }}</text>
+                </view>
+              </view>
+
+              <!-- 服务人员 (仅显示) -->
+              <view class="info-row" v-if="isOwner && order.sitterId && order.status !== 'PENDING'">
+                <view class="label-box">
+                  <text class="icon">👤</text>
+                  <text class="label">宠托师</text>
+                </view>
+                <view class="content-box sitter-row" @click.stop="showSitterProfile(order)">
+                  <text class="main-text">{{ getSitterName(order) }}</text>
+                  <view class="level-tag" :class="getSitterLevelClass(order)">{{ getSitterLevelText(order) }}</view>
+                  <text class="arrow">></text>
+                </view>
+              </view>
+            </view>
+            
+            <!-- 卡片底部：价格与操作 -->
+            <view class="card-footer">
+              <view class="price-section">
+                <text class="currency">¥</text>
+                <text class="amount">{{ formatPrice(order.totalPrice) }}</text>
+              </view>
+              <view class="action-group">
+                <!-- 铲屎官视角 -->
+                <template v-if="isOwner">
+                  <button class="action-btn outline" v-if="order.status === 'PENDING'" @click.stop="handleCancel(order)">取消订单</button>
+                  <button class="action-btn primary" v-if="order.status === 'UNPAID'" @click.stop="handlePay(order)">去支付</button>
+                  <button class="action-btn primary" v-if="order.status === 'ACCEPTED'" @click.stop="handleConfirmStart(order)">确认开始</button>
+                  <button class="action-btn primary" v-if="order.status === 'IN_SERVICE'" @click.stop="handleConfirmComplete(order)">确认完成</button>
+                  <button class="action-btn outline" v-if="order.status === 'COMPLETED'" @click.stop="openReviewModal(order)">去评价</button>
+                  <button class="action-btn outline" v-if="['COMPLETED', 'REVIEWED'].includes(order.status)" @click.stop="handleReorder(order)">再来一单</button>
+                </template>
+                
+                <!-- 宠托师视角 -->
+                <template v-else>
+                  <button class="action-btn primary" v-if="order.status === 'PENDING_ACCEPTANCE'" @click.stop="handleSitterAccept(order)">确认接单</button>
+                  <button class="action-btn outline" v-if="order.status === 'PENDING_ACCEPTANCE'" @click.stop="handleSitterReject(order)">婉拒</button>
+                  <button class="action-btn primary" v-if="order.status === 'ACCEPTED'" @click.stop="handleStartService(order)">开始服务</button>
+                  <button class="action-btn primary" v-if="order.status === 'IN_SERVICE'" @click.stop="handleCompleteService(order)">完成服务</button>
+                  <button class="action-btn outline" v-if="order.status === 'COMPLETED'" @click.stop="handleInviteReview(order)">邀请评价</button>
+                </template>
+              </view>
+            </view>
+          </view>
+        </view>
       
       <!-- 空状态 -->
       <view v-else class="empty-state">
@@ -143,6 +235,28 @@
         <text class="empty-text">暂无相关订单</text>
         <button class="btn-publish" @click="goToPublish" v-if="isOwner">去发布任务</button>
         <button class="btn-publish" @click="goToHall" v-else>去接单</button>
+      </view>
+    </view>
+    </view>
+
+    <view class="modal-overlay" v-if="showReminderModal" @click="closeReminderModal">
+      <view class="modal-content reminder-modal" @click.stop>
+        <view class="modal-header">
+          <text class="title">服务提醒</text>
+          <text class="close-btn" @click="closeReminderModal">×</text>
+        </view>
+        <view class="reminder-body">
+          <text class="reminder-text">距离服务时间还有30分钟</text>
+          <text class="reminder-sub" v-if="reminderOrder">{{ formatTime(reminderOrder.time) }}</text>
+        </view>
+        <view class="reminder-actions">
+          <button class="action-btn outline" @click="setReminderResponse('ack')">已知晓</button>
+          <button class="action-btn primary" @click="setReminderResponse('ontime')">准时服务</button>
+        </view>
+        <view class="reminder-delay">
+          <input class="delay-input" type="number" v-model="delayMinutes" placeholder="预计延期分钟数" />
+          <button class="action-btn outline" @click="submitDelay">预计延期</button>
+        </view>
       </view>
     </view>
 
@@ -251,6 +365,38 @@
         </view>
       </view>
     </view>
+    <!-- Calendar Order Popup -->
+    <view class="modal-overlay" v-if="showCalendarPopup" @click="closeCalendarOrderPopup">
+       <view class="modal-content calendar-popup" @click.stop>
+          <view class="modal-header">
+             <text class="title">订单详情</text>
+             <text class="close-btn" @click="closeCalendarOrderPopup">×</text>
+          </view>
+          <view class="popup-body" v-if="selectedCalendarOrder">
+             <view class="info-row">
+                <text class="label">服务类型：</text>
+                <view class="service-tag" :class="selectedCalendarOrder.serviceType">{{ formatServiceType(selectedCalendarOrder.serviceType) }}</view>
+             </view>
+             <view class="info-row">
+                <text class="label">当前状态：</text>
+                <text class="status-text" :class="selectedCalendarOrder.status.toLowerCase()">{{ formatStatus(selectedCalendarOrder.status) }}</text>
+             </view>
+             <view class="info-row">
+                <text class="label">服务时间：</text>
+                <text class="val">{{ formatTime(selectedCalendarOrder.time) }}</text>
+             </view>
+             <view class="info-row">
+                <text class="label">服务对象：</text>
+                <text class="val">{{ formatPetsMain(selectedCalendarOrder) }}</text>
+             </view>
+             <view class="info-row">
+                <text class="label">服务地址：</text>
+                <text class="val">{{ selectedCalendarOrder.address }}</text>
+             </view>
+             <button class="btn-primary block" @click="jumpToOrderHighlight(selectedCalendarOrder.id)">查看完整详情</button>
+          </view>
+       </view>
+    </view>
     <view style="height: 50px;"></view>
     <CustomTabBar current-path="pages/orders/index" />
   </view>
@@ -259,7 +405,7 @@
 <script setup lang="ts">
 import CustomTabBar from '@/components/custom-tab-bar/index.vue';
 // Force rebuild
-import { ref, computed } from 'vue';
+import { ref, computed, nextTick } from 'vue';
 import { onShow, onHide, onUnload } from '@dcloudio/uni-app';
 import { useOrderStore, type Order } from '@/stores/order';
 import { useUserStore, type UserInfo } from '@/stores/user';
@@ -277,7 +423,34 @@ const tempTasks = ref<string[]>(['feed', 'clean']);
 const foldedOrders = ref<Record<string, boolean>>({});
 const countdowns = ref<Record<string, string>>({});
 let timer: ReturnType<typeof setInterval> | null = null;
+let reminderTimer: ReturnType<typeof setInterval> | null = null;
 const bannerMessages = ref<any[]>([]);
+const viewMode = ref<'list' | 'calendar'>('list');
+const calendarMonth = ref(new Date());
+const selectedDateKey = ref('');
+const showReminderModal = ref(false);
+const reminderOrder = ref<Order | null>(null);
+const delayMinutes = ref('');
+const highlightOrderId = ref('');
+let highlightTimer: ReturnType<typeof setTimeout> | null = null;
+
+const showCalendarPopup = ref(false);
+const selectedCalendarOrder = ref<Order | null>(null);
+
+const showCalendarOrderPopup = (order: Order) => {
+  selectedCalendarOrder.value = order;
+  showCalendarPopup.value = true;
+};
+
+const closeCalendarOrderPopup = () => {
+  showCalendarPopup.value = false;
+  selectedCalendarOrder.value = null;
+};
+
+const jumpToOrderHighlight = async (id: string) => {
+  closeCalendarOrderPopup();
+  await focusOrderFromCalendar(id);
+};
 
 const isOwner = computed(() => userStore.userInfo?.role === 'owner');
 
@@ -338,14 +511,22 @@ onShow(async () => {
   if (timer) clearInterval(timer);
   timer = setInterval(updateCountdowns, 1000);
   updateCountdowns();
+  checkServiceReminders();
+  if (reminderTimer) clearInterval(reminderTimer);
+  reminderTimer = setInterval(checkServiceReminders, 60000);
+  if (!selectedDateKey.value) {
+    selectedDateKey.value = formatDateKey(new Date());
+  }
 });
 
 onHide(() => {
   if (timer) clearInterval(timer);
+  if (reminderTimer) clearInterval(reminderTimer);
 });
 
 onUnload(() => {
   if (timer) clearInterval(timer);
+  if (reminderTimer) clearInterval(reminderTimer);
 });
 
 const filteredOrders = computed(() => {
@@ -381,6 +562,201 @@ const refreshBanner = () => {
   bannerMessages.value = userStore.getUnreadNotifications();
 };
 
+const formatDateKey = (date: Date) => {
+  const y = date.getFullYear();
+  const m = (date.getMonth() + 1).toString().padStart(2, '0');
+  const d = date.getDate().toString().padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const parseOrderDate = (value: string | number) => {
+  if (typeof value === 'number') return new Date(value);
+  const direct = new Date(value);
+  if (!Number.isNaN(direct.getTime())) return direct;
+  return new Date(value.replace(/-/g, '/'));
+};
+
+const calendarWeekDays = ['日', '一', '二', '三', '四', '五', '六'];
+
+const calendarTitle = computed(() => {
+  const y = calendarMonth.value.getFullYear();
+  const m = (calendarMonth.value.getMonth() + 1).toString().padStart(2, '0');
+  return `${y}-${m}`;
+});
+
+const calendarOrders = computed(() => {
+  let all = orderStore.orders;
+  if (isOwner.value) {
+    all = all.filter(o => o.creatorId === userStore.userInfo?.id);
+  } else if (userStore.userInfo?.role === 'sitter') {
+    all = all.filter(o => o.sitterId === userStore.userInfo?.id);
+  } else {
+    return [];
+  }
+  return all.filter(o => o.status !== 'CANCELLED').slice().sort((a, b) => parseOrderDate(a.time).getTime() - parseOrderDate(b.time).getTime());
+});
+
+const calendarOrderMap = computed(() => {
+  const map = new Map<string, Order[]>();
+  calendarOrders.value.forEach(order => {
+    const key = formatDateKey(parseOrderDate(order.time));
+    const list = map.get(key) || [];
+    list.push(order);
+    map.set(key, list);
+  });
+  return map;
+});
+
+const isCompletedOrder = (order: Order) => ['COMPLETED', 'REVIEWED'].includes(order.status);
+
+const calendarDays = computed(() => {
+  const startOfMonth = new Date(calendarMonth.value.getFullYear(), calendarMonth.value.getMonth(), 1);
+  const startWeekday = startOfMonth.getDay();
+  const gridStart = new Date(startOfMonth);
+  gridStart.setDate(startOfMonth.getDate() - startWeekday);
+  const days = [];
+  for (let i = 0; i < 42; i += 1) {
+    const date = new Date(gridStart);
+    date.setDate(gridStart.getDate() + i);
+    const key = formatDateKey(date);
+    const orders = calendarOrderMap.value.get(key) || [];
+    const counts = orders.reduce(
+      (acc, o) => {
+        if (isCompletedOrder(o)) acc.completed += 1;
+        else acc.pending += 1;
+        return acc;
+      },
+      { pending: 0, completed: 0 }
+    );
+    days.push({
+      key,
+      date,
+      inMonth: date.getMonth() === calendarMonth.value.getMonth(),
+      orders,
+      counts
+    });
+  }
+  return days;
+});
+
+const selectedDayOrders = computed(() => {
+  if (!selectedDateKey.value) return [];
+  return calendarOrderMap.value.get(selectedDateKey.value) || [];
+});
+
+const changeCalendarMonth = (offset: number) => {
+  const date = new Date(calendarMonth.value);
+  date.setMonth(date.getMonth() + offset);
+  calendarMonth.value = date;
+};
+
+const selectCalendarDay = (day: { key: string }) => {
+  selectedDateKey.value = day.key;
+};
+
+const focusOrderFromCalendar = async (id: string) => {
+  viewMode.value = 'list';
+  highlightOrderId.value = id;
+  await nextTick();
+  uni.pageScrollTo({ selector: `#order-${id}`, duration: 300 });
+  if (highlightTimer) clearTimeout(highlightTimer);
+  highlightTimer = setTimeout(() => {
+    highlightOrderId.value = '';
+  }, 2000);
+};
+
+const getOrderStatusClass = (order: Order) => {
+  if (order.status === 'IN_SERVICE') return 'in-service';
+  if (isCompletedOrder(order)) return 'completed';
+  return 'pending';
+};
+
+const getOrderLine = (order: Order) => {
+  const timeText = formatTime(order.time).split(' ')[1] || '';
+  const names = (order.petSnapshots || []).map(p => p.name).filter((name): name is string => !!name);
+  const mainName = names[0] || order.petName || '宠物';
+  const count = names.length || (order.petName ? 1 : 0);
+  const petText = count > 1 ? `${mainName}等${count}只` : mainName;
+  return `${timeText} ${petText}`;
+};
+
+const previewEvidence = (order: Order, startIndex: number) => {
+  const urls = order.serviceEvidence?.photos || [];
+  if (!urls.length) return;
+  previewImage(urls, startIndex);
+};
+
+const reminderStorageKey = (orderId: string) => `miaomiao_service_reminder_${orderId}`;
+
+const checkServiceReminders = () => {
+  const now = Date.now();
+  calendarOrders.value.forEach(order => {
+    if (!['ACCEPTED', 'IN_SERVICE'].includes(order.status)) return;
+    const scheduled = parseOrderDate(order.time).getTime();
+    const diffMinutes = Math.floor((scheduled - now) / 60000);
+    if (diffMinutes > 30 || diffMinutes < 0) return;
+    const key = reminderStorageKey(order.id);
+    if (uni.getStorageSync(key)) return;
+    uni.setStorageSync(key, true);
+    const orderNoText = order.orderNo ? `订单${order.orderNo}` : '订单';
+    const link = `/pages/order-detail/index?id=${order.id}`;
+    userStore.addNotification({
+      id: `reminder_${order.id}_${scheduled}`,
+      type: 'order',
+      title: '服务即将开始',
+      content: `${orderNoText}距离服务时间还有30分钟`,
+      time: new Date().toLocaleString(),
+      link,
+      orderId: order.id
+    });
+    refreshBanner();
+    reminderOrder.value = order;
+    showReminderModal.value = true;
+  });
+};
+
+const closeReminderModal = () => {
+  showReminderModal.value = false;
+  reminderOrder.value = null;
+  delayMinutes.value = '';
+};
+
+const setReminderResponse = (type: 'ack' | 'ontime') => {
+  if (!reminderOrder.value) return;
+  const statusText = type === 'ack' ? '已知晓' : '准时服务';
+  userStore.addNotification({
+    id: `reminder_response_${reminderOrder.value.id}_${type}`,
+    type: 'order',
+    title: '服务提醒反馈',
+    content: `已反馈：${statusText}`,
+    time: new Date().toLocaleString(),
+    link: `/pages/order-detail/index?id=${reminderOrder.value.id}`,
+    orderId: reminderOrder.value.id
+  });
+  refreshBanner();
+  closeReminderModal();
+};
+
+const submitDelay = () => {
+  if (!reminderOrder.value) return;
+  const minutes = Number(delayMinutes.value);
+  if (!minutes || minutes <= 0) {
+    uni.showToast({ title: '请输入延期分钟数', icon: 'none' });
+    return;
+  }
+  userStore.addNotification({
+    id: `reminder_delay_${reminderOrder.value.id}_${minutes}`,
+    type: 'order',
+    title: '服务预计延期',
+    content: `预计延期${minutes}分钟`,
+    time: new Date().toLocaleString(),
+    link: `/pages/order-detail/index?id=${reminderOrder.value.id}`,
+    orderId: reminderOrder.value.id
+  });
+  refreshBanner();
+  closeReminderModal();
+};
+
 const openLink = (link?: string) => {
   if (!link) return;
   const tabPages = ['/pages/home/index', '/pages/orders/index', '/pages/profile/index', '/pages/message/index', '/pages/wallet/index'];
@@ -403,6 +779,34 @@ const formatServiceType = (type: ServiceType) => {
   return type === ServiceType.FEEDING ? '上门喂养' : '上门遛狗';
 };
 
+const formatPetsMain = (order: Order) => {
+  const names = (order.petSnapshots || []).map(p => p.name).filter((name): name is string => !!name);
+  if (names.length === 0 && order.petName) {
+    return order.petName;
+  }
+  if (names.length === 0) return '未填写';
+  const listText = names.slice(0, 3).join('·');
+  const more = names.length > 3 ? `等${names.length}只` : '';
+  return `共${names.length}只宠物（${listText}${more ? '·' + more : ''}）`;
+};
+
+const formatPetsSub = (order: Order) => {
+  const pets = order.petSnapshots || [];
+  if (pets.length === 0) {
+    const breed = order.petBreed || '';
+    const age = order.petAge != null ? `${order.petAge}岁` : '';
+    const gender = order.petGender ? (order.petGender === 'male' ? '弟弟' : '妹妹') : '';
+    return [breed, age, gender].filter(Boolean).join(' · ');
+  }
+  // 最大年龄
+  const ages = pets.map(p => p.age).filter((age): age is number => typeof age === 'number');
+  const maxAge = ages.length ? Math.max(...ages) : undefined;
+  const breeds = Array.from(new Set(pets.map(p => p.breed).filter((breed): breed is string => !!breed))).slice(0, 2);
+  const parts = [];
+  if (breeds.length) parts.push(breeds.join(' / '));
+  if (maxAge != null) parts.push(`${pets.length === 1 ? '' : '最大'}年龄${maxAge}岁`);
+  return parts.join(' · ');
+};
 const getServiceItems = (type: ServiceType) => {
   if (type === ServiceType.FEEDING) {
     return ['喂食', '换水', '铲屎', '拍摄反馈'];
@@ -847,6 +1251,341 @@ const makeCall = (phone: string) => {
   gap: 16rpx;
 }
 
+.view-switch {
+  display: flex;
+  gap: 16rpx;
+  padding: 0 $spacing-lg 10rpx;
+  
+  .switch-item {
+    flex: 1;
+    height: 64rpx;
+    border-radius: 32rpx;
+    background: #f5f5f5;
+    color: $color-text-secondary;
+    font-size: 26rpx;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    &.active {
+      background: $color-primary;
+      color: #fff;
+      font-weight: 600;
+    }
+  }
+}
+
+.calendar-wrapper {
+  padding: 0 $spacing-lg 20rpx;
+}
+
+.calendar-panel {
+  background: #fff;
+  border-radius: 20rpx;
+  padding: 20rpx;
+  box-shadow: $shadow-card;
+}
+
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10rpx 10rpx;
+}
+
+.calendar-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: $color-text-main;
+}
+
+.calendar-nav {
+  font-size: 40rpx;
+  color: $color-text-secondary;
+  padding: 0 10rpx;
+}
+
+.calendar-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  padding: 10rpx 0;
+}
+
+.week-item {
+  text-align: center;
+  font-size: 22rpx;
+  color: $color-text-secondary;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-auto-rows: minmax(130rpx, auto);
+  gap: 8rpx;
+}
+
+.calendar-day {
+  border-radius: 16rpx;
+  background: #fff;
+  padding: 8rpx;
+  border: 1px solid #f5f5f5;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  overflow: hidden;
+  
+  &.out {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+    opacity: 0.3;
+  }
+  &.selected {
+    border: 2rpx solid $color-primary;
+    background: #FFFBF6;
+    box-shadow: 0 0 0 4rpx rgba(255, 142, 60, 0.1);
+  }
+  &.has {
+    // background: #fff; // Keep white background for cleanliness
+  }
+}
+
+.day-num {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: $color-text-main;
+  margin-bottom: 4rpx;
+  line-height: 1;
+}
+
+.day-badges {
+  display: flex;
+  gap: 4rpx;
+  margin-bottom: 6rpx;
+}
+
+.badge {
+  font-size: 16rpx;
+  height: 24rpx;
+  line-height: 24rpx;
+  padding: 0 6rpx;
+  border-radius: 6rpx;
+  display: flex;
+  align-items: center;
+  
+  &.pending { 
+    background: #FFF0E6; 
+    color: #FF8E3C; 
+    border: 1rpx solid rgba(255, 142, 60, 0.2);
+  }
+  &.completed { 
+    background: #E6FFFB; 
+    color: #00B578; 
+    border: 1rpx solid rgba(0, 181, 120, 0.2);
+  }
+}
+
+.day-orders {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+  flex: 1;
+}
+
+.day-order {
+  height: 30rpx;
+  border-radius: 6rpx;
+  padding: 0 6rpx;
+  display: flex;
+  align-items: center;
+  font-size: 18rpx;
+  
+  &.pending { 
+    background: #FFF7E6; 
+    color: #FA8C16; 
+    border-left: 4rpx solid #FA8C16;
+  }
+  &.completed { 
+    background: #F6FFED; 
+    color: #52C41A; 
+    border-left: 4rpx solid #52C41A;
+  }
+  &.in-service { 
+    background: #E6F7FF; 
+    color: #1890FF; 
+    border-left: 4rpx solid #1890FF;
+  }
+}
+
+.line-text {
+  font-size: 18rpx;
+  line-height: 30rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.more-text {
+  font-size: 18rpx;
+  color: $color-text-secondary;
+}
+
+.calendar-detail {
+  margin-top: 20rpx;
+  background: #fff;
+  border-radius: 20rpx;
+  padding: 20rpx;
+  box-shadow: $shadow-card;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+
+.detail-date {
+  font-size: 28rpx;
+  font-weight: 600;
+}
+
+.detail-count {
+  font-size: 22rpx;
+  color: $color-text-secondary;
+}
+
+.detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.detail-card {
+  border-radius: 16rpx;
+  padding: 16rpx;
+  background: #f9fafb;
+}
+
+.detail-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8rpx;
+}
+
+.detail-time {
+  font-size: 24rpx;
+  color: $color-text-main;
+  margin-bottom: 4rpx;
+}
+
+.detail-pets,
+.detail-address {
+  font-size: 22rpx;
+  color: $color-text-secondary;
+  margin-bottom: 4rpx;
+}
+
+.detail-evidence {
+  margin-top: 12rpx;
+}
+
+.detail-sub {
+  font-size: 22rpx;
+  color: $color-text-main;
+  margin-bottom: 8rpx;
+  display: block;
+}
+
+.evidence-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+  margin-bottom: 8rpx;
+}
+
+.evidence-tag {
+  font-size: 20rpx;
+  padding: 2rpx 8rpx;
+  background: #fff0e5;
+  color: #ff8e3c;
+  border-radius: 10rpx;
+}
+
+.evidence-photos {
+  display: flex;
+  gap: 8rpx;
+}
+
+.evidence-photo {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 10rpx;
+  background: #eee;
+}
+
+.detail-pending {
+  margin-top: 10rpx;
+}
+
+.pending-text {
+  font-size: 22rpx;
+  color: #ff8e3c;
+}
+
+.calendar-empty {
+  text-align: center;
+  padding: 30rpx 0;
+  font-size: 24rpx;
+  color: $color-text-secondary;
+}
+
+.reminder-modal {
+  width: 80%;
+}
+
+.reminder-body {
+  padding: 20rpx 0;
+  text-align: center;
+}
+
+.reminder-text {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: $color-text-main;
+  display: block;
+}
+
+.reminder-sub {
+  font-size: 24rpx;
+  color: $color-text-secondary;
+  margin-top: 8rpx;
+  display: block;
+}
+
+.reminder-actions {
+  display: flex;
+  gap: 16rpx;
+  padding: 10rpx 0 20rpx;
+}
+
+.reminder-delay {
+  display: flex;
+  gap: 12rpx;
+  align-items: center;
+  padding-bottom: 10rpx;
+}
+
+.delay-input {
+  flex: 1;
+  height: 64rpx;
+  border-radius: 32rpx;
+  background: #f5f5f5;
+  padding: 0 20rpx;
+  font-size: 24rpx;
+}
+
 .banner-left {
   width: 40rpx;
 }
@@ -950,6 +1689,11 @@ const makeCall = (phone: string) => {
   
   &:active {
     transform: scale(0.995);
+  }
+  
+  &.highlight {
+    border: 2rpx solid $color-primary;
+    box-shadow: 0 10rpx 30rpx rgba(255, 142, 60, 0.3);
   }
   
   .card-header {
@@ -1488,6 +2232,55 @@ const makeCall = (phone: string) => {
 @keyframes scaleIn {
   from { transform: scale(0.9); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
+}
+
+.calendar-popup {
+  padding: 0;
+  
+  .modal-header {
+    padding: 24rpx 30rpx;
+    border-bottom: 1rpx solid #eee;
+    .title { font-size: 30rpx; font-weight: 600; }
+  }
+  
+  .popup-body {
+    padding: 30rpx;
+    
+    .info-row {
+      display: flex;
+      margin-bottom: 20rpx;
+      font-size: 26rpx;
+      align-items: center;
+      
+      .label {
+        color: $color-text-secondary;
+        width: 140rpx;
+      }
+      
+      .val {
+        color: $color-text-main;
+        flex: 1;
+      }
+      
+      .service-tag {
+        font-size: 22rpx;
+        padding: 4rpx 12rpx;
+        border-radius: 8rpx;
+        &.FEEDING { background: $color-primary-light; color: $color-primary; }
+        &.WALKING { background: #E6F7FF; color: $color-blue; }
+      }
+      
+      .status-text {
+        font-weight: 600;
+        &.pending { color: $color-primary; }
+        &.accepted { color: $color-blue; }
+        &.in_service { color: $color-success; }
+        &.completed { color: $color-text-main; }
+        &.reviewed { color: $color-text-secondary; }
+        &.cancelled { color: $color-text-secondary; }
+      }
+    }
+  }
 }
 
 </style>

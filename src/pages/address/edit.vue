@@ -42,7 +42,7 @@
       </view>
       <view class="form-item switch-item">
         <text class="label">设为默认地址</text>
-        <switch :checked="form.isDefault" color="#FF8E3C" @change="e => form.isDefault = (e as any).detail.value" />
+        <switch class="default-switch" :checked="form.isDefault" color="#FF8E3C" @change="e => form.isDefault = (e as any).detail.value" />
       </view>
     </view>
     
@@ -257,6 +257,11 @@ const handleDelete = () => {
         width: auto;
         white-space: nowrap;
       }
+    }
+    
+    .default-switch {
+      transform: scale(0.8);
+      transform-origin: right center;
     }
   }
 }

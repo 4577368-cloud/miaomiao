@@ -98,6 +98,7 @@ export const useOrderStore = defineStore('order', () => {
 
   // Helper: Map DB row to Order object
   const mapDbOrderToLocal = (row: any): Order => {
+    const primaryPet = row.pet_snapshots?.[0] || row.pet_snapshot;
     return {
       id: row.id,
       orderNo: row.order_no,
@@ -109,6 +110,11 @@ export const useOrderStore = defineStore('order', () => {
       petSnapshots: row.pet_snapshots || [],
       // For legacy compatibility, use first pet if available
       petSnapshot: row.pet_snapshots?.[0],
+      petName: primaryPet?.name,
+      petBreed: primaryPet?.breed,
+      petGender: primaryPet?.gender,
+      petAge: primaryPet?.age,
+      petWeight: primaryPet?.weight,
       
       contactName: row.contact_name || '',
       contactPhone: row.contact_phone || '',

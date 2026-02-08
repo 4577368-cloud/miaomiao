@@ -209,46 +209,11 @@
         <view class="time-selection-area">
            <view class="time-header">
               <text class="row-label">服务时间</text>
-              <view class="mode-switch">
-                 <text 
-                    :class="{active: !isMultiDay}" 
-                    @click="isMultiDay = false"
-                 >单次</text>
-                 <text class="sep">|</text>
-                 <text 
-                    :class="{active: isMultiDay}" 
-                    @click="isMultiDay = true"
-                 >连续多天</text>
-              </view>
            </view>
            
-           <picker 
-              v-if="!isMultiDay" 
-              mode="date" 
-              :start="startDate" 
-              :end="endDate" 
-              @change="handleDateChange"
-           >
-              <view class="date-display">
-                 <text class="date-val">{{ form.date || '选择日期' }}</text>
-                 <text class="icon">📅</text>
-              </view>
-           </picker>
-           
-           <view v-else class="multi-date-row">
-              <picker mode="date" :start="startDate" :end="endDate" @change="(e: any) => handleRangeChange('start', e)">
-                 <view class="date-box">
-                    <text class="lbl">开始</text>
-                    <text class="val">{{ dateRange.start || '请选择' }}</text>
-                 </view>
-              </picker>
-              <text class="arrow">→</text>
-              <picker mode="date" :start="dateRange.start || startDate" :end="endDate" @change="(e: any) => handleRangeChange('end', e)">
-                 <view class="date-box">
-                    <text class="lbl">结束</text>
-                    <text class="val">{{ dateRange.end || '请选择' }}</text>
-                 </view>
-              </picker>
+           <view class="date-display" @click="openCalendar">
+              <text class="date-val">{{ form.date || '选择日期' }}</text>
+              <text class="icon">📅</text>
            </view>
            
            <view class="slots-container">
@@ -343,7 +308,7 @@
               <text class="unit">分钟</text>
             </view>
             <view class="d-price-tag" :class="{ 'has-markup': d.markup > 0 }">
-              {{ d.markup > 0 ? `+${Math.round(d.markup * 100)}%` : '标准价' }}
+              ¥{{ getDurationDisplayPrice(d.value) }}
             </view>
             <view class="check-icon" v-if="form.duration === d.value">✓</view>
           </view>
@@ -494,12 +459,8 @@
                   </view>
                </view>
                <view class="pd-item">
-                  <text class="pd-label">宠物系数</text>
-                  <text class="pd-val">x{{ petCoefficient }}</text>
-               </view>
-               <view class="pd-item">
-                  <text class="pd-label">服务基础费</text>
-                  <text class="pd-val">¥{{ priceBreakdown.base }}</text>
+                  <text class="pd-label">宠物服务价</text>
+                  <text class="pd-val">¥{{ priceBreakdown.pets }}</text>
                </view>
                <view class="pd-item" v-if="priceBreakdown.pets > priceBreakdown.base">
                   <text class="pd-label">多宠附加费</text>
@@ -517,9 +478,17 @@
                   <text class="pd-label">急单溢价</text>
                   <text class="pd-val">+¥{{ priceBreakdown.rush }}</text>
                </view>
-               <view class="pd-item" v-if="priceBreakdown.addOns > 0">
-                  <text class="pd-label">附加服务费</text>
-                  <text class="pd-val">+¥{{ priceBreakdown.addOns }}</text>
+               <view class="pd-item" v-if="form.addOns.play">
+                  <text class="pd-label">附加：陪玩15分钟</text>
+                  <text class="pd-val">+¥{{ addOnPrices.PLAY_15_MIN }}</text>
+               </view>
+               <view class="pd-item" v-if="form.addOns.deepClean">
+                  <text class="pd-label">附加：深度清洁</text>
+                  <text class="pd-val">+¥{{ addOnPrices.DEEP_CLEAN }}</text>
+               </view>
+               <view class="pd-item" v-if="form.addOns.medicine">
+                  <text class="pd-label">附加：喂药服务</text>
+                  <text class="pd-val">+¥{{ addOnPrices.MEDICINE }}</text>
                </view>
                <view class="pd-divider"></view>
                <view class="pd-item total" v-if="standardTotalPrice > rawTotalPrice">
@@ -541,6 +510,93 @@
             </view>
          </view>
       </view>
+
+      <!-- 地址选择弹窗 -->
+    <view class="address-popup-mask" v-if="showAddressPopup" @click="closeAddressPopup">
+        <view class="address-popup-content" @click.stop>
+          <view class="popup-header">
+            <text class="popup-title">选择服务地址</text>
+            <text class="popup-close" @click="closeAddressPopup">×</text>
+          </view>
+          <scroll-view scroll-y class="address-scroll">
+            <view class="address-section" v-if="addressOptions.length > 0">
+              <text class="section-title">我的地址</text>
+              <view 
+                class="address-item"
+                v-for="addr in addressOptions"
+                :key="addr.id"
+                :class="{ active: form.address === formatAddressText(addr) }"
+                @click="selectSavedAddress(addr)"
+              >
+                <view class="address-main">
+                  <text class="address-name">{{ addr.name || '地址' }}</text>
+                  <text class="address-tag" v-if="addr.isDefault">默认</text>
+                </view>
+                <text class="address-detail">{{ addr.detail }}</text>
+              </view>
+            </view>
+            <view class="address-section" v-if="historyAddressOptions.length > 0">
+              <text class="section-title">历史地址</text>
+              <view 
+                class="address-item"
+                v-for="addr in historyAddressOptions"
+                :key="addr.address"
+                :class="{ active: form.address === addr.address }"
+                @click="selectHistoryAddress(addr)"
+              >
+                <text class="address-detail">{{ addr.address }}</text>
+              </view>
+            </view>
+            <view class="address-empty" v-if="addressOptions.length === 0 && historyAddressOptions.length === 0">
+              暂无可用地址
+            </view>
+          </scroll-view>
+          <view class="address-actions">
+            <button class="btn-select-address" @click="chooseNewAddress">选择新地址</button>
+          </view>
+        </view>
+      </view>
+    
+    <view class="calendar-popup-mask" v-if="showCalendar" @click="closeCalendar">
+      <view class="calendar-popup-content" @click.stop>
+        <view class="popup-header">
+          <text class="popup-title">选择服务日期</text>
+          <text class="popup-close" @click="closeCalendar">×</text>
+        </view>
+        <view class="calendar-header">
+          <text class="calendar-nav" @click="changeCalendarMonth(-1)">‹</text>
+          <text class="calendar-title">{{ calendarTitle }}</text>
+          <text class="calendar-nav" @click="changeCalendarMonth(1)">›</text>
+        </view>
+        <view class="calendar-week">
+          <text v-for="d in calendarWeekDays" :key="d" class="week-item">{{ d }}</text>
+        </view>
+        <view class="calendar-grid">
+          <view 
+            v-for="day in calendarDays" 
+            :key="day.key"
+            class="calendar-day"
+            :class="{
+              out: !day.inMonth,
+              disabled: day.disabled,
+              selected: day.key === calendarRange.start || day.key === calendarRange.end,
+              inrange: day.inRange
+            }"
+            @click="selectCalendarDay(day)"
+            @touchstart="handleDayTouchStart(day)"
+            @touchmove="handleDayTouchMove(day)"
+            @touchend="handleDayTouchEnd"
+            @touchcancel="handleDayTouchEnd"
+          >
+            <text class="day-num">{{ day.date.getDate() }}</text>
+          </view>
+        </view>
+        <view class="calendar-actions">
+          <button class="btn-ghost" @click="clearCalendarRange">清除</button>
+          <button class="btn-primary" @click="applyCalendarRange">确定</button>
+        </view>
+      </view>
+    </view>
 
       <!-- 优惠券选择弹窗 -->
     <view class="coupon-popup-mask" v-if="showCouponPopup" @click="closeCouponPopup">
@@ -624,9 +680,24 @@ const showCouponPopup = ref(false);
 const showServiceDesc = ref(false);
 const lastPetCount = ref(0);
 const showSitterSelector = ref(false);
+const showAddressPopup = ref(false);
 
 const availableSitters = computed(() => sitterStore.availableSitters);
 const addOnPrices = computed(() => configStore.getAddOnPrices());
+const addressOptions = computed(() => userStore.userInfo?.addresses || []);
+const historyAddressOptions = computed(() => {
+  const userId = userStore.userInfo?.id;
+  const set = new Set<string>();
+  const list: { address: string }[] = [];
+  orderStore.orders.forEach(o => {
+    if (userId && o.creatorId !== userId) return;
+    const address = (o.address || '').trim();
+    if (!address || set.has(address)) return;
+    set.add(address);
+    list.push({ address });
+  });
+  return list;
+});
 const standardBasePrice = computed(() => {
   const price = configStore.getServiceStandardPrice(form.serviceType);
   return price > 0 ? price : fallbackBasePrice;
@@ -775,7 +846,6 @@ const selectServiceType = (type: ServiceType) => {
 const today = new Date();
 const startDate = ref(today.toISOString().split('T')[0]);
 const endDate = ref(new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
-const isMultiDay = ref(false);
 const dateRange = reactive({ start: '', end: '' });
 
 const timeSlots = ['08:00', '09:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00', '19:00', '20:00'];
@@ -793,17 +863,203 @@ const handleRangeChange = (type: 'start' | 'end', e: any) => {
    }
 };
 
+const showCalendar = ref(false);
+const calendarMonth = ref(new Date(today.getFullYear(), today.getMonth(), 1));
+const calendarRange = reactive({ start: '', end: '' });
+const dragStartKey = ref('');
+const dragEndKey = ref('');
+let isDragSelecting = false;
+let suppressCalendarClick = false;
+
+const formatDateKey = (date: Date) => {
+  const y = date.getFullYear();
+  const m = (date.getMonth() + 1).toString().padStart(2, '0');
+  const d = date.getDate().toString().padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const parseDateKey = (key: string) => new Date(key.replace(/-/g, '/'));
+
+const calendarWeekDays = ['日', '一', '二', '三', '四', '五', '六'];
+
+const calendarTitle = computed(() => {
+  const y = calendarMonth.value.getFullYear();
+  const m = (calendarMonth.value.getMonth() + 1).toString().padStart(2, '0');
+  return `${y}-${m}`;
+});
+
+const calendarDays = computed(() => {
+  const startOfMonth = new Date(calendarMonth.value.getFullYear(), calendarMonth.value.getMonth(), 1);
+  const startWeekday = startOfMonth.getDay();
+  const gridStart = new Date(startOfMonth);
+  gridStart.setDate(startOfMonth.getDate() - startWeekday);
+  const days = [];
+  for (let i = 0; i < 42; i += 1) {
+    const date = new Date(gridStart);
+    date.setDate(gridStart.getDate() + i);
+    const key = formatDateKey(date);
+    const inMonth = date.getMonth() === calendarMonth.value.getMonth();
+    const disabled = key < startDate.value;
+    const rangeStart = calendarRange.start;
+    const rangeEnd = calendarRange.end;
+    const inRange = !!rangeStart && !!rangeEnd && key >= rangeStart && key <= rangeEnd;
+    days.push({
+      key,
+      date,
+      inMonth,
+      disabled,
+      inRange
+    });
+  }
+  return days;
+});
+
+const parseFormDateRange = (value: string) => {
+  const text = value || '';
+  if (!text) return { start: '', end: '' };
+  if (text.includes('至')) {
+    const parts = text.split('至').map(p => p.trim());
+    return { start: parts[0] || '', end: parts[1] || '' };
+  }
+  return { start: text, end: '' };
+};
+
+const openCalendar = () => {
+  showCalendar.value = true;
+  const parsed = parseFormDateRange(form.date);
+  calendarRange.start = parsed.start || dateRange.start || '';
+  calendarRange.end = parsed.end || dateRange.end || '';
+  if (calendarRange.start) {
+    const date = parseDateKey(calendarRange.start);
+    calendarMonth.value = new Date(date.getFullYear(), date.getMonth(), 1);
+  }
+};
+
+const closeCalendar = () => {
+  showCalendar.value = false;
+};
+
+const changeCalendarMonth = (offset: number) => {
+  const date = new Date(calendarMonth.value);
+  date.setMonth(date.getMonth() + offset);
+  calendarMonth.value = new Date(date.getFullYear(), date.getMonth(), 1);
+};
+
+const selectCalendarDay = (day: { key: string; inMonth: boolean; disabled: boolean }) => {
+  if (suppressCalendarClick) return;
+  if (day.disabled) return;
+  if (!day.inMonth) {
+    const date = parseDateKey(day.key);
+    calendarMonth.value = new Date(date.getFullYear(), date.getMonth(), 1);
+  }
+  calendarRange.start = day.key;
+  calendarRange.end = '';
+  dateRange.start = day.key;
+  dateRange.end = '';
+  form.date = day.key;
+  showCalendar.value = false;
+};
+
+const updateCalendarRangeFromDrag = (startKey: string, endKey: string) => {
+  if (!startKey || !endKey) return;
+  if (startKey <= endKey) {
+    calendarRange.start = startKey;
+    calendarRange.end = endKey;
+  } else {
+    calendarRange.start = endKey;
+    calendarRange.end = startKey;
+  }
+};
+
+const handleDayTouchStart = (day: { key: string; disabled: boolean }) => {
+  if (day.disabled) return;
+  isDragSelecting = true;
+  suppressCalendarClick = true;
+  dragStartKey.value = day.key;
+  dragEndKey.value = day.key;
+  updateCalendarRangeFromDrag(dragStartKey.value, dragEndKey.value);
+};
+
+const handleDayTouchMove = (day: { key: string; disabled: boolean }) => {
+  if (!isDragSelecting || day.disabled) return;
+  if (day.key === dragEndKey.value) return;
+  dragEndKey.value = day.key;
+  updateCalendarRangeFromDrag(dragStartKey.value, dragEndKey.value);
+};
+
+const handleDayTouchEnd = () => {
+  if (!isDragSelecting) return;
+  isDragSelecting = false;
+  if (calendarRange.start && calendarRange.end) {
+    dateRange.start = calendarRange.start;
+    dateRange.end = calendarRange.end;
+    form.date = `${dateRange.start} 至 ${dateRange.end}`;
+    showCalendar.value = false;
+  }
+  setTimeout(() => {
+    suppressCalendarClick = false;
+  }, 50);
+};
+
+const clearCalendarRange = () => {
+  calendarRange.start = '';
+  calendarRange.end = '';
+  dateRange.start = '';
+  dateRange.end = '';
+  form.date = '';
+};
+
+const applyCalendarRange = () => {
+  if (!calendarRange.start) return;
+  if (!calendarRange.end) {
+    form.date = calendarRange.start;
+    dateRange.start = calendarRange.start;
+    dateRange.end = '';
+    showCalendar.value = false;
+    return;
+  }
+  dateRange.start = calendarRange.start;
+  dateRange.end = calendarRange.end;
+  form.date = `${dateRange.start} 至 ${dateRange.end}`;
+  showCalendar.value = false;
+};
+
 // Address
-const handleAddressSelect = () => {
+const formatAddressText = (addr: Address) => {
+  if (addr.detail && addr.name) return `${addr.detail} (${addr.name})`;
+  return addr.detail || addr.name || '';
+};
+const chooseNewAddress = () => {
+  showAddressPopup.value = false;
   uni.chooseLocation({
     success: (res) => {
       form.address = res.address + (res.name ? ` (${res.name})` : '');
     },
     fail: () => {
-       // Mock for dev
        form.address = '北京市朝阳区三里屯SOHO';
     }
   });
+};
+const closeAddressPopup = () => {
+  showAddressPopup.value = false;
+};
+const selectSavedAddress = (addr: Address) => {
+  form.address = formatAddressText(addr);
+  showAddressPopup.value = false;
+};
+const selectHistoryAddress = (addr: { address: string }) => {
+  form.address = addr.address;
+  showAddressPopup.value = false;
+};
+const openAddressPopup = () => {
+  if (addressOptions.value.length > 0 || historyAddressOptions.value.length > 0) {
+    showAddressPopup.value = true;
+    return;
+  }
+  chooseNewAddress();
+};
+const handleAddressSelect = () => {
+  openAddressPopup();
 };
 
 // Pet
@@ -892,26 +1148,39 @@ const closePriceDetail = () => {
    showPriceDetail.value = false;
 };
 
-// Price Calculation
-const standardPriceBreakdown = computed(() => {
-  // Determine effective pet sizes
-  let petSizes: PetSize[] = [];
+const resolvePricingPetSizes = () => {
   if (selectedPetIds.value.length > 0) {
     const selectedPets = userStore.userInfo?.pets?.filter(p => selectedPetIds.value.includes(p.id)) || [];
-    petSizes = selectedPets.map(p => p.size);
-  } else {
-    petSizes = [form.petSize];
+    return selectedPets.map(p => p.size);
   }
+  return [form.petSize];
+};
 
-  // Parse date for holiday check (use start date if range)
-  // form.date format example: "2023-10-01" or "2023-10-01 至 2023-10-03"
-  const serviceDate = form.date.split(' ')[0] || new Date().toISOString().split('T')[0];
+const getServiceDateForPricing = () => {
+  const parsed = parseFormDateRange(form.date);
+  return parsed.start || new Date().toISOString().split('T')[0];
+};
 
+const getDurationDisplayPrice = (durationValue: number) => {
+  const result = calculateTotalPrice({
+    basePrice: discountedBasePrice.value,
+    petSizes: resolvePricingPetSizes(),
+    durationMarkup: durations.find(d => d.value === durationValue)?.markup || 0,
+    serviceDate: getServiceDateForPricing(),
+    serviceTime: form.time || '12:00',
+    addOns: { play: false, deepClean: false, medicine: false },
+    overrides: pricingOverrides.value
+  });
+  return result.total.toFixed(2);
+};
+
+// Price Calculation
+const standardPriceBreakdown = computed(() => {
   return calculateTotalPrice({
     basePrice: standardBasePrice.value,
-    petSizes: petSizes,
+    petSizes: resolvePricingPetSizes(),
     durationMarkup: durations.find(d => d.value === form.duration)?.markup || 0,
-    serviceDate: serviceDate,
+    serviceDate: getServiceDateForPricing(),
     serviceTime: form.time || '12:00',
     addOns: form.addOns,
     overrides: pricingOverrides.value
@@ -919,22 +1188,11 @@ const standardPriceBreakdown = computed(() => {
 });
 
 const priceBreakdown = computed(() => {
-  // Determine effective pet sizes
-  let petSizes: PetSize[] = [];
-  if (selectedPetIds.value.length > 0) {
-    const selectedPets = userStore.userInfo?.pets?.filter(p => selectedPetIds.value.includes(p.id)) || [];
-    petSizes = selectedPets.map(p => p.size);
-  } else {
-    petSizes = [form.petSize];
-  }
-
-  const serviceDate = form.date.split(' ')[0] || new Date().toISOString().split('T')[0];
-
   return calculateTotalPrice({
     basePrice: discountedBasePrice.value,
-    petSizes: petSizes,
+    petSizes: resolvePricingPetSizes(),
     durationMarkup: durations.find(d => d.value === form.duration)?.markup || 0,
-    serviceDate: serviceDate,
+    serviceDate: getServiceDateForPricing(),
     serviceTime: form.time || '12:00',
     addOns: form.addOns,
     overrides: pricingOverrides.value
@@ -963,7 +1221,10 @@ const handleSubmit = async () => {
   if (!form.time) return uni.showToast({ title: '请选择时间段', icon: 'none' });
   
   // Get selected pets
-  const selectedPets = userStore.userInfo?.pets?.filter(p => selectedPetIds.value.includes(p.id)) || [];
+  let selectedPets = userStore.userInfo?.pets?.filter(p => selectedPetIds.value.includes(p.id)) || [];
+  if (selectedPets.length === 0 && userStore.userInfo?.pets?.length) {
+    selectedPets = [userStore.userInfo.pets[0]];
+  }
 
   // Create Order
   const newOrder = {
@@ -979,7 +1240,7 @@ const handleSubmit = async () => {
     address: form.address,
     time: `${form.date} ${form.time}`,
     petSize: selectedPets.length > 0 ? selectedPets[0].size : form.petSize,
-    petIds: selectedPetIds.value,
+    petIds: selectedPets.map(p => p.id),
     petSnapshots: selectedPets,
     duration: form.duration,
     remark: form.remark,
@@ -1020,6 +1281,14 @@ onShow(async () => {
     return;
   }
   await configStore.initConfig(true);
+  if (!form.address) {
+    const defaultAddress = addressOptions.value.find(a => a.isDefault) || addressOptions.value[0];
+    if (defaultAddress) {
+      form.address = formatAddressText(defaultAddress);
+    } else if (historyAddressOptions.value.length > 0) {
+      form.address = historyAddressOptions.value[0].address;
+    }
+  }
   
   // Sitter Mode Check
   if (userStore.userInfo?.role === 'sitter') {
@@ -1803,6 +2072,260 @@ onShow(async () => {
 }
 
 /* Coupon Popup */
+.address-popup-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  z-index: 10002;
+  display: flex;
+  align-items: flex-end;
+}
+
+.address-popup-content {
+  width: 100%;
+  height: 60vh;
+  background: #fff;
+  border-radius: 30rpx 30rpx 0 0;
+  display: flex;
+  flex-direction: column;
+  
+  .popup-header {
+    padding: 30rpx;
+    text-align: center;
+    position: relative;
+    border-bottom: 1rpx solid #eee;
+    .popup-title { font-size: 32rpx; font-weight: bold; }
+    .popup-close {
+      position: absolute;
+      right: 30rpx;
+      top: 30rpx;
+      font-size: 40rpx;
+      color: #999;
+      line-height: 1;
+    }
+  }
+  
+  .address-scroll {
+    flex: 1;
+    padding: 30rpx;
+    box-sizing: border-box;
+    background: #f7f7f7;
+  }
+  
+  .address-section {
+    margin-bottom: 24rpx;
+    .section-title {
+      font-size: 26rpx;
+      color: $color-text-secondary;
+      margin-bottom: 16rpx;
+      display: block;
+    }
+  }
+  
+  .address-item {
+    background: #fff;
+    padding: 24rpx;
+    border-radius: 16rpx;
+    margin-bottom: 16rpx;
+    border: 1rpx solid transparent;
+    &.active {
+      border-color: $color-primary;
+    }
+  }
+  
+  .address-main {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8rpx;
+  }
+  
+  .address-name {
+    font-size: 30rpx;
+    font-weight: 600;
+    color: $color-text-main;
+  }
+  
+  .address-tag {
+    font-size: 22rpx;
+    color: $color-primary;
+    background: rgba(255, 142, 60, 0.12);
+    padding: 2rpx 10rpx;
+    border-radius: 10rpx;
+  }
+  
+  .address-detail {
+    font-size: 26rpx;
+    color: $color-text-secondary;
+  }
+  
+  .address-empty {
+    text-align: center;
+    color: $color-text-secondary;
+    font-size: 26rpx;
+    padding: 40rpx 0;
+  }
+  
+  .address-actions {
+    padding: 20rpx 30rpx 30rpx;
+  }
+  
+  .btn-select-address {
+    width: 100%;
+    height: 88rpx;
+    background: linear-gradient(135deg, #FFB07C 0%, #FF8E3C 100%);
+    color: #fff;
+    border-radius: 44rpx;
+    font-size: 30rpx;
+    font-weight: 600;
+    line-height: 88rpx;
+  }
+}
+
+.calendar-popup-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  z-index: 10003;
+  display: flex;
+  align-items: flex-end;
+}
+
+.calendar-popup-content {
+  width: 100%;
+  height: 70vh;
+  background: #fff;
+  border-radius: 30rpx 30rpx 0 0;
+  display: flex;
+  flex-direction: column;
+  
+  .popup-header {
+    padding: 30rpx;
+    text-align: center;
+    position: relative;
+    border-bottom: 1rpx solid #eee;
+    .popup-title { font-size: 32rpx; font-weight: bold; }
+    .popup-close {
+      position: absolute;
+      right: 30rpx;
+      top: 30rpx;
+      font-size: 40rpx;
+      color: #999;
+      line-height: 1;
+    }
+  }
+  
+  .calendar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20rpx 30rpx 10rpx;
+  }
+  
+  .calendar-title {
+    font-size: 30rpx;
+    font-weight: 600;
+    color: $color-text-main;
+  }
+  
+  .calendar-nav {
+    font-size: 40rpx;
+    color: $color-text-secondary;
+    padding: 0 20rpx;
+  }
+  
+  .calendar-week {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    padding: 10rpx 20rpx;
+  }
+  
+  .week-item {
+    text-align: center;
+    font-size: 24rpx;
+    color: $color-text-secondary;
+  }
+  
+  .calendar-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    grid-auto-rows: 96rpx;
+    padding: 0 20rpx 10rpx;
+    gap: 8rpx;
+  }
+  
+  .calendar-day {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 16rpx;
+    background: #fff;
+    border: 1px solid #f0f0f0;
+    box-shadow: 0 6rpx 16rpx rgba(0, 0, 0, 0.04);
+    &.out {
+      background: transparent;
+      border-color: transparent;
+      box-shadow: none;
+      color: #c0c0c0;
+    }
+    &.disabled {
+      color: #c0c0c0;
+      background: #f6f6f6;
+      border-color: #f0f0f0;
+      box-shadow: none;
+    }
+    &.selected {
+      background: linear-gradient(135deg, #FFB07C 0%, #FF8E3C 100%);
+      color: #fff;
+      font-weight: 600;
+      border-color: transparent;
+      box-shadow: 0 10rpx 20rpx rgba(255, 142, 60, 0.25);
+    }
+    &.inrange {
+      background: rgba(255, 142, 60, 0.12);
+      border-color: rgba(255, 142, 60, 0.2);
+      color: $color-text-main;
+    }
+  }
+  
+  .day-num {
+    font-size: 26rpx;
+  }
+  
+  .calendar-actions {
+    display: flex;
+    gap: 20rpx;
+    padding: 20rpx 30rpx 30rpx;
+  }
+  
+  .btn-ghost {
+    flex: 1;
+    height: 80rpx;
+    border-radius: 40rpx;
+    background: #f5f5f5;
+    color: $color-text-secondary;
+    font-size: 28rpx;
+    line-height: 80rpx;
+  }
+  
+  .btn-primary {
+    flex: 1;
+    height: 80rpx;
+    border-radius: 40rpx;
+    background: linear-gradient(135deg, #FFB07C 0%, #FF8E3C 100%);
+    color: #fff;
+    font-size: 28rpx;
+    line-height: 80rpx;
+  }
+}
+
 .coupon-popup-mask {
    position: fixed;
    top: 0;

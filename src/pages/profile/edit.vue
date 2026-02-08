@@ -3,7 +3,6 @@
     <view class="form-card">
       <view class="avatar-section" @click="showAvatarPopup = true">
         <image :src="form.avatar || defaultAvatar" class="avatar" mode="aspectFill" />
-        <view class="camera-badge">📷</view>
       </view>
       <text class="hint">点击修改头像</text>
       
@@ -80,13 +79,14 @@ const defaultAvatar = 'https://img.yzcdn.cn/vant/cat.jpeg';
 const showAvatarPopup = ref(false);
 
 const defaultAvatars = [
-  'https://img.yzcdn.cn/vant/cat.jpeg',
-  'https://imgus.tangbuy.com/static/images/2026-02-07/1f7527725fb54136931c6bf2919e7e0e-177045402956211314871683841080806.jpeg',
-  'https://imgus.tangbuy.com/static/images/2026-02-07/6dd4699cc43b4845906dc5911a6f6b11-177045526494810424765923383103569.jpeg',
-  'https://imgus.tangbuy.com/static/images/2026-02-07/fb3eeeb726ef43ea9a0020b18da5290e-177045207976112019662246898497843.jpeg',
-  'https://img.yzcdn.cn/vant/dog.jpeg', // Added generic dog
-  'https://img.yzcdn.cn/vant/apple-1.jpg',
-  'https://img.yzcdn.cn/vant/apple-2.jpg'
+  '/static/avatars/cat-british.jpg',
+  '/static/avatars/cat-american.jpg',
+  '/static/avatars/cat-siamese.jpg',
+  '/static/avatars/dog-corgi.jpg',
+  '/static/avatars/dog-golden.jpg',
+  '/static/avatars/dog-shiba.jpg',
+  '/static/avatars/dog-husky.jpg',
+  '/static/avatars/dog-poodle.jpg'
 ];
 
 const form = ref({
