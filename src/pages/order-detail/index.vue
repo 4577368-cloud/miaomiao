@@ -37,6 +37,27 @@
       </view>
     </view>
 
+    <!-- 服务工具包 (仅服务中可见) -->
+    <view class="card toolkit-card" v-if="!isOwner && order.status === 'IN_SERVICE'">
+      <view class="card-header">
+        <text class="title">服务工具包</text>
+      </view>
+      <view class="toolkit-grid">
+        <view class="toolkit-item" @click="makeCall">
+          <view class="icon-circle call">
+            <text class="icon">📞</text>
+          </view>
+          <text class="label">一键通话</text>
+        </view>
+        <view class="toolkit-item" @click="handleUploadEvidence">
+          <view class="icon-circle camera">
+            <text class="icon">📸</text>
+          </view>
+          <text class="label">拍照留证</text>
+        </view>
+      </view>
+    </view>
+
     <!-- 宠物信息 -->
     <view class="card pet-card">
       <view class="card-header">
@@ -323,9 +344,24 @@ import { ServiceType, PetSize } from '@/constants/pet';
 
 const orderStore = useOrderStore();
 const userStore = useUserStore();
-const order = ref<Order | null>(null);
+const orderId = ref('');
+const order = computed(() => orderStore.orders.find(o => o.id === orderId.value) || null);
 const timer = ref<number | null>(null);
 const countdown = ref('');
+
+// Watch for status changes to handle timer
+import { watch } from 'vue';
+watch(() => order.value?.status, (newStatus) => {
+    if (newStatus === 'IN_SERVICE') {
+        startTimer();
+    } else if (newStatus === 'COMPLETED') {
+        if (timer.value) {
+            clearInterval(timer.value);
+            timer.value = null;
+        }
+        countdown.value = '00:00';
+    }
+});
 
 // Sitter Review State
 const showSitterReviewModal = ref(false);
@@ -413,7 +449,7 @@ const handleUploadEvidence = () => {
             photos: [...currentPhotos, tempFilePaths[0]],
             confirmedAt: Date.now() // Mock
         });
-        refreshOrder();
+        
       }
     }
   });
@@ -428,7 +464,7 @@ const handleAccept = () => {
             if (res.confirm) {
                 if (orderStore.acceptOrder(order.value!.id, userStore.userInfo!)) {
                     uni.showToast({ title: '抢单成功' });
-                    refreshOrder();
+                    
                 } else {
                     uni.showToast({ title: '抢单失败', icon: 'none' });
                 }
@@ -446,7 +482,7 @@ const handleStartService = () => {
         // Simulate checking if location matches (mock success)
         if (orderStore.startService(order.value!.id)) {
              uni.showToast({ title: '已开启服务' });
-             refreshOrder();
+             
         } else {
              uni.showToast({ title: '开启失败', icon: 'none' });
         }
@@ -468,7 +504,7 @@ const handleCompleteService = () => {
             if (res.confirm) {
                 if (orderStore.completeService(order.value!.id)) {
                     uni.showToast({ title: '订单完成，收益已到账' });
-                    refreshOrder();
+                    
                 }
             }
         }
@@ -528,7 +564,7 @@ const submitSitterReview = () => {
     );
     uni.showToast({ title: '评价成功' });
     closeSitterReviewModal();
-    refreshOrder();
+    
 };
 
 // Owner Review Logic
@@ -551,17 +587,9 @@ const submitOwnerReview = () => {
     );
     uni.showToast({ title: '评价成功' });
     closeOwnerReviewModal();
-    refreshOrder();
+    
 };
 
-const refreshOrder = () => {
-    if (order.value) {
-        const found = orderStore.orders.find(o => o.id === order.value!.id);
-        if (found) {
-            order.value = JSON.parse(JSON.stringify(found));
-        }
-    }
-};
 const previewImage = (index: number) => {
   const photos = order.value?.serviceEvidence?.photos || [];
   if (photos.length) {
@@ -592,15 +620,20 @@ const startTimer = () => {
   }
 };
 
-onLoad((options) => {
+onLoad(async (options) => {
   if (options && options.id) {
-    const found = orderStore.orders.find(o => o.id === options.id);
-    if (found) {
-      order.value = found;
-      startTimer();
-    } else {
+    orderId.value = options.id;
+    
+    // Ensure orders are loaded
+    if (orderStore.orders.length === 0) {
+        await orderStore.loadOrders();
+    }
+    
+    if (!order.value) {
       uni.showToast({ title: '订单不存在', icon: 'none' });
       setTimeout(() => uni.navigateBack(), 1500);
+    } else {
+      startTimer();
     }
   }
 });
@@ -705,6 +738,52 @@ const formatTime = (time: number | string) => {
       font-size: 30rpx;
       font-weight: 600;
       color: $color-text-main;
+    }
+  }
+}
+
+.toolkit-card {
+  .toolkit-grid {
+    display: flex;
+    justify-content: space-around;
+    padding: 20rpx 0;
+    
+    .toolkit-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12rpx;
+      
+      .icon-circle {
+        width: 100rpx;
+        height: 100rpx;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        
+        &.call {
+          background-color: rgba(255, 142, 60, 0.1);
+          color: #FF8E3C;
+        }
+        &.camera {
+          background-color: rgba(64, 158, 255, 0.1);
+          color: #409EFF;
+        }
+        
+        .icon {
+          font-size: 48rpx;
+        }
+      }
+      
+      .label {
+        font-size: 26rpx;
+        color: #333;
+      }
+      
+      &:active {
+        opacity: 0.8;
+      }
     }
   }
 }

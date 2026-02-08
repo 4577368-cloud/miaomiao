@@ -69,6 +69,7 @@ export interface Order {
 
 export const useOrderStore = defineStore('order', () => {
   const orders = ref<Order[]>([]);
+  let realtimeChannel: any = null;
 
   // Helper: Map DB row to Order object
   const mapDbOrderToLocal = (row: any): Order => {
@@ -113,15 +114,82 @@ export const useOrderStore = defineStore('order', () => {
     };
   };
 
+  const handleRealtimeUpdate = (payload: any) => {
+    const { eventType, new: newRecord } = payload;
+    const userStore = useUserStore();
+    const userId = userStore.userInfo?.id;
+
+    if (!userId || !newRecord) return;
+
+    if (eventType === 'UPDATE') {
+       const index = orders.value.findIndex(o => o.id === newRecord.id);
+       
+       if (index > -1) {
+         const updatedOrder = mapDbOrderToLocal(newRecord);
+         
+         // Sitter Logic: If order is taken by someone else, remove it from my list
+         if (userStore.userInfo.role === 'sitter' && 
+             newRecord.sitter_id && 
+             newRecord.sitter_id !== userId) {
+            orders.value.splice(index, 1);
+         } else {
+            orders.value[index] = updatedOrder;
+         }
+       } else {
+         // Not in list, check if it should be
+         if (newRecord.creator_id === userId || newRecord.sitter_id === userId) {
+            orders.value.unshift(mapDbOrderToLocal(newRecord));
+         }
+       }
+    } else if (eventType === 'INSERT') {
+       // New order created
+       if (newRecord.creator_id === userId) {
+          if (!orders.value.some(o => o.id === newRecord.id)) {
+             orders.value.unshift(mapDbOrderToLocal(newRecord));
+          }
+       } else if (userStore.userInfo.role === 'sitter' && newRecord.status === 'PENDING' && !newRecord.sitter_id) {
+          orders.value.unshift(mapDbOrderToLocal(newRecord));
+       }
+    }
+    
+    // Sort by createdAt desc
+    orders.value.sort((a, b) => b.createdAt - a.createdAt);
+    uni.setStorageSync('miaomiao_orders', JSON.stringify(orders.value));
+  };
+
+  const subscribeToOrders = () => {
+    if (realtimeChannel) return;
+    
+    realtimeChannel = supabase
+      .channel('public:orders')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders' },
+        (payload) => handleRealtimeUpdate(payload)
+      )
+      .subscribe();
+  };
+
+  const unsubscribeFromOrders = () => {
+    if (realtimeChannel) {
+      supabase.removeChannel(realtimeChannel);
+      realtimeChannel = null;
+    }
+  };
+
   const loadOrders = async () => {
     const userStore = useUserStore();
     if (!userStore.userInfo) return;
+    
+    // Start Realtime Subscription
+    subscribeToOrders();
 
     try {
       const { data, error } = await supabase
         .from('orders')
         .select('*')
-        .or(`creator_id.eq.${userStore.userInfo.id},sitter_id.eq.${userStore.userInfo.id}`)
+        // Allow seeing own orders (creator/sitter) OR public pending orders (Task Hall)
+        .or(`creator_id.eq.${userStore.userInfo.id},sitter_id.eq.${userStore.userInfo.id},and(status.eq.PENDING,sitter_id.is.null)`)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -360,6 +428,28 @@ export const useOrderStore = defineStore('order', () => {
       }
   };
 
+  const updateOrderEvidence = async (orderId: string, evidence: { photos: string[], items?: string[], confirmedAt: number }) => {
+     const { error } = await supabase
+       .from('orders')
+       .update({ 
+           service_evidence: evidence,
+           updated_at: new Date().toISOString()
+       })
+       .eq('id', orderId);
+       
+     if (error) {
+         console.error('Update evidence failed:', error);
+         return false;
+     }
+
+     const idx = orders.value.findIndex(o => o.id === orderId);
+     if (idx > -1) {
+         orders.value[idx].serviceEvidence = evidence;
+         uni.setStorageSync('miaomiao_orders', JSON.stringify(orders.value));
+     }
+     return true;
+  };
+
   // Helper alias (since previous code used addOrder)
   const addOrder = createOrder;
 
@@ -371,9 +461,12 @@ export const useOrderStore = defineStore('order', () => {
     acceptOrder,
     startService,
     completeService,
+    updateOrderEvidence,
     submitOwnerReview,
     submitSitterReview,
     cancelOrder,
-    payOrder
+    payOrder,
+    subscribeToOrders,
+    unsubscribeFromOrders
   };
 });
