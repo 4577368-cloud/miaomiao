@@ -99,7 +99,8 @@ const switchTab = (item: any) => {
       url: '/' + item.pagePath
     });
   } else {
-    uni.navigateTo({
+    // 对于非tab页面，使用reLaunch来确保页面栈正确
+    uni.reLaunch({
       url: '/' + item.pagePath
     });
   }
@@ -117,7 +118,7 @@ const switchTab = (item: any) => {
   display: flex;
   padding-bottom: env(safe-area-inset-bottom);
   border-top: 1px solid rgba(0, 0, 0, 0.1);
-  z-index: 9999;
+  z-index: 10010;
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
 }
 

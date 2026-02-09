@@ -94,10 +94,13 @@
       </view>
     </template>
   </view>
+  <view style="height: 100px;"></view>
+  <CustomTabBar current-path="pages/profile/certification" />
 </template>
 
 <script setup lang="ts">
 import { ref, computed, reactive } from 'vue';
+import CustomTabBar from '@/components/custom-tab-bar/index.vue';
 import { onShow } from '@dcloudio/uni-app';
 import { useUserStore } from '@/stores/user';
 import { supabase } from '@/utils/supabase';

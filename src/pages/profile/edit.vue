@@ -68,10 +68,13 @@
       </view>
     </view>
   </view>
+  <view style="height: 100px;"></view>
+  <CustomTabBar current-path="pages/profile/edit" />
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import CustomTabBar from '@/components/custom-tab-bar/index.vue';
 import { useUserStore } from '@/stores/user';
 
 const userStore = useUserStore();

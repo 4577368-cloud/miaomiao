@@ -51,10 +51,13 @@
       <button class="btn-delete" v-if="isEdit" @click="handleDelete">删除</button>
     </view>
   </view>
+  <view style="height: 100px;"></view>
+  <CustomTabBar current-path="pages/address/edit" />
 </template>
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue';
+import CustomTabBar from '@/components/custom-tab-bar/index.vue';
 import { onLoad } from '@dcloudio/uni-app';
 import { useUserStore, type Address } from '@/stores/user';
 

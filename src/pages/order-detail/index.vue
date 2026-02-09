@@ -338,10 +338,13 @@
   <view v-else class="loading">
     <text>加载中...</text>
   </view>
+  <view style="height: 100px;"></view>
+  <CustomTabBar current-path="pages/order-detail/index" />
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from 'vue';
+import CustomTabBar from '@/components/custom-tab-bar/index.vue';
 import { onLoad } from '@dcloudio/uni-app';
 import { useOrderStore, type Order } from '@/stores/order';
 import { useUserStore } from '@/stores/user';

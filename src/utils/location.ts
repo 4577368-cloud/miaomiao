@@ -1,6 +1,6 @@
 const AMAP_KEY = 'b785d85fbf0a8faf26934d832ace1c66'; // H5端 Key (来自 manifest.json)
 // 注意：小程序端需要 "Web服务" 类型的 Key，请在开发者后台申请并替换此处
-const AMAP_WEB_SERVICE_KEY = ''; 
+const AMAP_WEB_SERVICE_KEY = 'b785d85fbf0a8faf26934d832ace1c66'; // 临时使用相同的key，建议申请专用的Web服务Key 
 
 export interface LocationResult {
   latitude: number;
@@ -56,7 +56,7 @@ export const getCurrentLocation = (): Promise<LocationResult> => {
       fail: (err) => {
         console.error('获取位置失败', err.errMsg || err);
         // 模拟定位兜底
-        if (err.errMsg && (err.errMsg.includes('limit') || err.errMsg.includes('auth') || err.errMsg.includes('fail'))) {
+        if (err.errMsg && (err.errMsg.includes('limit') || err.errMsg.includes('auth') || err.errMsg.includes('fail') || err.errMsg.includes('denied'))) {
             uni.showToast({
                 title: '定位失败，已切换至模拟定位',
                 icon: 'none'

@@ -45,7 +45,7 @@
         <text class="title">{{ isOwner ? '消费记录' : '收益明细' }}</text>
       </view>
       <view class="transaction-list">
-        <view class="trans-item" v-for="item in history" :key="item.id">
+        <view class="trans-item" v-for="item in history" :key="item.id" @click="showTransactionDetail(item)">
           <view class="trans-icon">{{ isOwner ? '🛍️' : '💰' }}</view>
           <view class="trans-info">
             <text class="trans-title">{{ item.title }}</text>
@@ -130,6 +130,16 @@ const handleWithdraw = () => {
                 }
             }
         }
+    });
+};
+
+const showTransactionDetail = (item: any) => {
+    // 显示交易详情
+    uni.showModal({
+        title: '收益详情',
+        content: `服务类型：${item.title}\n金额：¥${item.amount.toFixed(2)}\n时间：${formatTime(item.time)}`,
+        showCancel: false,
+        confirmText: '知道了'
     });
 };
 

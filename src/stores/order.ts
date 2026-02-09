@@ -361,6 +361,23 @@ export const useOrderStore = defineStore('order', () => {
         scheduledTime = new Date(order.time.replace(/-/g, '/')).toISOString();
     }
 
+    // 验证必要字段
+    if (!order.creatorId) {
+        throw new Error('创建者ID不能为空');
+    }
+    if (!order.serviceType) {
+        throw new Error('服务类型不能为空');
+    }
+    if (!order.address) {
+        throw new Error('服务地址不能为空');
+    }
+    if (!order.time) {
+        throw new Error('服务时间不能为空');
+    }
+    if (!order.totalPrice || order.totalPrice <= 0) {
+        throw new Error('订单金额必须大于0');
+    }
+
     const orderNo = generateOrderNo();
 
     const dbOrder = {
@@ -385,13 +402,15 @@ export const useOrderStore = defineStore('order', () => {
        pet_snapshots: order.petSnapshots,
        coupon_id: order.couponId || null,
        discount_amount: order.discountAmount || 0,
-       original_price: order.originalPrice || order.totalPrice
+       original_price: order.originalPrice || order.totalPrice,
+       created_at: new Date().toISOString(),
+       updated_at: new Date().toISOString()
     };
 
     const { data, error } = await supabase.from('orders').insert(dbOrder).select().single();
     if (error) {
         console.error('Create order failed:', error);
-        throw error;
+        throw new Error(`创建订单失败: ${error.message}`);
     }
     
     // Update local store
@@ -407,6 +426,8 @@ export const useOrderStore = defineStore('order', () => {
        
        return newOrder;
     }
+    
+    throw new Error('创建订单失败：未获取到订单数据');
   };
 
   const payOrder = async (orderId: string) => {
@@ -500,6 +521,12 @@ export const useOrderStore = defineStore('order', () => {
     const order = orders.value.find(o => o.id === orderId);
     if (!order) return false;
 
+    // 先检查订单状态，避免重复完成
+    if (order.status === 'COMPLETED') {
+        console.warn('订单已完成，无需重复操作');
+        return true;
+    }
+
     const { error } = await supabase
         .from('orders')
         .update({
@@ -508,32 +535,45 @@ export const useOrderStore = defineStore('order', () => {
         })
         .eq('id', orderId);
 
-    if (error) return false;
+    if (error) {
+        console.error('完成服务失败:', error);
+        return false;
+    }
     
     // Add Income
     const userStore = useUserStore();
-    // Assuming backend triggers (Supabase Edge Function) handle money better, but for MVP:
-    // We rely on RPC or manual update. userStore.addLaborIncome calls local update + TODO DB.
-    // We should implement addLaborIncome with RPC in user store too, but for now:
+    
     if (order.sitterId) {
-         // Call RPC
-         await supabase.rpc('add_labor_income', { 
+         // Call RPC to add labor income
+         const { error: rpcError } = await supabase.rpc('add_labor_income', { 
              user_id: order.sitterId, 
              amount: order.totalPrice 
          });
          
+         if (rpcError) {
+             console.error('增加收入失败:', rpcError);
+             // 即使收入增加失败，也要继续更新订单状态
+         }
+         
          // Add Points (100 + Order Price)
          const pointsToAdd = 100 + Math.floor(order.totalPrice);
+         
          // If current user is the sitter (which they should be if they are completing it)
          if (userStore.userInfo?.id === order.sitterId) {
              await userStore.addPoints(pointsToAdd);
-             // Increment completed orders count
-             if (userStore.userInfo.sitterProfile) {
+         }
+         
+         // 增加宠托师的服务单量 - 使用RPC确保原子性
+         const { error: countError } = await supabase.rpc('increment_sitter_completed_orders', { 
+             user_id: order.sitterId 
+         });
+         
+         if (countError) {
+             console.error('增加服务单量失败:', countError);
+         } else {
+             // 更新本地缓存
+             if (userStore.userInfo?.id === order.sitterId && userStore.userInfo.sitterProfile) {
                  userStore.userInfo.sitterProfile.completedOrders = (userStore.userInfo.sitterProfile.completedOrders || 0) + 1;
-                 // Sync to DB
-                 await supabase.from('sitter_profiles')
-                   .update({ completed_orders: userStore.userInfo.sitterProfile.completedOrders })
-                   .eq('user_id', order.sitterId);
              }
          }
     }
@@ -543,6 +583,7 @@ export const useOrderStore = defineStore('order', () => {
         orders.value[orderIndex].status = 'COMPLETED';
         uni.setStorageSync('miaomiao_orders', JSON.stringify(orders.value));
     }
+    
     return true;
   };
   

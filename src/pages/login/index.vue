@@ -172,12 +172,15 @@
       </view>
     </view>
   </view>
+  <view style="height: 100px;"></view>
+  <CustomTabBar current-path="pages/login/index" />
 </template>
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue';
 import { onShow, onLoad } from '@dcloudio/uni-app';
 import { useUserStore, type UserInfo, type SitterProfile } from '@/stores/user';
+import CustomTabBar from '@/components/custom-tab-bar/index.vue';
 import { getRandomNickname } from '@/utils/nickname';
 import { supabase } from '@/utils/supabase';
 import { sendSmsCode, verifySmsCode } from '@/utils/sms';

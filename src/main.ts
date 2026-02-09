@@ -15,6 +15,21 @@ export function createApp() {
   const pinia = createPinia();
   app.use(pinia);
 
+  // 注册Service Worker (PWA支持)
+  // #ifdef H5
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/src/sw.js')
+        .then(registration => {
+          console.log('ServiceWorker 注册成功: ', registration);
+        })
+        .catch(err => {
+          console.log('ServiceWorker 注册失败: ', err);
+        });
+    });
+  }
+  // #endif
+
   // Global Route Guard
   const routeGuard = (args: any) => {
     try {

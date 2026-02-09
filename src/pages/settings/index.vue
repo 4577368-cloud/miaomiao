@@ -28,10 +28,13 @@
 
     <view class="logout-btn" @click="handleLogout">退出登录</view>
   </view>
+  <view style="height: 100px;"></view>
+  <CustomTabBar current-path="pages/settings/index" />
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import CustomTabBar from '@/components/custom-tab-bar/index.vue';
 import { useUserStore } from '@/stores/user';
 import { useOrderStore } from '@/stores/order';
 

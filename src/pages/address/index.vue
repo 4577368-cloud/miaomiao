@@ -32,6 +32,9 @@
     <view class="footer-btn">
       <button class="btn-add" @click="editAddress()">+ 新增地址</button>
     </view>
+    
+    <view style="height: 50px;"></view>
+    <CustomTabBar current-path="pages/address/index" />
   </view>
 </template>
 
@@ -39,6 +42,7 @@
 import { ref } from 'vue';
 import { onLoad } from '@dcloudio/uni-app';
 import { useUserStore, type Address } from '@/stores/user';
+import CustomTabBar from '@/components/custom-tab-bar/index.vue';
 
 const userStore = useUserStore();
 const isSelectionMode = ref(false);
@@ -68,7 +72,7 @@ const editAddress = (addr?: Address) => {
   min-height: 100vh;
   background-color: $color-bg-page;
   padding: 20rpx;
-  padding-bottom: 120rpx;
+  padding-bottom: 180rpx; /* 为CustomTabBar留出空间 */
 }
 
 .address-list {

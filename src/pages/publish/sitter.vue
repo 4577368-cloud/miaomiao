@@ -75,13 +75,17 @@
       <button class="btn-submit" @click="handleSubmit">发布意向</button>
     </view>
   </view>
+  <view style="height: 100px;"></view>
+  <CustomTabBar current-path="pages/publish/sitter" />
 </template>
 
 <script setup lang="ts">
 import { reactive, onMounted } from 'vue';
 import { useUserStore } from '@/stores/user';
+import { useSitterStore } from '@/stores/sitter';
 
 const userStore = useUserStore();
+const sitterStore = useSitterStore();
 
 const availableTags = ['猫咪专家', '大型犬', '幼宠照顾', '老年宠护理', '口服药喂食', '注射服务', '行为训练', '多宠家庭'];
 
@@ -141,6 +145,9 @@ const handleSubmit = () => {
       userStore.userInfo.sitterProfile.bio = form.experience;
       
       userStore.updateUser(userStore.userInfo);
+      
+      // Add to available sitters for user visibility
+      sitterStore.addSitter(userStore.userInfo);
       
       uni.showToast({ title: '发布成功', icon: 'success' });
       setTimeout(() => {

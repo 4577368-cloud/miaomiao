@@ -9,9 +9,10 @@ onLaunch(() => {
   const configStore = useConfigStore();
   userStore.initUser();
   configStore.initConfig();
-  uni.hideTabBar({
-    fail: () => {}
-  });
+  // 不再全局隐藏tabbar，由各个页面自行控制
+  // uni.hideTabBar({
+  //   fail: () => {}
+  // });
 });
 onShow(() => {
   console.log("App Show");

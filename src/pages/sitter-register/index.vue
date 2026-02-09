@@ -100,10 +100,13 @@
 
     <button class="btn-submit" @click="handleSubmit">提交申请并认证</button>
   </view>
+  <view style="height: 100px;"></view>
+  <CustomTabBar current-path="pages/sitter-register/index" />
 </template>
 
 <script setup lang="ts">
 import { reactive } from 'vue';
+import CustomTabBar from '@/components/custom-tab-bar/index.vue';
 import { useUserStore, type SitterAvailability } from '@/stores/user';
 
 const userStore = useUserStore();

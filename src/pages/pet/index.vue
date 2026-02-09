@@ -182,10 +182,13 @@
       </view>
     </view>
   </view>
+  <view style="height: 100px;"></view>
+  <CustomTabBar current-path="pages/pet/index" />
 </template>
 
 <script setup lang="ts">
 import { ref, computed, reactive } from 'vue';
+import CustomTabBar from '@/components/custom-tab-bar/index.vue';
 import { useUserStore, type PetInfo } from '@/stores/user';
 import { PetSize, PET_SIZE_COEFFICIENTS } from '@/constants/pet';
 import { DOG_BREEDS, CAT_BREEDS, BREED_AVATAR_MAP } from '@/constants/breeds';
