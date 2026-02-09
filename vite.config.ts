@@ -28,8 +28,8 @@ export default defineConfig({
   
   build: {
     // 2. 静态资源输出目录
-    // 确保构建产物能正确映射到 Vercel 的输出目录配置
-    assetsDir: 'static',
+    // 使用默认 assets 目录，避免与 static 目录混淆
+    // assetsDir: 'assets',
     
     // 3. 输出目录设定
     // Uni-app 默认 H5 构建路径，请确保 Vercel 的 Output Directory 与此一致
