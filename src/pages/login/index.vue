@@ -2,7 +2,7 @@
   <view class="login-container">
     <view class="glass-card">
       <view class="header">
-        <image src="https://imgus.tangbuy.com/static/images/2026-02-07/fb3eeeb726ef43ea9a0020b18da5290e-177045207976112019662246898497843.jpeg" class="brand-logo" mode="heightFix" />
+        <image src="/static/logo.png" class="brand-logo" mode="heightFix" @error="onLogoError" />
         <text class="title">您的贴心宠托伙伴</text>
         <text class="subtitle">{{ isRegister ? '创建新账号' : '欢迎回来' }}</text>
       </view>
@@ -207,6 +207,12 @@ const userInfo = reactive<UserInfo>({
   role: 'owner',
   joinDate: Date.now()
 });
+
+// Logo错误处理
+const onLogoError = (event: any) => {
+  console.log('Logo加载失败，使用备用图片');
+  event.target.src = 'https://via.placeholder.com/200x200/FF8E3C/FFFFFF?text=宠乐到家';
+};
 
 const showAvatarPopup = ref(false);
 

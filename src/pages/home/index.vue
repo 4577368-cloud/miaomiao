@@ -87,9 +87,10 @@
             <view class="card-icon">
               <!-- 使用混合模式消除背景色，同时使用圆角 -->
               <image 
-                src="https://imgus.tangbuy.com/static/images/2026-02-07/1f7527725fb54136931c6bf2919e7e0e-177045402956211314871683841080806.jpeg" 
+                src="/static/logo.png" 
                 mode="aspectFill" 
                 class="icon-img mix-blend" 
+                @error="handleImageError($event, 'https://via.placeholder.com/120x120/FF8E3C/FFFFFF?text=🐱')"
               />
             </view>
           </view>
@@ -108,9 +109,10 @@
             </view>
             <view class="card-icon">
               <image 
-                src="https://imgus.tangbuy.com/static/images/2026-02-07/6dd4699cc43b4845906dc5911a6f6b11-177045526494810424765923383103569.jpeg" 
+                src="/static/logo.png" 
                 mode="aspectFill" 
                 class="icon-img" 
+                @error="handleImageError($event, 'https://via.placeholder.com/120x120/4CAF50/FFFFFF?text=🐶')"
               />
             </view>
           </view>
@@ -249,6 +251,13 @@ import { useOrderStore } from '@/stores/order';
 
 const userStore = useUserStore();
 const orderStore = useOrderStore();
+
+// 图片错误处理函数
+const handleImageError = (event: any, fallbackUrl: string) => {
+  if (event && event.target) {
+    event.target.src = fallbackUrl;
+  }
+};
 
 const locationName = ref('点击定位');
 const isMounted = ref(false);

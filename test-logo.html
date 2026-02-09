@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Logo Test</title>
+    <style>
+        .test-container {
+            padding: 20px;
+            text-align: center;
+        }
+        .test-image {
+            max-width: 200px;
+            margin: 20px;
+            border: 1px solid #ccc;
+        }
+        .error {
+            color: red;
+            margin: 10px;
+        }
+        .success {
+            color: green;
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h2>Logo Image Test</h2>
+        
+        <h3>测试1: 原始URL</h3>
+        <img src="https://imgus.tangbuy.com/static/images/2026-02-07/fb3eeeb726ef43ea9a0020b18da5290e-177045207976112019662246898497843.jpeg" 
+             class="test-image" 
+             onload="this.nextElementSibling.className='success'; this.nextElementSibling.textContent='✅ 图片加载成功'"
+             onerror="this.nextElementSibling.className='error'; this.nextElementSibling.textContent='❌ 图片加载失败'">
+        <div></div>
+        
+        <h3>测试2: 本地logo.png</h3>
+        <img src="/src/static/logo.png" 
+             class="test-image"
+             onload="this.nextElementSibling.className='success'; this.nextElementSibling.textContent='✅ 本地logo加载成功'"
+             onerror="this.nextElementSibling.className='error'; this.nextElementSibling.textContent='❌ 本地logo加载失败'">
+        <div></div>
+        
+        <h3>测试3: 备用图片</h3>
+        <img src="https://via.placeholder.com/200x200/FF8E3C/FFFFFF?text=宠乐到家" 
+             class="test-image"
+             onload="this.nextElementSibling.className='success'; this.nextElementSibling.textContent='✅ 备用图片加载成功'"
+             onerror="this.nextElementSibling.className='error'; this.nextElementSibling.textContent='❌ 备用图片加载失败'">
+        <div></div>
+        
+        <h3>浏览器信息</h3>
+        <div id="browser-info"></div>
+        
+        <h3>控制台错误</h3>
+        <div id="console-errors"></div>
+    </div>
+    
+    <script>
+        // 显示浏览器信息
+        document.getElementById('browser-info').innerHTML = `
+            <p>用户代理: ${navigator.userAgent}</p>
+            <p>是否HTTPS: ${window.location.protocol === 'https:'}</p>
+            <p>当前域名: ${window.location.hostname}</p>
+        `;
+        
+        // 捕获控制台错误
+        const errorDiv = document.getElementById('console-errors');
+        window.addEventListener('error', function(e) {
+            errorDiv.innerHTML += `<p class="error">错误: ${e.message} (${e.filename}:${e.lineno})</p>`;
+        });
+        
+        // 检查图片加载状态
+        const images = document.querySelectorAll('img');
+        images.forEach(img => {
+            console.log('图片src:', img.src);
+        });
+    </script>
+</body>
+</html>

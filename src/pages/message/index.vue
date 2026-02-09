@@ -51,8 +51,8 @@
           <view class="icon-box" :class="msg.type">
             <text class="icon" v-if="msg.type === 'order'">📦</text>
             <text class="icon" v-else-if="msg.type === 'system'">🔔</text>
-            <text class="icon" v-else-if="msg.type === 'announcement'">�</text>
-            <text class="icon" v-else>�</text>
+            <image class="icon" v-else-if="msg.type === 'announcement'" src="/static/logo.png" mode="aspectFit" />
+            <image class="icon" v-else src="/static/logo.png" mode="aspectFit" />
             <view class="unread-dot" v-if="!msg.read"></view>
           </view>
           
@@ -338,7 +338,11 @@ const clearAll = () => {
     margin-right: 24rpx;
     flex-shrink: 0;
     
-    .icon { font-size: 40rpx; }
+    .icon { 
+      width: 40rpx; 
+      height: 40rpx; 
+      font-size: 40rpx; 
+    }
     position: relative;
     .unread-dot {
       position: absolute;
