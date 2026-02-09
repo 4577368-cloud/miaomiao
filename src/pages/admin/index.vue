@@ -292,8 +292,22 @@ const submitAnnouncement = async () => {
 };
 
 const deleteAnnouncement = async (item: any) => {
-  // TODO: Implement delete API
-  uni.showToast({ title: '暂未实现删除', icon: 'none' });
+  const confirm = await uni.showModal({
+    title: '确认删除',
+    content: '确定要删除这条公告吗？',
+    confirmText: '删除',
+    confirmColor: '#ff4d4f'
+  });
+  
+  if (confirm.confirm) {
+    const result = await AdminAPI.deleteAnnouncement(item.id);
+    if (result.success) {
+      uni.showToast({ title: '删除成功', icon: 'success' });
+      fetchAnnouncements();
+    } else {
+      uni.showToast({ title: '删除失败', icon: 'none' });
+    }
+  }
 };
 
 // 通用格式化
@@ -422,24 +436,24 @@ const refreshData = () => {
             <view class="table-body">
                <view v-for="cert in certifications" :key="cert.id" class="table-row">
                   <view class="table-cell">
-                     <text class="cell-main">{{ cert.profiles?.nickname }}</text>
-                     <text class="cell-sub">{{ cert.profiles?.phone }}</text>
+                     <text class="cell-main">{{ cert.nickname }}</text>
+                     <text class="cell-sub">{{ cert.phone }}</text>
                   </view>
                   <view class="table-cell">
-                     <text>{{ cert.experience_years }}年经验</text>
-                     <text class="tag">{{ cert.level }}</text>
+                     <text>{{ cert.experience_years || 0 }}年经验</text>
+                     <text class="tag">{{ cert.level || '初级' }}</text>
                   </view>
                   <view class="table-cell">
                      <text class="cell-main">{{ cert.real_name }}</text>
                      <text class="cell-sub">{{ cert.id_card }}</text>
                   </view>
-                  <text class="table-cell date-cell">{{ formatDate(cert.created_at) }}</text>
-                  <view class="table-cell actions" v-if="cert.verification_status === 'pending'">
-                     <button class="btn-small btn-success" @click="handleVerifySitter(cert.user_id, 'approved')">通过</button>
-                     <button class="btn-small btn-danger" @click="handleVerifySitter(cert.user_id, 'rejected')">拒绝</button>
+                  <text class="table-cell date-cell">{{ formatDate(cert.submitted_at) }}</text>
+                  <view class="table-cell actions" v-if="cert.status === 'pending'">
+                     <button class="btn-small btn-success" @click="handleVerifySitter(cert.id, 'approved')">通过</button>
+                     <button class="btn-small btn-danger" @click="handleVerifySitter(cert.id, 'rejected')">拒绝</button>
                   </view>
                   <text class="table-cell" v-else>
-                     {{ cert.verification_status === 'approved' ? '已通过' : '已拒绝' }}
+                     {{ cert.status === 'approved' ? '已通过' : '已拒绝' }}
                   </text>
                </view>
                <view v-if="certifications.length === 0" class="empty-tip">暂无数据</view>
@@ -487,9 +501,9 @@ const refreshData = () => {
             </view>
             <view class="table-body">
               <view v-for="order in filteredOrders" :key="order.id" class="table-row">
-                <text class="table-cell">{{ order.order_number }}</text>
+                <text class="table-cell">{{ order.id.slice(0, 8) }}...</text>
                 <text class="table-cell">{{ getServiceTypeName(order.service_type) }}</text>
-                <text class="table-cell">¥{{ order.amount }}</text>
+                <text class="table-cell">¥{{ order.total_price }}</text>
                 <text class="table-cell">
                   <text class="status-tag" :class="order.status">{{ getOrderStatusName(order.status) }}</text>
                 </text>

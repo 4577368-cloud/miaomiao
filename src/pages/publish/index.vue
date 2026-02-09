@@ -415,9 +415,18 @@
            </view>
         </view>
       </view>
+    </block>
 
-  <view class="footer-bar-placeholder"></view>
-  <view class="footer-bar">
+    <!-- 公共底部栏 (Sitter 和 Owner 通用) -->
+    <view class="footer-bar-placeholder"></view>
+    <view class="footer-bar">
+      <!-- Sitter Mode Footer -->
+      <view v-if="userStore.userInfo?.role === 'sitter'" class="footer-content sitter-mode" style="width: 100%">
+         <button class="btn-submit" @click="handleSitterUpdate" style="width: 100%">保存设置</button>
+      </view>
+      
+      <!-- Owner/Default Mode Footer -->
+      <view v-else class="footer-content owner-mode" style="display: flex; width: 100%; align-items: center;">
         <view class="price-container" @click="openPriceDetail">
           <view class="price-label-row">
              <text class="price-label">预估总价</text>
@@ -427,11 +436,11 @@
             <view class="price-main">
               <view class="price-val">
                 <text class="symbol">¥</text>
-                <text class="amount">{{ finalPrice }}</text>
+                <text class="amount">{{ safeFinalPrice }}</text>
               </view>
-              <text class="original-price" v-if="standardTotalPrice > rawTotalPrice">¥{{ standardTotalPrice }}</text>
+              <text class="original-price" v-if="safeStandardPrice > safeRawPrice">¥{{ safeStandardPrice }}</text>
             </view>
-            <view class="price-tags" v-if="priceBreakdown.holiday > 0 || priceBreakdown.rush > 0">
+            <view class="price-tags" v-if="priceBreakdown && (priceBreakdown.holiday > 0 || priceBreakdown.rush > 0)">
                <text class="tag holiday" v-if="priceBreakdown.holiday > 0">节日+{{ priceBreakdown.holiday }}</text>
                <text class="tag rush" v-if="priceBreakdown.rush > 0">急单+{{ priceBreakdown.rush }}</text>
             </view>
@@ -441,6 +450,7 @@
           {{ form.targetSitterId ? '立即预约' : '发布需求' }}
         </button>
       </view>
+    </view>
 
       <!-- 价格明细弹窗 -->
       <view class="price-detail-mask" v-if="showPriceDetail" @click="closePriceDetail">
@@ -652,12 +662,9 @@
       </view>
     </block>
   </view>
-  <view style="height: 50px;"></view>
-  <CustomTabBar current-path="pages/publish/index" />
 </template>
 
 <script setup lang="ts">
-import CustomTabBar from '@/components/custom-tab-bar/index.vue';
 import { reactive, computed, ref, onUnmounted } from 'vue';
 import { onLoad, onShow } from '@dcloudio/uni-app';
 import { PetSize, ServiceType } from '@/constants/pet';
@@ -738,6 +745,8 @@ const pricingOverrides = computed(() => ({
   rushThresholdHours: configStore.getRushThresholdHours(),
   multiPetDiscount: configStore.getMultiPetDiscount()
 }));
+
+
 
 const form = reactive({
   targetSitterId: undefined as string | undefined,
@@ -1212,6 +1221,40 @@ const finalPrice = computed(() => {
      }
   }
   return Math.max(0.01, price); // Minimum price
+});
+
+// Safe Computed for Price Display to prevent render errors
+const safeFinalPrice = computed(() => {
+  try {
+    if (!priceBreakdown.value) return '0.00';
+    // Use finalPrice logic here or just rely on priceBreakdown if finalPrice is not needed for display?
+    // The template uses safeFinalPrice.
+    // finalPrice logic includes coupon deduction which is NOT in priceBreakdown.total (usually).
+    // Let's check calculateTotalPrice.
+    // Usually total in breakdown is pre-coupon.
+    // But finalPrice computed above does the coupon deduction.
+    // So safeFinalPrice should probably wrap finalPrice.
+    return finalPrice.value || '0.00';
+  } catch (e) {
+    console.error('Price display error:', e);
+    return '0.00';
+  }
+});
+
+const safeStandardPrice = computed(() => {
+  try {
+    return standardTotalPrice.value || 0;
+  } catch {
+    return 0;
+  }
+});
+
+const safeRawPrice = computed(() => {
+  try {
+    return rawTotalPrice.value || 0;
+  } catch {
+    return 0;
+  }
 });
 
 
@@ -2042,6 +2085,7 @@ onShow(async () => {
   bottom: 0;
   left: 0;
   width: 100%;
+  width: 100vw; /* 确保占满屏幕宽度 */
   height: calc(120rpx + env(safe-area-inset-bottom));
   background: #fff;
   box-shadow: 0 -4rpx 16rpx rgba(0,0,0,0.05);
@@ -2050,7 +2094,7 @@ onShow(async () => {
   padding: 0 30rpx;
   padding-bottom: env(safe-area-inset-bottom);
   box-sizing: border-box;
-  z-index: 10000;
+  z-index: 99999; /* 极大值，防止被遮挡 */
   
   .price-container {
     flex: 1;
