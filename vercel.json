@@ -1,4 +1,6 @@
 {
+  "buildCommand": "npm run build:h5",
+  "outputDirectory": "dist/build/h5",
   "headers": [
     {
       "source": "/assets/(.*)",
