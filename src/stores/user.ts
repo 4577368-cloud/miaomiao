@@ -336,12 +336,17 @@ export const useUserStore = defineStore('user', () => {
   };
 
   const fetchSitterProfile = async (userId: string): Promise<SitterProfile | undefined> => {
-       const { data: sitterData } = await supabase
+       const { data: sitterData, error } = await supabase
          .from('sitter_profiles')
          .select('*')
          .eq('user_id', userId)
-         .single();
+         .maybeSingle();
          
+       if (error) {
+         console.error('Fetch sitter profile failed:', error);
+         return undefined;
+       }
+
        if (sitterData) {
          return {
            level: (sitterData.level as SitterLevel) || 'BRONZE',
