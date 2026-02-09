@@ -126,37 +126,67 @@ export class AdminAPI {
    * 获取用户列表（管理员权限）
    */
   static async getUsers() {
-    return this.getAdminClient().admin.select('users', `
-      *,
-      profiles:nickname,
-      auth:phone
-    `);
+    // 使用RPC函数获取用户列表
+    const { data, error } = await supabase
+      .rpc('get_admin_users');
+    
+    if (error) {
+      console.error('获取用户列表失败:', error);
+      return { success: false, error: error.message };
+    }
+    
+    return { success: true, data };
   }
   
   /**
    * 更新用户状态（管理员权限）
    */
   static async updateUserStatus(userId: string, status: string) {
-    return this.getAdminClient().admin.update('users', userId, { status });
+    // 使用RPC函数切换用户状态
+    const { data, error } = await supabase
+      .rpc('admin_toggle_user_status', {
+        p_user_id: userId,
+        p_ban: status === 'banned'
+      });
+    
+    if (error) {
+      console.error('更新用户状态失败:', error);
+      return { success: false, error: error.message };
+    }
+    
+    return { success: true, data };
   }
   
   /**
    * 获取订单列表（管理员权限）
    */
   static async getOrders() {
-    return this.getAdminClient().admin.select('orders', `
-      *,
-      owner:owner_id(nickname, phone),
-      sitter:sitter_id(nickname, phone),
-      service:service_type
-    `);
+    // 使用RPC函数获取订单列表
+    const { data, error } = await supabase
+      .rpc('get_admin_orders');
+    
+    if (error) {
+      console.error('获取订单列表失败:', error);
+      return { success: false, error: error.message };
+    }
+    
+    return { success: true, data };
   }
   
   /**
-   * 获取系统公告（管理员权限）
+   * 获取系统公告列表（管理员权限）
    */
   static async getAnnouncements() {
-    return this.getAdminClient().admin.select('announcements', '*');
+    // 使用RPC函数获取公告列表
+    const { data, error } = await supabase
+      .rpc('get_admin_announcements');
+    
+    if (error) {
+      console.error('获取公告列表失败:', error);
+      return { success: false, error: error.message };
+    }
+    
+    return { success: true, data };
   }
   
   /**
@@ -167,7 +197,20 @@ export class AdminAPI {
     content: string;
     created_by: string;
   }) {
-    return this.getAdminClient().admin.insert('announcements', data);
+    // 使用RPC函数创建公告
+    const { data: result, error } = await supabase
+      .rpc('admin_create_announcement', {
+        p_title: data.title,
+        p_content: data.content,
+        p_created_by: data.created_by
+      });
+    
+    if (error) {
+      console.error('创建公告失败:', error);
+      return { success: false, error: error.message };
+    }
+    
+    return { success: true, data: { id: result } };
   }
   
   /**
@@ -177,14 +220,37 @@ export class AdminAPI {
     title?: string;
     content?: string;
   }) {
-    return this.getAdminClient().admin.update('announcements', id, data);
+    // 使用RPC函数更新公告内容
+    const { data: result, error } = await supabase
+      .rpc('admin_update_announcement', {
+        p_id: id,
+        p_content: data.content || ''
+      });
+    
+    if (error) {
+      console.error('更新公告失败:', error);
+      return { success: false, error: error.message };
+    }
+    
+    return { success: true, data: result };
   }
   
   /**
    * 删除系统公告（管理员权限）
    */
   static async deleteAnnouncement(id: string) {
-    return this.getAdminClient().admin.delete('announcements', id);
+    // 使用RPC函数删除公告
+    const { data: result, error } = await supabase
+      .rpc('admin_delete_announcement', {
+        p_id: id
+      });
+    
+    if (error) {
+      console.error('删除公告失败:', error);
+      return { success: false, error: error.message };
+    }
+    
+    return { success: true, data: result };
   }
   
   /**
@@ -192,31 +258,18 @@ export class AdminAPI {
    */
   static async getStats() {
     try {
-      // 获取用户统计
-      const { data: userStats, error: userError } = await supabase
-        .from('users')
-        .select('role', { count: 'exact' });
+      // 使用RPC函数获取统计数据
+      const { data, error } = await supabase
+        .rpc('get_admin_stats');
       
-      if (userError) throw userError;
-      
-      // 获取订单统计
-      const { data: orderStats, error: orderError } = await supabase
-        .from('orders')
-        .select('status, amount', { count: 'exact' });
-      
-      if (orderError) throw orderError;
-      
-      // 计算总收入
-      const totalRevenue = orderStats?.reduce((sum: number, order: any) => {
-        return sum + (order.amount || 0);
-      }, 0) || 0;
+      if (error) throw error;
       
       return {
         success: true,
-        data: {
-          totalUsers: userStats?.length || 0,
-          totalOrders: orderStats?.length || 0,
-          totalRevenue
+        data: data[0] || {
+          total_users: 0,
+          total_orders: 0,
+          total_revenue: 0
         }
       };
     } catch (error) {
@@ -230,29 +283,26 @@ export class AdminAPI {
    */
   static async validateAdmin(username: string, password: string) {
     try {
-      // 在admin_users表中验证管理员账号
+      // 使用RPC函数验证管理员登录
       const { data, error } = await supabase
-        .from('admin_users')
-        .select('id, username, role, status')
-        .eq('username', username)
-        .eq('password', password) // 注意：实际应用中应该使用加密密码
-        .single();
+        .rpc('admin_login', {
+          p_username: username,
+          p_password: password
+        });
       
-      if (error || !data) {
+      if (error || !data || data.length === 0) {
         return { success: false, error: '用户名或密码错误' };
       }
       
-      // 检查管理员状态
-      if (data.status === 'banned') {
-        return { success: false, error: '管理员账号已被禁用' };
-      }
+      const admin = data[0];
       
       return {
         success: true,
         data: {
-          id: data.id,
-          username: data.username,
-          role: data.role
+          id: admin.id,
+          username: admin.username,
+          role: admin.role,
+          permissions: admin.permissions
         }
       };
     } catch (error) {
