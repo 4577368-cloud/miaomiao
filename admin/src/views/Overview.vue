@@ -134,37 +134,21 @@ const calculateChart = (items: { label: string; value: number }[]): ChartItem[] 
 
 const fetchDashboard = async () => {
   loading.value = true
-  const { data: ordersData, error: orderError } = await supabase
-    .from('orders')
-    .select('id, status, total_price, service_type, created_at')
-    .order('created_at', { ascending: false })
-    .limit(500)
-  
-  const { data: reviewsData, error: reviewError } = await supabase
-    .from('reviews')
-    .select('rating, created_at')
-    .order('created_at', { ascending: false })
-    .limit(500)
-  
-  if (orderError || reviewError) {
+  const { data: ordersData, error: orderError } = await supabase.rpc('get_admin_orders')
+  const { data: statsData, error: statsError } = await supabase.rpc('get_admin_stats')
+  if (orderError || statsError) {
     ElMessage.error('数据加载失败')
     loading.value = false
     return
   }
-
-  const orders = (ordersData || []) as OrderItem[]
-  const reviews = (reviewsData || []) as ReviewItem[]
+  const orders = (ordersData || []) as any[]
   const completedStatuses = ['COMPLETED', 'REVIEWED']
-
   stats.value.totalOrders = orders.length
   stats.value.completedOrders = orders.filter(order => completedStatuses.includes(order.status)).length
   stats.value.totalRevenue = orders
     .filter(order => completedStatuses.includes(order.status))
     .reduce((sum, order) => sum + Number(order.total_price || 0), 0)
-  stats.value.avgRating = reviews.length
-    ? reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) / reviews.length
-    : 0
-
+  stats.value.avgRating = 0
   const today = new Date()
   const trendItems: { label: string; value: number }[] = []
   for (let i = 6; i >= 0; i--) {
@@ -172,11 +156,10 @@ const fetchDashboard = async () => {
     date.setDate(today.getDate() - i)
     const label = formatDateLabel(date)
     const dateKey = date.toISOString().split('T')[0]
-    const count = orders.filter(order => order.created_at?.startsWith(dateKey)).length
+    const count = orders.filter(order => (order.created_at || '').startsWith(dateKey)).length
     trendItems.push({ label, value: count })
   }
   orderTrend.value = calculateChart(trendItems)
-
   const serviceMap = orders.reduce((acc, order) => {
     const key = order.service_type || 'UNKNOWN'
     acc[key] = (acc[key] || 0) + 1
@@ -187,7 +170,6 @@ const fetchDashboard = async () => {
     value: serviceMap[key]
   }))
   serviceDistribution.value = calculateChart(serviceItems)
-
   recentOrders.value = orders.slice(0, 10).map(order => ({
     id: order.id,
     serviceType: order.service_type,
@@ -195,8 +177,7 @@ const fetchDashboard = async () => {
     totalPrice: Number(order.total_price || 0).toFixed(2),
     createdAt: order.created_at ? new Date(order.created_at).toLocaleString() : ''
   }))
-
-  if (!orders.length && !reviews.length) {
+  if (!orders.length && !(statsData || []).length) {
     ElMessage.warning('暂无数据')
   }
   loading.value = false

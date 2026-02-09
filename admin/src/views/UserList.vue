@@ -223,35 +223,17 @@ const selectedCouponId = ref('')
 
 const fetchUsers = async () => {
   loading.value = true
-  // Note: 'pets' and 'orders' must be foreign keys. If not configured, this might fail or return null.
-  // We assume standard Supabase relation setup. If not, we might need manual joins or a view.
-  // For now, we try to fetch related data. If 'orders' is too large, this is bad, but for admin MVP it's ok.
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*, pets(id, name, type), orders:orders!orders_creator_id_fkey(id, status, total_price, creator_id)')
-    .order('created_at', { ascending: false })
-  
+  const { data, error } = await supabase.rpc('get_admin_users')
   if (error) {
     ElMessage.error('加载失败: ' + error.message)
   } else {
-    users.value = (data || []).map((u: any) => {
-      // Calculate Stats
-      const myOrders = u.orders || []
-      const initiated = myOrders.length
-      const completed = myOrders.filter((o: any) => o.status === 'COMPLETED' || o.status === 'REVIEWED').length
-      const spent = myOrders
-        .filter((o: any) => o.status === 'COMPLETED' || o.status === 'REVIEWED')
-        .reduce((sum: number, o: any) => sum + (Number(o.total_price) || 0), 0)
-
-      return {
-        ...u,
-        initiatedOrderCount: initiated,
-        completedOrderCount: completed,
-        totalSpent: spent,
-        // Assume phone/email might be in profile, if not, they are empty for now
-        // (Real implementation needs a View joining auth.users or Admin API)
-      }
-    })
+    users.value = (data || []).map((u: any) => ({
+      ...u,
+      initiatedOrderCount: 0,
+      completedOrderCount: 0,
+      totalSpent: 0,
+      pets: []
+    }))
   }
   loading.value = false
 }

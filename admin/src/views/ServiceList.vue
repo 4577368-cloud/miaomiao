@@ -63,7 +63,7 @@
     </el-table>
 
     <!-- Dialog -->
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑服务' : '新增服务'">
+    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑服务' : '新增服务'" class="admin-dialog">
       <el-form :model="form" label-width="100px">
         <el-form-item label="服务代码">
           <el-input v-model="form.code" :disabled="isEdit" placeholder="如: FEEDING" />
@@ -95,7 +95,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="pricingDialogVisible" :title="isPricingEdit ? '编辑规则' : '新增规则'">
+    <el-dialog v-model="pricingDialogVisible" :title="isPricingEdit ? '编辑规则' : '新增规则'" class="admin-dialog">
       <el-form :model="pricingForm" label-width="100px">
         <el-form-item label="分类">
           <el-select v-model="pricingForm.category" placeholder="选择分类">
@@ -347,5 +347,11 @@ onMounted(() => {
   font-size: 16px;
   font-weight: 600;
   color: #333;
+}
+
+/* Dialog body scroll fix */
+:deep(.admin-dialog .el-dialog__body) {
+  max-height: 70vh;
+  overflow: auto;
 }
 </style>
