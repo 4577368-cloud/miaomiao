@@ -130,7 +130,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import { supabase } from '@/utils/supabase'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -331,6 +331,10 @@ const handlePricingSubmit = async () => {
 onMounted(() => {
   fetchServices()
   fetchPricingConfigs()
+  window.addEventListener('admin-refresh-all', refreshAll)
+})
+onUnmounted(() => {
+  window.removeEventListener('admin-refresh-all', refreshAll)
 })
 </script>
 

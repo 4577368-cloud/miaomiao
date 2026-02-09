@@ -83,7 +83,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { supabase } from '@/utils/supabase'
 import { ElMessage } from 'element-plus'
 
@@ -183,7 +183,13 @@ const fetchDashboard = async () => {
   loading.value = false
 }
 
-onMounted(fetchDashboard)
+onMounted(() => {
+  fetchDashboard()
+  window.addEventListener('admin-refresh-all', fetchDashboard)
+})
+onUnmounted(() => {
+  window.removeEventListener('admin-refresh-all', fetchDashboard)
+})
 </script>
 
 <style scoped>

@@ -386,7 +386,7 @@
             class="remark-input" 
             placeholder-style="color: #BFBFBF"
             auto-height
-          />
+          ></textarea>
         </view>
       </view>
 
@@ -660,7 +660,6 @@
           </scroll-view>
         </view>
       </view>
-    </block>
   </view>
 </template>
 

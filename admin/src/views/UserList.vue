@@ -179,7 +179,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import { supabase } from '@/utils/supabase'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -352,7 +352,13 @@ const handleSendCouponSubmit = async () => {
   }
 }
 
-onMounted(fetchUsers)
+onMounted(() => {
+  fetchUsers()
+  window.addEventListener('admin-refresh-all', fetchUsers)
+})
+onUnmounted(() => {
+  window.removeEventListener('admin-refresh-all', fetchUsers)
+})
 </script>
 
 <style scoped>
