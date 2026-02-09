@@ -310,6 +310,95 @@ export class AdminAPI {
       return { success: false, error: '验证失败' };
     }
   }
+
+  /**
+   * 更新用户资产（余额/积分）（管理员权限）
+   */
+  static async updateUserAssets(userId: string, balance?: number, points?: number) {
+    const { data, error } = await supabase
+      .rpc('admin_update_user_assets', {
+        p_user_id: userId,
+        p_balance: balance,
+        p_points: points
+      });
+
+    if (error) {
+      console.error('更新用户资产失败:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data };
+  }
+
+  /**
+   * 获取宠托师认证列表（管理员权限）
+   */
+  static async getSitterCertifications(status: string = 'pending') {
+    const { data, error } = await supabase
+      .rpc('admin_get_sitter_certifications', {
+        p_status: status
+      });
+
+    if (error) {
+      console.error('获取认证列表失败:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data };
+  }
+
+  /**
+   * 审核宠托师（管理员权限）
+   */
+  static async verifySitter(sitterId: string, status: string, rejectReason?: string) {
+    const { data, error } = await supabase
+      .rpc('admin_verify_sitter', {
+        p_sitter_id: sitterId,
+        p_status: status,
+        p_reject_reason: rejectReason
+      });
+
+    if (error) {
+      console.error('审核宠托师失败:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data };
+  }
+
+  /**
+   * 获取服务列表（管理员权限）
+   */
+  static async getServices() {
+    const { data, error } = await supabase
+      .rpc('admin_get_services');
+
+    if (error) {
+      console.error('获取服务列表失败:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data };
+  }
+
+  /**
+   * 更新服务价格（管理员权限）
+   */
+  static async updateServicePrice(serviceId: string, price: number, discount: number = 100) {
+    const { data, error } = await supabase
+      .rpc('admin_update_service_price', {
+        p_service_id: serviceId,
+        p_price: price,
+        p_discount: discount
+      });
+
+    if (error) {
+      console.error('更新服务价格失败:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data };
+  }
 }
 
 export default AdminAPI;

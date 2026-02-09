@@ -1,122 +1,342 @@
--- 全量修复脚本：一次性解决表结构、字段类型、函数定义和数据插入问题
+-- Consolidated Admin System Fixes
+-- Run this script to fix all admin backend issues
 
--- 1. 启用必要的加密扩展
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
--- 2. 先删除函数，避免因依赖关系导致修改表结构失败
-DROP FUNCTION IF EXISTS admin_login(VARCHAR, VARCHAR);
-
--- 3. 修复 admin_users 表结构（全量检查）
-DO $$ 
-BEGIN 
-    -- 3.1 处理 password 字段重命名
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'admin_users' AND column_name = 'password') THEN
-        ALTER TABLE admin_users RENAME COLUMN "password" TO password_hash;
-    END IF;
-
-    -- 3.2 确保 password_hash 存在
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'admin_users' AND column_name = 'password_hash') THEN
-        ALTER TABLE admin_users ADD COLUMN password_hash VARCHAR(255);
-    END IF;
-
-    -- 3.3 确保 email 存在
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'admin_users' AND column_name = 'email') THEN
-        ALTER TABLE admin_users ADD COLUMN email VARCHAR(255) UNIQUE;
-    END IF;
-    
-    -- 3.4 确保 role 存在
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'admin_users' AND column_name = 'role') THEN
-        ALTER TABLE admin_users ADD COLUMN role VARCHAR(20) DEFAULT 'admin';
-    END IF;
-
-    -- 3.5 确保 is_active 存在
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'admin_users' AND column_name = 'is_active') THEN
-        ALTER TABLE admin_users ADD COLUMN is_active BOOLEAN DEFAULT true;
-    END IF;
-
-    -- 3.6 修复 permissions 字段类型为 JSONB
-    -- 如果字段存在但不是 jsonb，尝试转换；如果转换失败则重建
-    IF EXISTS (
-        SELECT 1 
-        FROM information_schema.columns 
-        WHERE table_name = 'admin_users' 
-        AND column_name = 'permissions' 
-    ) THEN
-        BEGIN
-            -- 尝试直接转换类型
-            ALTER TABLE admin_users 
-            ALTER COLUMN permissions TYPE JSONB 
-            USING permissions::jsonb;
-        EXCEPTION WHEN OTHERS THEN
-            -- 如果转换失败（例如旧数据格式完全不兼容），则删除重建
-            ALTER TABLE admin_users DROP COLUMN permissions;
-            ALTER TABLE admin_users ADD COLUMN permissions JSONB DEFAULT '[]';
-        END;
-    ELSE
-        -- 字段不存在，直接创建
-        ALTER TABLE admin_users ADD COLUMN permissions JSONB DEFAULT '[]';
-    END IF;
-
-END $$;
-
--- 4. 确保日志表存在
-CREATE TABLE IF NOT EXISTS admin_login_logs (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  admin_id UUID REFERENCES admin_users(id) ON DELETE CASCADE,
-  login_ip INET,
-  login_time TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  login_success BOOLEAN DEFAULT true,
-  user_agent TEXT
+-- 1. Ensure Service Types Table and Data
+CREATE TABLE IF NOT EXISTS service_types (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  code VARCHAR NOT NULL UNIQUE,
+  name VARCHAR NOT NULL,
+  description TEXT,
+  base_price DECIMAL(10,2) NOT NULL DEFAULT 0,
+  discount_percent INTEGER DEFAULT 100,
+  duration_minutes INTEGER DEFAULT 30,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 5. 重建 admin_login 函数
-CREATE OR REPLACE FUNCTION admin_login(p_username VARCHAR, p_password VARCHAR)
+INSERT INTO service_types (code, name, description, base_price, discount_percent)
+VALUES 
+  ('FEEDING', '上门喂养', '喂食 · 换水 · 铲屎', 50.00, 100),
+  ('WALKING', '上门遛宠', '遛狗 · 陪玩 · 清洁', 60.00, 100),
+  ('FOSTER', '家庭寄养', '寄养 · 照看 · 陪伴', 80.00, 100)
+ON CONFLICT (code) DO NOTHING;
+
+-- 2. Ensure Admin Users Table and Default Admin
+CREATE TABLE IF NOT EXISTS admin_users (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  username VARCHAR NOT NULL UNIQUE,
+  password VARCHAR NOT NULL, -- In production, use hash
+  role VARCHAR DEFAULT 'admin',
+  permissions TEXT[] DEFAULT ARRAY['all'],
+  last_login TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Insert Default Admin (admin / admin123)
+INSERT INTO admin_users (username, password, role)
+VALUES ('admin', 'admin123', 'super_admin')
+ON CONFLICT (username) DO NOTHING;
+
+-- 3. Fix RPC Functions to match AdminAPI.ts
+
+-- 3.1 Get Admin Users
+DROP FUNCTION IF EXISTS get_admin_users();
+CREATE OR REPLACE FUNCTION get_admin_users()
+RETURNS TABLE (
+  id UUID,
+  nickname VARCHAR,
+  avatar VARCHAR,
+  phone VARCHAR,
+  role VARCHAR,
+  balance DECIMAL,
+  points INTEGER,
+  status VARCHAR,
+  created_at TIMESTAMPTZ
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    p.id,
+    p.nickname,
+    p.avatar,
+    p.phone,
+    p.role::VARCHAR,
+    p.balance,
+    p.points,
+    COALESCE(p.status, 'active') as status,
+    p.created_at
+  FROM profiles p
+  ORDER BY p.created_at DESC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 3.2 Update User Assets
+DROP FUNCTION IF EXISTS admin_update_user_assets(UUID, DECIMAL, INTEGER);
+CREATE OR REPLACE FUNCTION admin_update_user_assets(
+  p_user_id UUID,
+  p_balance DECIMAL DEFAULT NULL,
+  p_points INTEGER DEFAULT NULL
+)
+RETURNS JSONB AS $$
+DECLARE
+  v_result JSONB;
+BEGIN
+  UPDATE profiles
+  SET 
+    balance = COALESCE(p_balance, balance),
+    points = COALESCE(p_points, points),
+    updated_at = NOW()
+  WHERE id = p_user_id;
+  
+  SELECT jsonb_build_object(
+    'id', id,
+    'balance', balance,
+    'points', points
+  ) INTO v_result
+  FROM profiles
+  WHERE id = p_user_id;
+  
+  RETURN v_result;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 3.3 Get Sitter Certifications
+DROP FUNCTION IF EXISTS admin_get_sitter_certifications(VARCHAR);
+CREATE OR REPLACE FUNCTION admin_get_sitter_certifications(p_status VARCHAR DEFAULT NULL)
+RETURNS TABLE (
+  user_id UUID,
+  real_name VARCHAR,
+  id_card VARCHAR,
+  level VARCHAR,
+  status VARCHAR,
+  submitted_at TIMESTAMPTZ,
+  photos JSONB,
+  experience_years INTEGER
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    sp.user_id,
+    sp.real_name,
+    sp.id_card,
+    sp.level,
+    sp.certification_status as status,
+    sp.certification_submitted_at as submitted_at,
+    jsonb_build_object(
+      'front', sp.id_card_front,
+      'back', sp.id_card_back
+    ) as photos,
+    sp.experience_years
+  FROM sitter_profiles sp
+  WHERE (p_status IS NULL OR sp.certification_status = p_status)
+  ORDER BY sp.certification_submitted_at DESC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 3.4 Verify Sitter (Match AdminAPI params: p_sitter_id, p_status, p_reject_reason)
+DROP FUNCTION IF EXISTS admin_verify_sitter(UUID, VARCHAR, VARCHAR);
+CREATE OR REPLACE FUNCTION admin_verify_sitter(
+  p_sitter_id UUID,
+  p_status VARCHAR,
+  p_reject_reason VARCHAR DEFAULT NULL
+)
+RETURNS BOOLEAN AS $$
+BEGIN
+  UPDATE sitter_profiles
+  SET 
+    certification_status = p_status,
+    certification_reject_reason = p_reject_reason,
+    certification_reviewed_at = NOW(),
+    is_certified = (p_status = 'approved') -- Assuming 'approved' is the success status
+  WHERE user_id = p_sitter_id;
+  
+  -- If verified, ensure role is sitter in profiles
+  IF p_status = 'approved' THEN
+    UPDATE profiles SET role = 'sitter' WHERE id = p_sitter_id AND role = 'owner';
+  END IF;
+
+  RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 3.5 Get Services
+DROP FUNCTION IF EXISTS admin_get_services();
+CREATE OR REPLACE FUNCTION admin_get_services()
+RETURNS SETOF service_types AS $$
+BEGIN
+  RETURN QUERY SELECT * FROM service_types ORDER BY base_price ASC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 3.6 Update Service Price (Match AdminAPI: p_service_id, p_price, p_discount)
+DROP FUNCTION IF EXISTS admin_update_service_price(VARCHAR, DECIMAL, INTEGER);
+DROP FUNCTION IF EXISTS admin_update_service_price(UUID, DECIMAL, INTEGER);
+
+CREATE OR REPLACE FUNCTION admin_update_service_price(
+  p_service_id UUID, -- Changed from code to UUID to match AdminAPI calling logic (if it passes ID)
+  p_price DECIMAL,
+  p_discount INTEGER
+)
+RETURNS BOOLEAN AS $$
+BEGIN
+  UPDATE service_types
+  SET 
+    base_price = p_price,
+    discount_percent = p_discount,
+    updated_at = NOW()
+  WHERE id = p_service_id;
+  
+  RETURN FOUND;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Also provide overload for code if needed, but ID is safer if frontend has ID
+CREATE OR REPLACE FUNCTION admin_update_service_price(
+  p_code VARCHAR,
+  p_price DECIMAL,
+  p_discount INTEGER
+)
+RETURNS BOOLEAN AS $$
+BEGIN
+  UPDATE service_types
+  SET 
+    base_price = p_price,
+    discount_percent = p_discount,
+    updated_at = NOW()
+  WHERE code = p_code;
+  
+  RETURN FOUND;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+-- 3.7 Create Announcement
+DROP FUNCTION IF EXISTS admin_create_announcement(VARCHAR, VARCHAR, VARCHAR);
+CREATE OR REPLACE FUNCTION admin_create_announcement(
+  p_title VARCHAR,
+  p_content VARCHAR,
+  p_created_by VARCHAR
+)
+RETURNS UUID AS $$
+DECLARE
+  v_id UUID;
+BEGIN
+  INSERT INTO announcements (title, content, created_by, created_at)
+  VALUES (p_title, p_content, p_created_by, NOW())
+  RETURNING id INTO v_id;
+  
+  RETURN v_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 3.8 Get Announcements
+DROP FUNCTION IF EXISTS get_admin_announcements();
+CREATE OR REPLACE FUNCTION get_admin_announcements()
+RETURNS TABLE (
+  id UUID,
+  title VARCHAR,
+  content TEXT,
+  created_by VARCHAR,
+  created_at TIMESTAMPTZ
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    a.id,
+    a.title,
+    a.content,
+    a.created_by,
+    a.created_at
+  FROM announcements a
+  ORDER BY a.created_at DESC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 3.9 Admin Login (Fix ambiguity)
+DROP FUNCTION IF EXISTS admin_login(VARCHAR, VARCHAR);
+CREATE OR REPLACE FUNCTION admin_login(
+  p_username TEXT,
+  p_password TEXT
+)
 RETURNS TABLE (
   id UUID,
   username VARCHAR,
-  email VARCHAR,
   role VARCHAR,
-  permissions JSONB
+  permissions TEXT[]
 ) AS $$
 BEGIN
-  -- 验证管理员账号
   RETURN QUERY
   SELECT 
     au.id,
     au.username,
-    au.email,
     au.role,
     au.permissions
   FROM admin_users au
   WHERE au.username = p_username 
-    AND au.password_hash = crypt(p_password, au.password_hash)
-    AND au.is_active = true;
-  
-  -- 更新最后登录时间
-  IF FOUND THEN
-    UPDATE admin_users 
-    SET last_login = NOW() 
-    WHERE username = p_username;
-    
-    -- 记录登录日志 (使用 NULL 避免 inet 类型转换错误)
-    INSERT INTO admin_login_logs (admin_id, login_ip, login_success)
-    SELECT id, NULL, true 
-    FROM admin_users
-    WHERE username = p_username;
-  END IF;
+  AND au.password = p_password;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 6. 插入默认管理员账号（此时表结构已完全正确）
-INSERT INTO admin_users (username, email, password_hash, role, permissions) 
-VALUES (
-  'admin', 
-  'admin@miaomiao.com',
-  crypt('admin123', gen_salt('bf')),
-  'super_admin',
-  '["users.manage", "orders.manage", "announcements.manage", "stats.view", "system.manage"]'::jsonb
-) ON CONFLICT (username) 
-DO UPDATE SET 
-  password_hash = EXCLUDED.password_hash,
-  role = EXCLUDED.role,
-  permissions = EXCLUDED.permissions;
+-- 3.10 Get Admin Stats
+DROP FUNCTION IF EXISTS get_admin_stats();
+CREATE OR REPLACE FUNCTION get_admin_stats()
+RETURNS TABLE (
+  total_users BIGINT,
+  total_orders BIGINT,
+  total_revenue DECIMAL
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    (SELECT COUNT(*) FROM profiles) as total_users,
+    (SELECT COUNT(*) FROM orders) as total_orders,
+    (SELECT COALESCE(SUM(total_price), 0) FROM orders WHERE status = 'COMPLETED') as total_revenue;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 3.11 Toggle User Status (Ban/Unban)
+DROP FUNCTION IF EXISTS admin_toggle_user_status(UUID, BOOLEAN);
+CREATE OR REPLACE FUNCTION admin_toggle_user_status(
+  p_user_id UUID,
+  p_ban BOOLEAN
+)
+RETURNS BOOLEAN AS $$
+BEGIN
+  UPDATE profiles
+  SET status = CASE WHEN p_ban THEN 'banned' ELSE 'active' END
+  WHERE id = p_user_id;
+  RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 3.12 Get Admin Orders
+DROP FUNCTION IF EXISTS get_admin_orders();
+CREATE OR REPLACE FUNCTION get_admin_orders()
+RETURNS TABLE (
+  id UUID,
+  order_number VARCHAR,
+  service_type VARCHAR,
+  amount DECIMAL,
+  status VARCHAR,
+  created_at TIMESTAMPTZ,
+  sitter_name VARCHAR,
+  owner_name VARCHAR
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    o.id,
+    o.id::VARCHAR as order_number, -- Simplified, normally use serial or specific column
+    o.service_type,
+    o.total_price as amount,
+    o.status,
+    o.created_at,
+    s.nickname as sitter_name,
+    p.nickname as owner_name
+  FROM orders o
+  LEFT JOIN profiles p ON o.creator_id = p.id
+  LEFT JOIN profiles s ON o.sitter_id = s.id
+  ORDER BY o.created_at DESC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

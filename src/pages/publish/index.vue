@@ -416,9 +416,8 @@
         </view>
       </view>
 
-      <!-- 底部价格栏 -->
-      <view class="footer-bar-placeholder"></view>
-      <view class="footer-bar">
+  <view class="footer-bar-placeholder"></view>
+  <view class="footer-bar">
         <view class="price-container" @click="openPriceDetail">
           <view class="price-label-row">
              <text class="price-label">预估总价</text>
