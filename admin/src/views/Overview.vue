@@ -2,7 +2,7 @@
   <div class="page-container">
     <div class="page-header">
       <div class="title">数据看板</div>
-      <el-button type="primary" :loading="loading" @click="fetchDashboard">刷新数据</el-button>
+      <el-button type="primary" :loading="loading" @click="fetchDashboard">拉取云端数据</el-button>
     </div>
 
     <el-row :gutter="16" class="stats-row">

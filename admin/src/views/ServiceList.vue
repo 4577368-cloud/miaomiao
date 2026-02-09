@@ -2,6 +2,7 @@
   <div class="page-container">
     <div class="toolbar">
       <el-button type="primary" :icon="Plus" @click="handleAdd">新增服务</el-button>
+      <el-button @click="refreshAll">拉取云端数据</el-button>
     </div>
     
     <el-table :data="services" border style="width: 100%" v-loading="loading">
@@ -210,6 +211,11 @@ const fetchPricingConfigs = async () => {
     pricingConfigs.value = data || []
   }
   pricingLoading.value = false
+}
+
+const refreshAll = async () => {
+  await fetchServices()
+  await fetchPricingConfigs()
 }
 
 const handleAdd = () => {

@@ -1,7 +1,7 @@
 <template>
   <div class="page-container">
     <div class="toolbar">
-      <!-- <el-button type="primary" :icon="Plus" @click="handleAdd">新增用户</el-button> -->
+      <el-button type="primary" @click="fetchUsers">拉取云端数据</el-button>
     </div>
 
     <el-table :data="users" border style="width: 100%" v-loading="loading">
