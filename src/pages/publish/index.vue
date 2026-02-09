@@ -4,7 +4,7 @@
     <view class="nav-placeholder"></view>
 
     <!-- SITTER MODE: Update Availability -->
-    <block v-if="userStore.userInfo?.role === 'sitter'">
+    <template v-if="userStore.userInfo?.role === 'sitter'">
       <view class="page-header">
         <text class="title">服务管理</text>
         <text class="subtitle">管理您的接单时间与服务内容</text>
@@ -50,10 +50,10 @@
       </view>
 
       <button class="btn-submit" @click="handleSitterUpdate">保存设置</button>
-    </block>
+    </template>
 
     <!-- OWNER MODE: Publish Task -->
-    <block v-else>
+    <template v-else>
       <!-- 1. 发布模式选择 (Task Hall vs Specific Sitter) -->
       <view class="section card-section mode-selection">
         <view class="section-header">
@@ -415,7 +415,7 @@
            </view>
         </view>
       </view>
-    </block>
+    </template>
 
     <!-- 公共底部栏 (Sitter 和 Owner 通用) -->
     <view class="footer-bar-placeholder"></view>
