@@ -19,67 +19,67 @@
       "short_name": "发布",
       "description": "快速发布宠物服务需求",
       "url": "/src/pages/publish/index",
-      "icons": [{ "src": "static/logo.png", "sizes": "192x192" }]
+      "icons": [{ "src": "logo.png", "sizes": "192x192" }]
     },
     {
       "name": "我的订单",
       "short_name": "订单",
       "description": "查看我的宠物服务订单",
       "url": "/src/pages/orders/index",
-      "icons": [{ "src": "static/logo.png", "sizes": "192x192" }]
+      "icons": [{ "src": "logo.png", "sizes": "192x192" }]
     }
   ],
   "icons": [
     {
-      "src": "static/favicon.ico",
+      "src": "favicon.ico",
       "sizes": "48x48",
       "type": "image/x-icon",
       "purpose": "any"
     },
     {
-      "src": "static/logo.png",
+      "src": "logo.png",
       "sizes": "72x72",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "static/logo.png",
+      "src": "logo.png",
       "sizes": "96x96",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "static/logo.png",
+      "src": "logo.png",
       "sizes": "128x128",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "static/logo.png",
+      "src": "logo.png",
       "sizes": "144x144",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "static/logo.png",
+      "src": "logo.png",
       "sizes": "152x152",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "static/logo.png",
+      "src": "logo.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "static/logo.png",
+      "src": "logo.png",
       "sizes": "384x384",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "static/logo.png",
+      "src": "logo.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
