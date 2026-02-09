@@ -16,20 +16,21 @@
       </view>
     </view>
 
-    <view class="notice-banner" v-if="bannerMessages.length > 0">
+    <view class="notice-banner" v-if="bannerMessages.length > 0" @click="handleBannerClick">
       <view class="banner-left">
         <text class="icon">🔔</text>
       </view>
-      <swiper class="banner-swiper-vertical" vertical autoplay circular interval="3000" duration="500">
-        <swiper-item v-for="msg in bannerMessages" :key="msg.id">
-          <view class="notice-banner-item" @click="handleBannerClick(msg)">
-            <text class="notice-banner-title">{{ msg.title }}</text>
-            <text class="notice-banner-content">{{ msg.content }}</text>
-          </view>
-        </swiper-item>
-      </swiper>
+      <view class="banner-content-wrapper">
+        <swiper class="banner-swiper-vertical" vertical autoplay circular interval="4000" duration="500" @click.stop="handleBannerClick">
+          <swiper-item v-for="msg in bannerMessages" :key="msg.id" @click.stop="showAnnouncementDetail(msg)">
+            <view class="notice-banner-item">
+              <text class="notice-banner-title" :class="getTitleScrollClass(msg.title)">{{ msg.title }}</text>
+            </view>
+          </swiper-item>
+        </swiper>
+      </view>
       <view class="banner-right">
-        <text class="banner-count">{{ bannerMessages.length }}</text>
+        <text class="banner-arrow">›</text>
       </view>
     </view>
     <!-- 铲屎官视图 -->
@@ -347,8 +348,42 @@ const handleClaimCoupon = async () => {
   }
 };
 
+// 检查公告标题是否需要滚动
+const isTitleOverflow = (title: string) => {
+  // 估算中文字符宽度，大约每个字符28rpx，加上一些边距
+  const charWidth = 28;
+  const maxWidth = 400; // banner-content-wrapper的最大宽度
+  return title.length * charWidth > maxWidth;
+};
+
+// 获取公告标题的滚动动画类名
+const getTitleScrollClass = (title: string) => {
+  return isTitleOverflow(title) ? 'scroll-title' : '';
+};
+
 const refreshBanner = () => {
   bannerMessages.value = userStore.getUnreadNotifications();
+};
+
+// 显示所有公告
+const showAllAnnouncements = () => {
+  uni.switchTab({ url: '/pages/message/index' });
+};
+
+// 显示公告详情
+const showAnnouncementDetail = (announcement: any) => {
+  uni.showModal({
+    title: announcement.title,
+    content: announcement.content,
+    showCancel: false,
+    confirmText: '知道了',
+    success: () => {
+      if (announcement?.id) {
+        userStore.markNotificationRead(announcement.id);
+        refreshBanner();
+      }
+    }
+  });
 };
 
 const openLink = (link?: string) => {
@@ -695,6 +730,19 @@ const handleAcceptOrder = async (orderId: string) => {
   display: flex;
   align-items: center;
   gap: 16rpx;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  
+  &:active {
+    transform: scale(0.98);
+    opacity: 0.9;
+  }
+  
+  .banner-content-wrapper {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+  }
 }
 
 .banner-left {
@@ -716,6 +764,24 @@ const handleAcceptOrder = async (orderId: string) => {
   font-size: 28rpx;
   color: #8d6b00;
   font-weight: 600;
+  white-space: nowrap;
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  
+  &.scroll-title {
+    animation: scrollText 12s linear infinite;
+    padding-right: 100%;
+    max-width: none;
+  }
+}
+
+@keyframes scrollText {
+  0% { transform: translateX(100%); }
+  10% { transform: translateX(0); }
+  90% { transform: translateX(0); }
+  100% { transform: translateX(-100%); }
 }
 
 .notice-banner-content {
@@ -727,11 +793,15 @@ const handleAcceptOrder = async (orderId: string) => {
 }
 
 .banner-right {
-  background: #ff9f0a;
-  color: #fff;
-  border-radius: 20rpx;
-  padding: 4rpx 12rpx;
-  font-size: 22rpx;
+  color: #ff9f0a;
+  font-size: 32rpx;
+  font-weight: bold;
+  padding: 0 8rpx;
+}
+
+.banner-arrow {
+  display: block;
+  transform: scaleX(0.6);
 }
 
 .sitter-action-card {

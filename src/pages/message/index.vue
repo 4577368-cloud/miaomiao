@@ -61,7 +61,12 @@
                 <text class="title">{{ msg.title }}</text>
                 <text class="time">{{ msg.time }}</text>
              </view>
-             <text class="desc">{{ msg.content }}</text>
+             <text class="desc" :class="{ expired: isExpired(msg) }">{{ msg.content }}</text>
+             <view class="status-bar" v-if="msg.type === 'announcement'">
+               <text class="status-text" :class="{ expired: isExpired(msg) }">
+                 {{ isExpired(msg) ? '已过期' : '进行中' }}
+               </text>
+             </view>
           </view>
        </view>
        <view class="footer-tip">没有更多消息了</view>
@@ -207,8 +212,29 @@ onUnload(() => {
 });
 
 const filteredNotifications = computed(() => {
-  if (currentTab.value === 'all') return notifications.value;
-  return notifications.value.filter(msg => msg.type === currentTab.value);
+  let filtered = notifications.value;
+  
+  if (currentTab.value === 'all') {
+    // 显示所有消息，包括过期的公告
+    return filtered;
+  } else if (currentTab.value === 'announcement') {
+    // 公告标签页显示所有公告（包括过期的）
+    return filtered.filter(msg => msg.type === 'announcement');
+  } else {
+    // 其他类型只显示未过期的
+    return filtered.filter(msg => {
+      if (msg.type !== currentTab.value) return false;
+      
+      // 检查公告是否过期
+      if (msg.type === 'announcement') {
+        const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+        const notificationTime = new Date(msg.time).getTime();
+        return notificationTime > oneDayAgo;
+      }
+      
+      return true;
+    });
+  }
 });
 
 const openLink = (link?: string) => {
@@ -228,6 +254,14 @@ const handleMessageClick = (msg: any) => {
     if (userId) storedNotifications.value = userStore.getNotifications(userId);
   }
   if (msg?.link) openLink(msg.link);
+};
+
+// 检查公告是否过期
+const isExpired = (msg: any) => {
+  if (msg.type !== 'announcement') return false;
+  const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+  const notificationTime = new Date(msg.time).getTime();
+  return notificationTime <= oneDayAgo;
 };
 
 const markAllRead = () => {
@@ -390,6 +424,28 @@ const clearAll = () => {
       -webkit-box-orient: vertical;
       -webkit-line-clamp: 2;
       overflow: hidden;
+      
+      &.expired {
+        color: #999;
+        opacity: 0.7;
+      }
+    }
+    
+    .status-bar {
+      margin-top: 12rpx;
+      
+      .status-text {
+        font-size: 22rpx;
+        padding: 4rpx 12rpx;
+        border-radius: 12rpx;
+        background: rgba($color-primary, 0.1);
+        color: $color-primary;
+        
+        &.expired {
+          background: #f0f0f0;
+          color: #999;
+        }
+      }
     }
   }
 }

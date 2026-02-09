@@ -8,28 +8,117 @@
         '<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0' +
         (coverSupport ? ', viewport-fit=cover' : '') + '" />')
     </script>
-    <title>宠乐到家</title>
+    <title>宠乐到家 - 专业宠物上门服务</title>
     
+    <!-- Favicon配置 -->
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
+    <link rel="icon" type="image/png" href="/static/logo.png" />
+    <link rel="shortcut icon" type="image/png" href="/static/logo.png" />
+    <link rel="apple-touch-icon" sizes="57x57" href="/static/logo.png" />
+    <link rel="apple-touch-icon" sizes="72x72" href="/static/logo.png" />
+    <link rel="apple-touch-icon" sizes="114x114" href="/static/logo.png" />
+    <link rel="apple-touch-icon" sizes="144x144" href="/static/logo.png" />
+    
+    <!-- 强制刷新favicon -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    
+    <!-- PWA配置 -->
     <link rel="manifest" href="/static/manifest.json" />
     <meta name="theme-color" content="#FF8E3C" />
     
+    <!-- iOS配置 -->
     <meta name="mobile-web-app-capable" content="yes" />
-    
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="宠乐到家" />
-    <link rel="apple-touch-icon" href="/static/logo.png" />
+    
+    <!-- 应用描述 -->
+    <meta name="description" content="宠乐到家 - 专业的宠物上门服务平台，提供宠物寄养、遛狗、美容等一站式宠物服务" />
+    <meta name="keywords" content="宠物服务,宠物寄养,宠物美容,宠物遛狗,上门服务" />
+    
+    <!-- Open Graph标签 -->
+    <meta property="og:title" content="宠乐到家 - 专业宠物上门服务" />
+    <meta property="og:description" content="专业的宠物上门服务平台，提供宠物寄养、遛狗、美容等一站式宠物服务" />
+    <meta property="og:image" content="/static/logo.png" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="宠乐到家" />
     
     </head>
   <body>
     <div id="app">
       <style>
-        .loading-container { display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #FFFBF5; }
-        .loading-spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #FF8E3C; border-radius: 50%; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        .loading-container { 
+          display: flex; 
+          flex-direction: column;
+          justify-content: center; 
+          align-items: center; 
+          height: 100vh; 
+          background: linear-gradient(135deg, #FFFBF5 0%, #FFF8F0 100%);
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+        }
+        .brand-logo {
+          width: 120px;
+          height: 120px;
+          margin-bottom: 24px;
+          animation: logoPulse 2s ease-in-out infinite;
+          border-radius: 24px;
+          box-shadow: 0 8px 24px rgba(255, 142, 60, 0.2);
+        }
+        .brand-name {
+          font-size: 28px;
+          font-weight: 700;
+          color: #333;
+          margin-bottom: 8px;
+          animation: textFadeIn 1s ease-out;
+        }
+        .brand-slogan {
+          font-size: 16px;
+          color: #666;
+          margin-bottom: 32px;
+          animation: textFadeIn 1s ease-out 0.3s both;
+        }
+        .loading-spinner { 
+          width: 40px; 
+          height: 40px; 
+          border: 4px solid #f3f3f3; 
+          border-top: 4px solid #FF8E3C; 
+          border-radius: 50%; 
+          animation: spin 1s linear infinite; 
+        }
+        .loading-text {
+          font-size: 14px;
+          color: #999;
+          margin-top: 16px;
+          animation: textFadeIn 1s ease-out 0.6s both;
+        }
+        @keyframes spin { 
+          0% { transform: rotate(0deg); } 
+          100% { transform: rotate(360deg); } 
+        }
+        @keyframes logoPulse {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.05); opacity: 0.8; }
+        }
+        @keyframes textFadeIn {
+          0% { opacity: 0; transform: translateY(10px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        /* 移动端适配 */
+        @media (max-width: 768px) {
+          .brand-logo { width: 100px; height: 100px; }
+          .brand-name { font-size: 24px; }
+          .brand-slogan { font-size: 14px; }
+        }
       </style>
       <div class="loading-container">
+        <img src="/static/logo.png" alt="宠乐到家" class="brand-logo" />
+        <div class="brand-name">宠乐到家</div>
+        <div class="brand-slogan">专业宠物上门服务，让爱不缺席</div>
         <div class="loading-spinner"></div>
+        <div class="loading-text">正在加载中...</div>
       </div>
       </div>
     

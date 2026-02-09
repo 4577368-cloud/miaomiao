@@ -22,6 +22,49 @@ export function createApp() {
       navigator.serviceWorker.register('/src/sw.js')
         .then(registration => {
           console.log('ServiceWorker 注册成功: ', registration);
+          
+          // 监听PWA安装提示
+          let deferredPrompt: any;
+          
+          window.addEventListener('beforeinstallprompt', (e) => {
+            // 阻止默认的安装提示
+            e.preventDefault();
+            deferredPrompt = e;
+            
+            // 显示自定义安装按钮
+            const installButton = document.createElement('div');
+            installButton.innerHTML = `
+              <div style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #FF8E3C; color: white; padding: 12px 24px; border-radius: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); cursor: pointer; z-index: 9999; font-size: 14px; font-weight: 500;">
+                📱 添加到主屏幕
+              </div>
+            `;
+            installButton.onclick = async () => {
+              if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                console.log(`用户${outcome === 'accepted' ? '接受' : '拒绝'}了安装提示`);
+                deferredPrompt = null;
+                installButton.remove();
+              }
+            };
+            document.body.appendChild(installButton);
+            
+            // 5秒后自动隐藏安装提示
+            setTimeout(() => {
+              if (installButton.parentNode) {
+                installButton.remove();
+              }
+            }, 5000);
+          });
+          
+          // 监听应用安装成功
+          window.addEventListener('appinstalled', () => {
+            console.log('PWA已安装');
+            uni.showToast({
+              title: '安装成功！现在可以从主屏幕直接访问',
+              icon: 'success'
+            });
+          });
         })
         .catch(err => {
           console.log('ServiceWorker 注册失败: ', err);

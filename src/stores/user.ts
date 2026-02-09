@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import { supabase } from '@/utils/supabase';
 import { PetSize } from '@/constants/pet';
 import { useOrderStore } from '@/stores/order';
+import AdminAPI from '@/utils/admin-api';
 
 export type UserRole = 'owner' | 'sitter';
 export type SitterLevel = 'DIAMOND' | 'GOLD' | 'SILVER' | 'BRONZE' | 'TRAINEE';
@@ -88,6 +89,15 @@ export interface NotificationItem {
   orderId?: string;
 }
 
+export interface AdminInfo {
+  id: string;
+  username: string;
+  email?: string;
+  role: 'super_admin' | 'admin' | 'moderator';
+  permissions: string[];
+  lastLogin?: number;
+}
+
 export interface UserInfo {
   id: string;
   email?: string;
@@ -106,11 +116,19 @@ export interface UserInfo {
   points?: number;
   coupons?: Coupon[];
   laborBalance?: number;
+  status?: 'active' | 'banned'; // 添加用户状态字段
 }
 
 export const useUserStore = defineStore('user', () => {
   const userInfo = ref<UserInfo | null>(null);
   const isLoggedIn = ref(false);
+  const adminInfo = ref<AdminInfo | null>(null);
+  const isAdmin = ref(false);
+  
+  // 计算管理员状态
+  const updateAdminStatus = () => {
+    isAdmin.value = !!adminInfo.value;
+  };
 
   // Sync Supabase Session to Store
   const syncSession = async () => {
@@ -371,8 +389,209 @@ export const useUserStore = defineStore('user', () => {
     await supabase.auth.signOut();
     userInfo.value = null;
     isLoggedIn.value = false;
+    adminInfo.value = null; // 清除管理员信息
     uni.removeStorageSync('miaomiao_user');
+    uni.removeStorageSync('miaomiao_admin');
     uni.reLaunch({ url: '/pages/login/index' });
+  };
+  
+  // 管理员登录
+  const adminLogin = async (username: string, password: string) => {
+    try {
+      // 使用AdminAPI验证管理员身份
+      const result = await AdminAPI.validateAdmin(username, password);
+      
+      if (!result.success) {
+        return { success: false, message: result.error || '登录失败' };
+      }
+      
+      // 设置管理员信息
+      adminInfo.value = {
+        id: result.data!.id,
+        username: result.data!.username,
+        email: '', // 可以从数据库获取，这里简化处理
+        role: result.data!.role,
+        permissions: ['admin'], // 管理员权限
+        lastLogin: Date.now()
+      };
+      
+      // 更新管理员状态
+      updateAdminStatus();
+      
+      // 保存到本地存储
+      uni.setStorageSync('miaomiao_admin', JSON.stringify(adminInfo.value));
+      
+      return { success: true, data: adminInfo.value };
+    } catch (error: any) {
+      console.error('管理员登录失败:', error);
+      return { success: false, message: error.message || '登录失败' };
+    }
+  };
+  
+  // 管理员登出
+  const adminLogout = () => {
+    adminInfo.value = null;
+    updateAdminStatus();
+    uni.removeStorageSync('miaomiao_admin');
+  };
+
+  // 验证管理员会话
+  const validateAdminSession = async () => {
+    if (!adminInfo.value) {
+      return { success: false, error: '管理员未登录' };
+    }
+    
+    try {
+      // 这里可以添加会话验证逻辑
+      // 例如检查会话是否过期，或者向服务器验证会话有效性
+      
+      // 简单的本地验证：检查最后登录时间是否超过24小时
+      const now = Date.now();
+      const lastLogin = adminInfo.value.lastLogin || 0;
+      const sessionTimeout = 24 * 60 * 60 * 1000; // 24小时
+      
+      if (now - lastLogin > sessionTimeout) {
+        // 会话过期，清除管理员信息
+        adminLogout();
+        return { success: false, error: '管理员会话已过期' };
+      }
+      
+      return { success: true };
+    } catch (error: any) {
+      console.error('验证管理员会话失败:', error);
+      return { success: false, error: '会话验证失败' };
+    }
+  };
+
+  // 清除管理员会话
+  const clearAdminSession = () => {
+    adminLogout();
+  };
+  
+  // 获取管理员用户列表
+  const getAdminUsers = async () => {
+    if (!isAdmin.value) {
+      throw new Error('没有管理员权限');
+    }
+    
+    try {
+      const result = await AdminAPI.getUsers();
+      return result;
+    } catch (error: any) {
+      console.error('获取用户列表失败:', error);
+      return { success: false, message: error.message || '获取用户列表失败' };
+    }
+  };
+  
+  // 切换用户状态
+  const toggleUserStatus = async (userId: string, ban: boolean) => {
+    if (!isAdmin.value) {
+      throw new Error('没有管理员权限');
+    }
+    
+    try {
+      const result = await AdminAPI.updateUserStatus(userId, ban ? 'banned' : 'active');
+      return result;
+    } catch (error: any) {
+      console.error('切换用户状态失败:', error);
+      return { success: false, message: error.message || '操作失败' };
+    }
+  };
+  
+  // 获取管理员订单列表
+  const getAdminOrders = async () => {
+    if (!isAdmin.value) {
+      throw new Error('没有管理员权限');
+    }
+    
+    try {
+      const result = await AdminAPI.getOrders();
+      return result;
+    } catch (error: any) {
+      console.error('获取订单列表失败:', error);
+      return { success: false, message: error.message || '获取订单列表失败' };
+    }
+  };
+  
+  // 获取管理员公告列表
+  const getAdminAnnouncements = async () => {
+    if (!isAdmin.value) {
+      throw new Error('没有管理员权限');
+    }
+    
+    try {
+      const result = await AdminAPI.getAnnouncements();
+      return result;
+    } catch (error: any) {
+      console.error('获取公告列表失败:', error);
+      return { success: false, message: error.message || '获取公告列表失败' };
+    }
+  };
+  
+  // 创建公告
+  const createAnnouncement = async (announcement: { title: string; content: string }) => {
+    if (!isAdmin.value) {
+      throw new Error('没有管理员权限');
+    }
+    
+    try {
+      const result = await AdminAPI.createAnnouncement({
+        title: announcement.title,
+        content: announcement.content,
+        created_by: adminInfo.value?.username || '管理员'
+      });
+      return result;
+    } catch (error: any) {
+      console.error('创建公告失败:', error);
+      return { success: false, message: error.message || '创建公告失败' };
+    }
+  };
+  
+  // 更新公告
+  const updateAnnouncement = async (id: string, announcement: { content: string }) => {
+    if (!isAdmin.value) {
+      throw new Error('没有管理员权限');
+    }
+    
+    try {
+      const result = await AdminAPI.updateAnnouncement(id, {
+        content: announcement.content
+      });
+      return result;
+    } catch (error: any) {
+      console.error('更新公告失败:', error);
+      return { success: false, message: error.message || '更新公告失败' };
+    }
+  };
+  
+  // 删除公告
+  const deleteAnnouncement = async (id: string) => {
+    if (!isAdmin.value) {
+      throw new Error('没有管理员权限');
+    }
+    
+    try {
+      const result = await AdminAPI.deleteAnnouncement(id);
+      return result;
+    } catch (error: any) {
+      console.error('删除公告失败:', error);
+      return { success: false, message: error.message || '删除公告失败' };
+    }
+  };
+  
+  // 获取管理员统计数据
+  const getAdminStats = async () => {
+    if (!isAdmin.value) {
+      throw new Error('没有管理员权限');
+    }
+    
+    try {
+      const result = await AdminAPI.getStats();
+      return result;
+    } catch (error: any) {
+      console.error('获取统计数据失败:', error);
+      return { success: false, message: error.message || '获取统计数据失败' };
+    }
   };
   
   // New: Auth Actions
@@ -1047,7 +1266,27 @@ export const useUserStore = defineStore('user', () => {
   };
 
   const getUnreadNotifications = (userId?: string) => {
-    return getNotifications(userId).filter(n => !n.read);
+    const uid = userId || userInfo.value?.id;
+    if (!uid) return [];
+    
+    // 清理过期的公告通知（超过1天）
+    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    const allNotifications = getNotifications(uid);
+    const validNotifications = allNotifications.filter(n => {
+      // 如果是公告类型，检查是否过期
+      if (n.type === 'announcement') {
+        const notificationTime = new Date(n.time).getTime();
+        return notificationTime > oneDayAgo;
+      }
+      return true; // 其他类型不过期
+    });
+    
+    // 如果有过期通知被清理，更新存储
+    if (validNotifications.length < allNotifications.length) {
+      setNotifications(uid, validNotifications);
+    }
+    
+    return validNotifications.filter(n => !n.read);
   };
 
   const clearNotifications = (userId?: string) => {
@@ -1085,17 +1324,25 @@ export const useUserStore = defineStore('user', () => {
   const syncAnnouncements = async () => {
     const uid = userInfo.value?.id;
     if (!uid) return;
+    
+    // 获取当前时间，计算1天前的边界时间
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    
     const { data, error } = await supabase
       .from('announcements')
       .select('*')
+      .gte('created_at', oneDayAgo.toISOString()) // 只获取1天内的公告
       .order('created_at', { ascending: false });
+    
     if (error) {
       console.error('Load announcements failed:', error);
       return;
     }
+    
     const existing = getNotifications(uid);
     const existsIds = new Set(existing.map(n => n.id));
     const added: NotificationItem[] = [];
+    
     (data || []).forEach((row: any) => {
       const nid = `announcement_${row.id}_${uid}`;
       if (!existsIds.has(nid)) {
@@ -1111,6 +1358,7 @@ export const useUserStore = defineStore('user', () => {
         added.push(item);
       }
     });
+    
     if (added.length > 0) {
       setNotifications(uid, [...added, ...existing]);
       void supabase.from('notifications').insert(added.map(item => ({
@@ -1129,9 +1377,15 @@ export const useUserStore = defineStore('user', () => {
   return {
     userInfo,
     isLoggedIn,
+    adminInfo,
+    isAdmin,
     initUser,
     login,
     logout,
+    adminLogin,
+    adminLogout,
+    validateAdminSession,
+    clearAdminSession,
     switchRole,
     updateProfile,
     updateUser,
@@ -1146,6 +1400,15 @@ export const useUserStore = defineStore('user', () => {
     registerAsSitter,
     fetchProfile,
     addPoints, // Export this
+    // Admin functions
+    getAdminUsers,
+    toggleUserStatus,
+    getAdminOrders,
+    getAdminAnnouncements,
+    createAnnouncement,
+    updateAnnouncement,
+    deleteAnnouncement,
+    getAdminStats,
     // New CRUD exports
     addPet,
     updatePet,

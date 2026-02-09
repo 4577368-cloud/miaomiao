@@ -83,6 +83,18 @@
       "style": {
         "navigationBarTitleText": "发布接单意向"
       }
+    },
+    {
+      "path": "pages/admin/index",
+      "style": {
+        "navigationBarTitleText": "管理后台"
+      }
+    },
+    {
+      "path": "pages/admin/login",
+      "style": {
+        "navigationBarTitleText": "管理员登录"
+      }
     }
   ],
   "globalStyle": {

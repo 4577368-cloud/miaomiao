@@ -10,10 +10,81 @@ export interface LocationResult {
 }
 
 /**
+ * 主动申请定位权限
+ */
+export const requestLocationPermission = async (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    // #ifdef H5
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        () => resolve(true),
+        (error) => {
+          console.warn('H5定位权限申请失败:', error);
+          if (error.code === error.PERMISSION_DENIED) {
+            uni.showModal({
+              title: '定位权限',
+              content: '需要获取您的位置信息以提供更好的服务，请在浏览器设置中允许位置访问',
+              showCancel: false,
+              confirmText: '我知道了'
+            });
+          }
+          resolve(false);
+        },
+        { timeout: 10000, enableHighAccuracy: true }
+      );
+    } else {
+      uni.showToast({ title: '浏览器不支持定位', icon: 'none' });
+      resolve(false);
+    }
+    // #endif
+    
+    // #ifdef MP-WEIXIN
+    uni.authorize({
+      scope: 'scope.userLocation',
+      success: () => resolve(true),
+      fail: () => {
+        uni.showModal({
+          title: '定位权限',
+          content: '需要获取您的位置信息以提供更好的服务，请在设置中开启定位权限',
+          confirmText: '去设置',
+          success: (res) => {
+            if (res.confirm) {
+              uni.openSetting({
+                success: (settingRes) => {
+                  resolve(!!settingRes.authSetting['scope.userLocation']);
+                }
+              });
+            } else {
+              resolve(false);
+            }
+          }
+        });
+      }
+    });
+    // #endif
+    
+    // #ifndef H5 || MP-WEIXIN
+    resolve(true);
+    // #endif
+  });
+};
+
+/**
  * 获取当前位置（支持H5和微信小程序）
  * 统一使用高德地图服务
  */
-export const getCurrentLocation = (): Promise<LocationResult> => {
+export const getCurrentLocation = async (): Promise<LocationResult> => {
+  // 先申请权限
+  const hasPermission = await requestLocationPermission();
+  if (!hasPermission) {
+    return Promise.resolve({
+      latitude: 39.9042,
+      longitude: 116.4074,
+      address: '北京市东城区长安街',
+      name: '模拟位置(北京)'
+    });
+  }
+  
   return new Promise((resolve, reject) => {
     uni.getLocation({
       type: 'gcj02',

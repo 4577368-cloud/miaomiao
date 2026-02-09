@@ -2,15 +2,40 @@
   "name": "宠乐到家 - 专业宠物上门服务",
   "short_name": "宠乐到家",
   "description": "专业的宠物上门服务平台，提供宠物寄养、遛狗、美容等服务",
-  "start_url": "./",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#FFFBF5",
   "theme_color": "#FF8E3C",
   "orientation": "portrait",
-  "scope": "./",
+  "scope": "/",
   "categories": ["pets", "lifestyle", "utilities"],
   "lang": "zh-CN",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "related_applications": [],
+  "shortcuts": [
+    {
+      "name": "发布需求",
+      "short_name": "发布",
+      "description": "快速发布宠物服务需求",
+      "url": "/src/pages/publish/index",
+      "icons": [{ "src": "static/logo.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "我的订单",
+      "short_name": "订单",
+      "description": "查看我的宠物服务订单",
+      "url": "/src/pages/orders/index",
+      "icons": [{ "src": "static/logo.png", "sizes": "192x192" }]
+    }
+  ],
   "icons": [
+    {
+      "src": "static/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon",
+      "purpose": "any"
+    },
     {
       "src": "static/logo.png",
       "sizes": "72x72",
