@@ -20,11 +20,11 @@ BEGIN
     p.id,
     p.phone,
     p.nickname,
-    p.role,
+    p.role::TEXT,
     p.balance,
     p.points,
     p.created_at,
-    COALESCE(p.status, 'active') as status
+    COALESCE(p.status::TEXT, 'active') as status
   FROM profiles p
   ORDER BY p.created_at DESC;
 END;
@@ -34,7 +34,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 DROP FUNCTION IF EXISTS get_admin_orders();
 CREATE OR REPLACE FUNCTION get_admin_orders()
 RETURNS TABLE (
-  id VARCHAR,
+  id UUID,
   created_at TIMESTAMP WITH TIME ZONE,
   status VARCHAR,
   total_price DECIMAL,
@@ -49,9 +49,9 @@ BEGIN
   SELECT 
     o.id,
     o.created_at,
-    o.status,
+    o.status::TEXT,
     o.total_price,
-    o.service_type,
+    o.service_type::TEXT,
     c.nickname as creator_name,
     c.phone as creator_phone,
     s.nickname as sitter_name,

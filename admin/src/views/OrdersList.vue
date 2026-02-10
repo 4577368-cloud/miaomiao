@@ -13,7 +13,9 @@
         style="margin: 0 12px"
       />
       <el-button type="primary" :loading="loading" @click="fetchOrders">拉取历史订单</el-button>
+      <el-checkbox v-model="useMock" style="margin-left: 12px">使用示例数据</el-checkbox>
     </div>
+    <el-alert v-if="lastError" :title="lastError" type="error" show-icon style="margin-bottom: 12px" />
     <el-table :data="filtered" border style="width: 100%" v-loading="loading">
       <el-table-column prop="id" label="订单ID" min-width="180" />
       <el-table-column prop="service_type" label="服务类型" width="120">
@@ -45,6 +47,8 @@ const loading = ref(false)
 const orders = ref<any[]>([])
 const statusFilter = ref<string>('ALL')
 const dateRange = ref<[Date, Date] | null>(null)
+const useMock = ref<boolean>(false)
+const lastError = ref<string>('')
 
 const statusOptions = [
   { label: '全部状态', value: 'ALL' },
@@ -56,11 +60,21 @@ const statusOptions = [
 
 const fetchOrders = async () => {
   loading.value = true
-  const { data, error } = await supabase.rpc('get_admin_orders')
-  if (error) {
-    ElMessage.error('加载失败')
+  lastError.value = ''
+  if (useMock.value) {
+    orders.value = [
+      { id: 'MOCK-1', service_type: 'FEEDING', status: 'PENDING', total_price: 88, creator_name: '张三', sitter_name: '李四', created_at: new Date().toISOString() },
+      { id: 'MOCK-2', service_type: 'WALKING', status: 'COMPLETED', total_price: 66, creator_name: '王五', sitter_name: '赵六', created_at: new Date(Date.now() - 86400000).toISOString() }
+    ]
   } else {
-    orders.value = data || []
+    const { data, error } = await supabase.rpc('get_admin_orders')
+    if (error) {
+      lastError.value = `拉取失败: ${error.message}`
+      ElMessage.error('加载失败')
+      orders.value = []
+    } else {
+      orders.value = data || []
+    }
   }
   loading.value = false
 }

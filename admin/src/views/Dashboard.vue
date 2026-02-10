@@ -24,6 +24,10 @@
           <el-icon><User /></el-icon>
           <span>用户管理</span>
         </el-menu-item>
+        <el-menu-item index="/dashboard/orders">
+          <el-icon><DataAnalysis /></el-icon>
+          <span>订单管理</span>
+        </el-menu-item>
         <el-menu-item index="/dashboard/sitters">
           <el-icon><UserFilled /></el-icon>
           <span>宠托师管理</span>
