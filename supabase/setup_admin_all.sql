@@ -32,6 +32,41 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Admin profile update/delete to bypass RLS
+DROP FUNCTION IF EXISTS public.admin_update_profile(UUID, VARCHAR, TEXT, TEXT, TEXT, TEXT, TEXT);
+CREATE OR REPLACE FUNCTION public.admin_update_profile(
+  p_id UUID,
+  p_nickname VARCHAR,
+  p_avatar TEXT,
+  p_gender TEXT,
+  p_role TEXT,
+  p_phone TEXT,
+  p_email TEXT
+)
+RETURNS BOOLEAN AS $$
+BEGIN
+  UPDATE public.profiles
+  SET
+    nickname = p_nickname,
+    avatar = p_avatar,
+    gender = p_gender,
+    role = p_role,
+    phone = p_phone,
+    email = p_email
+  WHERE id = p_id;
+  RETURN FOUND;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP FUNCTION IF EXISTS public.admin_delete_profile(UUID);
+CREATE OR REPLACE FUNCTION public.admin_delete_profile(p_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+  DELETE FROM public.profiles WHERE id = p_id;
+  RETURN FOUND;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- FUNCTIONS: Orders
 DROP FUNCTION IF EXISTS public.get_admin_orders();
 CREATE OR REPLACE FUNCTION public.get_admin_orders()
