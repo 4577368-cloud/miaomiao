@@ -571,6 +571,8 @@
         <view class="popup-header">
           <text class="popup-title">选择服务日期</text>
           <text class="popup-close" @click="closeCalendar">×</text>
+          <text class="popup-action popup-clear" @click="clearCalendarRange">清除</text>
+          <text class="popup-action popup-confirm" @click="applyCalendarRange">确定</text>
         </view>
         <view class="calendar-header">
           <text class="calendar-nav" @click="changeCalendarMonth(-1)">‹</text>
@@ -2264,6 +2266,14 @@ onShow(async () => {
       color: #999;
       line-height: 1;
     }
+    .popup-action {
+      position: absolute;
+      top: 32rpx;
+      font-size: 28rpx;
+      color: $color-primary;
+    }
+    .popup-clear { left: 30rpx; }
+    .popup-confirm { right: 100rpx; }
   }
   
   .address-scroll {
@@ -2417,6 +2427,7 @@ onShow(async () => {
     grid-auto-rows: 96rpx;
     padding: 0 20rpx 10rpx;
     gap: 8rpx;
+    overflow: auto;
   }
   
   .calendar-day {
@@ -2458,9 +2469,16 @@ onShow(async () => {
   }
   
   .calendar-actions {
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    right: 0;
     display: flex;
     gap: 20rpx;
-    padding: 20rpx 30rpx 30rpx;
+    padding: 20rpx 30rpx calc(30rpx + env(safe-area-inset-bottom));
+    background: #fff;
+    box-shadow: 0 -6rpx 16rpx rgba(0,0,0,0.06);
+    z-index: 2;
   }
   
   .btn-ghost {
