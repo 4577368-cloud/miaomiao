@@ -38,26 +38,12 @@
       <!-- 顶部 Banner -->
       <view class="banner-swiper">
         <swiper class="swiper" autoplay circular interval="5000" duration="500">
-          <swiper-item>
-            <view class="banner-item banner-1" @click="handleClaimCoupon">
-              <view class="banner-content">
-                <text class="banner-tag">新人专享</text>
-                <text class="banner-title">首单立减 ¥30</text>
-                <text class="banner-sub">专业宠托，安心无忧</text>
-                <button class="banner-btn">立即领取</button>
+          <swiper-item v-for="b in homeBanners" :key="b.id">
+            <view class="banner-item" @click="handleBannerAction(b)">
+              <image :src="b.image_url" mode="aspectFill" style="position:absolute;left:0;top:0;width:100%;height:100%;" />
+              <view style="position:absolute;left:24rpx;bottom:24rpx;background:rgba(0,0,0,0.35);padding:8rpx 12rpx;border-radius:12rpx;">
+                <text style="color:#fff;font-size:28rpx;">{{ b.title }}</text>
               </view>
-              <view class="banner-img">🎁</view>
-            </view>
-          </swiper-item>
-          <swiper-item>
-            <view class="banner-item banner-2">
-              <view class="banner-content">
-                <text class="banner-tag">假期预售</text>
-                <text class="banner-title">春节上门喂养</text>
-                <text class="banner-sub">提前预约，不再拥挤</text>
-                <button class="banner-btn">去看看</button>
-              </view>
-              <view class="banner-img">🧧</view>
             </view>
           </swiper-item>
         </swiper>
@@ -249,6 +235,7 @@ import { ServiceType } from '@/constants/pet';
 import { getCurrentLocation } from '@/utils/location';
 import { useUserStore } from '@/stores/user';
 import { useOrderStore } from '@/stores/order';
+import { supabase } from '@/utils/supabase';
 
 const userStore = useUserStore();
 const orderStore = useOrderStore();
@@ -263,6 +250,7 @@ const handleImageError = (event: any, fallbackUrl: string) => {
 const locationName = ref('点击定位');
 const isMounted = ref(false);
 const bannerMessages = ref<any[]>([]);
+const homeBanners = ref<any[]>([]);
 
 type SortType = 'distance' | 'amount' | 'date';
 const currentSort = ref<SortType>('distance');
@@ -396,6 +384,41 @@ const openLink = (link?: string) => {
   }
 };
 
+const handleBannerAction = async (b: any) => {
+  if (!b || !b.action_type) return;
+  if (b.action_type === 'link') {
+    const link = b.action_payload?.link || '';
+    if (link) openLink(link);
+  } else if (b.action_type === 'announcement') {
+    uni.switchTab({ url: '/pages/message/index' });
+  } else if (b.action_type === 'coupon') {
+    if (!userStore.userInfo?.id) {
+      uni.navigateTo({ url: '/pages/login/index' });
+      return;
+    }
+    const tplId = b.action_payload?.coupon_template_id;
+    if (!tplId) return;
+    const { data: tpl } = await supabase.from('coupon_templates').select('*').eq('id', tplId).single();
+    if (!tpl) return;
+    const { error } = await supabase.from('coupons').insert({
+      user_id: userStore.userInfo.id,
+      name: tpl.name,
+      type: tpl.type,
+      value: tpl.value,
+      threshold: tpl.min_spend || 0,
+      start_time: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      status: 'UNUSED'
+    });
+    if (!error) uni.showToast({ title: '已领取', icon: 'success' });
+  }
+};
+
+const loadHomeBanners = async () => {
+  const { data } = await supabase.rpc('get_active_banners');
+  homeBanners.value = data || [];
+};
+
 const handleBannerClick = (msg: any) => {
   if (msg?.id) {
     userStore.markNotificationRead(msg.id);
@@ -417,6 +440,7 @@ onShow(async () => {
   await userStore.syncNotifications();
   await userStore.syncAnnouncements();
   refreshBanner();
+  await loadHomeBanners();
 
   // 尝试自动定位
   if (locationName.value === '点击定位') {

@@ -223,7 +223,7 @@ const selectedCouponId = ref('')
 
 const fetchUsers = async () => {
   loading.value = true
-  const { data, error } = await supabase.rpc('public.get_admin_users')
+  const { data, error } = await supabase.rpc('get_admin_users')
   if (error) {
     ElMessage.error('加载失败: ' + error.message)
   } else {

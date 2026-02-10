@@ -134,8 +134,8 @@ const calculateChart = (items: { label: string; value: number }[]): ChartItem[] 
 
 const fetchDashboard = async () => {
   loading.value = true
-  const { data: ordersData, error: orderError } = await supabase.rpc('public.get_admin_orders')
-  const { data: statsData, error: statsError } = await supabase.rpc('public.get_admin_stats')
+  const { data: ordersData, error: orderError } = await supabase.rpc('get_admin_orders')
+  const { data: statsData, error: statsError } = await supabase.rpc('get_admin_stats')
   if (orderError || statsError) {
     ElMessage.error('数据加载失败')
     loading.value = false

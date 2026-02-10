@@ -32,6 +32,10 @@
           <el-icon><UserFilled /></el-icon>
           <span>宠托师管理</span>
         </el-menu-item>
+        <el-menu-item index="/dashboard/banners">
+          <el-icon><Picture /></el-icon>
+          <span>轮播管理</span>
+        </el-menu-item>
         <el-menu-item index="/dashboard/coupons">
           <el-icon><Ticket /></el-icon>
           <span>优惠券管理</span>

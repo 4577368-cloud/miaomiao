@@ -67,7 +67,7 @@ const fetchOrders = async () => {
       { id: 'MOCK-2', service_type: 'WALKING', status: 'COMPLETED', total_price: 66, creator_name: '王五', sitter_name: '赵六', created_at: new Date(Date.now() - 86400000).toISOString() }
     ]
   } else {
-    const { data, error } = await supabase.rpc('public.get_admin_orders')
+    const { data, error } = await supabase.rpc('get_admin_orders')
     if (error) {
       lastError.value = `拉取失败: ${error.message}`
       ElMessage.error('加载失败')
