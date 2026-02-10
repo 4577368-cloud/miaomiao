@@ -13,16 +13,7 @@ export const useUserStore = defineStore('user', () => {
     if (data.user) {
       user.value = data.user
     } else {
-      // MOCK ADMIN USER FOR TESTING
-      user.value = {
-        id: 'mock-admin-id',
-        email: 'admin@example.com',
-        role: 'authenticated',
-        app_metadata: { provider: 'email' },
-        user_metadata: { role: 'admin' },
-        aud: 'authenticated',
-        created_at: new Date().toISOString()
-      }
+      user.value = null
     }
   }
 
