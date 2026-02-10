@@ -106,6 +106,24 @@
         </view>
       </view>
 
+      <!-- 优惠专区 -->
+      <view class="section-container">
+        <view class="section-header">
+          <text class="title">优惠专区</text>
+          <text class="more" @click="goWallet">我的优惠券 ></text>
+        </view>
+        <view class="coupon-grid">
+          <view class="coupon-card" v-for="tpl in couponTemplates" :key="tpl.id">
+            <view class="coupon-info">
+              <text class="coupon-name">{{ tpl.name }}</text>
+              <text class="coupon-desc">{{ tpl.type === 'FIXED' ? ('立减 ¥'+tpl.value) : (tpl.value*10+'折') }}</text>
+            </view>
+            <button class="coupon-btn" @click="claimCouponTemplate(tpl)">领取</button>
+          </view>
+          <view v-if="couponTemplates.length === 0" style="padding: 12rpx; color: #888;">暂无活动优惠</view>
+        </view>
+      </view>
+
       <!-- 平台保障 -->
       <view class="section-container">
         <view class="section-header">
@@ -251,6 +269,7 @@ const locationName = ref('点击定位');
 const isMounted = ref(false);
 const bannerMessages = ref<any[]>([]);
 const homeBanners = ref<any[]>([]);
+const couponTemplates = ref<any[]>([]);
 
 type SortType = 'distance' | 'amount' | 'date';
 const currentSort = ref<SortType>('distance');
@@ -384,6 +403,10 @@ const openLink = (link?: string) => {
   }
 };
 
+const goWallet = () => {
+  uni.switchTab({ url: '/pages/wallet/index' });
+};
+
 const handleBannerAction = async (b: any) => {
   if (!b || !b.action_type) return;
   if (b.action_type === 'link') {
@@ -419,6 +442,33 @@ const loadHomeBanners = async () => {
   homeBanners.value = data || [];
 };
 
+const loadCouponTemplates = async () => {
+  const { data } = await supabase.from('coupon_templates').select('*').eq('is_active', true);
+  couponTemplates.value = data || [];
+};
+
+const claimCouponTemplate = async (tpl: any) => {
+  if (!userStore.userInfo?.id) {
+    uni.navigateTo({ url: '/pages/login/index' });
+    return;
+  }
+  const { error } = await supabase.from('coupons').insert({
+    user_id: userStore.userInfo.id,
+    name: tpl.name,
+    type: tpl.type,
+    value: tpl.value,
+    threshold: tpl.min_spend || 0,
+    start_time: new Date().toISOString(),
+    expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    status: 'UNUSED'
+  });
+  if (error) {
+    uni.showToast({ title: '领取失败', icon: 'none' });
+  } else {
+    uni.showToast({ title: '已领取', icon: 'success' });
+  }
+};
+
 const handleBannerClick = (msg: any) => {
   if (msg?.id) {
     userStore.markNotificationRead(msg.id);
@@ -440,6 +490,7 @@ onShow(async () => {
   await userStore.syncNotifications();
   await userStore.syncAnnouncements();
   refreshBanner();
+  await loadCouponTemplates();
   await loadHomeBanners();
 
   // 尝试自动定位
