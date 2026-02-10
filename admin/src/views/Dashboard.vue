@@ -57,7 +57,7 @@
         <div class="header-right">
           <el-dropdown>
             <span class="el-dropdown-link">
-              管理员 <el-icon class="el-icon--right"><arrow-down /></el-icon>
+              {{ userLabel }} <el-icon class="el-icon--right"><arrow-down /></el-icon>
             </span>
             <template #dropdown>
               <el-dropdown-menu>
@@ -86,6 +86,7 @@ const userStore = useUserStore()
 
 const activeMenu = computed(() => route.path)
 const currentRouteName = computed(() => route.meta.title || '管理')
+const userLabel = computed(() => userStore.user?.email || '未登录')
 
 const handleLogout = async () => {
   try {

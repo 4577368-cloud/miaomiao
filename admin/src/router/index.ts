@@ -79,13 +79,17 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to, from, next) => {
-  // BYPASS AUTH FOR TESTING
-  
+  const { data } = await supabase.auth.getSession()
+  const isAuthed = !!data.session
   if (to.path === '/login') {
-    next('/')
+    if (isAuthed) next('/dashboard')
+    else next()
     return
   }
-  
+  if (to.meta?.requiresAuth && !isAuthed) {
+    next('/login')
+    return
+  }
   next()
 })
 
