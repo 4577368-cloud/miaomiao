@@ -79,8 +79,8 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to, from, next) => {
-  const { data } = await supabase.auth.getSession()
-  const isAuthed = !!data.session
+  const { data } = await supabase.auth.getUser()
+  const isAuthed = !!data.user
   if (to.path === '/login') {
     if (isAuthed) next('/dashboard')
     else next()

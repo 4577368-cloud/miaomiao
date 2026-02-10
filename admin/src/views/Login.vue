@@ -35,6 +35,7 @@ import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { ElMessage } from 'element-plus'
+import { supabase } from '../utils/supabase'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -59,44 +60,23 @@ const rules = {
 
 const handleLogin = async () => {
   if (!formRef.value) return
-  
   await formRef.value.validate(async (valid: boolean) => {
-    if (valid) {
-      loading.value = true
-      try {
-        try {
-          await userStore.login(form.email, form.password)
-        } catch (e: any) {
-          const msg = e?.message || ''
-          const isInvalid = msg.includes('Invalid login credentials')
-          if (isInvalid) {
-            const { data: signupData, error: signupErr } = await userStore.$state ? supabase.auth.signUp({ email: form.email, password: form.password }) : supabase.auth.signUp({ email: form.email, password: form.password })
-            if (signupErr) throw signupErr
-            const uid = signupData.user?.id
-            if (uid) {
-              await supabase.from('profiles').upsert({
-                id: uid,
-                nickname: '管理员',
-                role: 'admin',
-                status: 'active'
-              }, { onConflict: 'id' })
-              const { error: relogErr } = await supabase.auth.signInWithPassword({ email: form.email, password: form.password })
-              if (relogErr) throw relogErr
-            } else {
-              throw e
-            }
-          } else {
-            throw e
-          }
-        }
+    if (!valid) return
+    loading.value = true
+    try {
+      await userStore.login(form.email, form.password)
+      const { data: sessionData } = await supabase.auth.getSession()
+      if (sessionData?.session) {
         ElMessage.success('登录成功')
-        router.push('/dashboard')
-      } catch (error: any) {
-        console.error(error)
-        ElMessage.error(error.message || '登录失败')
-      } finally {
-        loading.value = false
+        router.replace('/dashboard')
+      } else {
+        ElMessage.warning('登录成功，但会话未建立。如果开启邮箱验证，请先完成邮箱确认。')
       }
+    } catch (error: any) {
+      console.error(error)
+      ElMessage.error(error.message || '登录失败')
+    } finally {
+      loading.value = false
     }
   })
 }
