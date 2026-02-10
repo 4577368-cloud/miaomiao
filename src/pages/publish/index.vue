@@ -223,8 +223,8 @@
                        v-for="t in timeSlots" 
                        :key="t" 
                        class="time-slot"
-                       :class="{active: form.time === t}"
-                       @click="form.time = t"
+                       :class="{active: form.times.includes(t)}"
+                       @click="form.times = form.times.includes(t) ? form.times.filter(x => x !== t) : [...form.times, t]"
                     >
                        {{ t }}
                     </view>
@@ -596,6 +596,9 @@
             @touchmove="handleDayTouchMove(day)"
             @touchend="handleDayTouchEnd"
             @touchcancel="handleDayTouchEnd"
+            @mousedown="handleDayMouseDown(day)"
+            @mousemove="handleDayMouseMove(day)"
+            @mouseup="handleDayMouseUp"
           >
             <text class="day-num">{{ day.date.getDate() }}</text>
           </view>
@@ -753,7 +756,7 @@ const form = reactive({
   contactName: '',
   contactPhone: '',
   date: '',
-  time: '',
+  times: [] as string[],
   serviceType: ServiceType.FEEDING,
   petSize: PetSize.CAT,
   duration: 30,
@@ -1007,6 +1010,29 @@ const handleDayTouchEnd = () => {
     suppressCalendarClick = false;
   }, 50);
 };
+const handleDayMouseDown = (day: { key: string; disabled: boolean }) => {
+  if (day.disabled) return;
+  isDragSelecting = true;
+  dragStartKey.value = day.key;
+  dragEndKey.value = day.key;
+  updateCalendarRangeFromDrag(dragStartKey.value, dragEndKey.value);
+};
+const handleDayMouseMove = (day: { key: string; disabled: boolean }) => {
+  if (!isDragSelecting || day.disabled) return;
+  if (day.key === dragEndKey.value) return;
+  dragEndKey.value = day.key;
+  updateCalendarRangeFromDrag(dragStartKey.value, dragEndKey.value);
+};
+const handleDayMouseUp = () => {
+  if (!isDragSelecting) return;
+  isDragSelecting = false;
+  if (calendarRange.start && calendarRange.end) {
+    dateRange.start = calendarRange.start;
+    dateRange.end = calendarRange.end;
+    form.date = `${dateRange.start} 至 ${dateRange.end}`;
+    showCalendar.value = false;
+  }
+};
 
 const clearCalendarRange = () => {
   calendarRange.start = '';
@@ -1040,11 +1066,23 @@ const chooseNewAddress = () => {
   showAddressPopup.value = false;
   uni.chooseLocation({
     success: (res) => {
-      // Use address only to avoid exposing POI name or other info
       form.address = res.address;
+      (form as any).latitude = res.latitude;
+      (form as any).longitude = res.longitude;
     },
     fail: () => {
-       form.address = '北京市朝阳区三里屯SOHO';
+       if (typeof navigator !== 'undefined' && navigator.geolocation) {
+         navigator.geolocation.getCurrentPosition((pos) => {
+           const { latitude, longitude } = pos.coords;
+           form.address = '当前位置';
+           (form as any).latitude = latitude;
+           (form as any).longitude = longitude;
+         }, () => {
+           form.address = '北京市朝阳区三里屯SOHO';
+         }, { enableHighAccuracy: true, timeout: 8000 });
+       } else {
+         form.address = '北京市朝阳区三里屯SOHO';
+       }
     }
   });
 };
@@ -1168,43 +1206,82 @@ const getServiceDateForPricing = () => {
   const parsed = parseFormDateRange(form.date);
   return parsed.start || new Date().toISOString().split('T')[0];
 };
+const getSelectedDates = () => {
+  const { start, end } = parseFormDateRange(form.date);
+  if (!start) return [];
+  const startDate = parseDateKey(start);
+  const endDate = end ? parseDateKey(end) : startDate;
+  const list: string[] = [];
+  const cur = new Date(startDate);
+  while (cur.getTime() <= endDate.getTime()) {
+    list.push(formatDateKey(cur));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return list;
+};
 
 const getDurationDisplayPrice = (durationValue: number) => {
-  const result = calculateTotalPrice({
-    basePrice: discountedBasePrice.value,
-    petSizes: resolvePricingPetSizes(),
-    durationMarkup: durations.find(d => d.value === durationValue)?.markup || 0,
-    serviceDate: getServiceDateForPricing(),
-    serviceTime: form.time || '12:00',
-    addOns: { play: false, deepClean: false, medicine: false },
-    overrides: pricingOverrides.value
-  });
-  return result.total.toFixed(2);
+  const timeList = form.times.length ? form.times : ['12:00'];
+  const dateList = getSelectedDates().length ? getSelectedDates() : [getServiceDateForPricing()];
+  let total = 0;
+  for (const d of dateList) {
+    for (const t of timeList) {
+      const result = calculateTotalPrice({
+        basePrice: discountedBasePrice.value,
+        petSizes: resolvePricingPetSizes(),
+        durationMarkup: durations.find(di => di.value === durationValue)?.markup || 0,
+        serviceDate: d,
+        serviceTime: t,
+        addOns: { play: false, deepClean: false, medicine: false },
+        overrides: pricingOverrides.value
+      });
+      total += result.total;
+    }
+  }
+  return total.toFixed(2);
 };
 
 // Price Calculation
 const standardPriceBreakdown = computed(() => {
-  return calculateTotalPrice({
-    basePrice: standardBasePrice.value,
-    petSizes: resolvePricingPetSizes(),
-    durationMarkup: durations.find(d => d.value === form.duration)?.markup || 0,
-    serviceDate: getServiceDateForPricing(),
-    serviceTime: form.time || '12:00',
-    addOns: form.addOns,
-    overrides: pricingOverrides.value
-  });
+  const timeList = form.times.length ? form.times : ['12:00'];
+  const dateList = getSelectedDates().length ? getSelectedDates() : [getServiceDateForPricing()];
+  const acc = { base: 0, pets: 0, duration: 0, holiday: 0, rush: 0, addOns: 0, total: 0 };
+  for (const d of dateList) {
+    for (const t of timeList) {
+      const r = calculateTotalPrice({
+        basePrice: standardBasePrice.value,
+        petSizes: resolvePricingPetSizes(),
+        durationMarkup: durations.find(di => di.value === form.duration)?.markup || 0,
+        serviceDate: d,
+        serviceTime: t,
+        addOns: form.addOns,
+        overrides: pricingOverrides.value
+      });
+      acc.base += r.base; acc.pets += r.pets; acc.duration += r.duration; acc.holiday += r.holiday; acc.rush += r.rush; acc.addOns += r.addOns; acc.total += r.total;
+    }
+  }
+  return acc;
 });
 
 const priceBreakdown = computed(() => {
-  return calculateTotalPrice({
-    basePrice: discountedBasePrice.value,
-    petSizes: resolvePricingPetSizes(),
-    durationMarkup: durations.find(d => d.value === form.duration)?.markup || 0,
-    serviceDate: getServiceDateForPricing(),
-    serviceTime: form.time || '12:00',
-    addOns: form.addOns,
-    overrides: pricingOverrides.value
-  });
+  const timeList = form.times.length ? form.times : ['12:00'];
+  const dateList = getSelectedDates().length ? getSelectedDates() : [getServiceDateForPricing()];
+  const acc = { base: 0, pets: 0, duration: 0, holiday: 0, rush: 0, addOns: 0, total: 0 };
+  for (const d of dateList) {
+    for (const t of timeList) {
+      const r = calculateTotalPrice({
+        basePrice: discountedBasePrice.value,
+        petSizes: resolvePricingPetSizes(),
+        durationMarkup: durations.find(di => di.value === form.duration)?.markup || 0,
+        serviceDate: d,
+        serviceTime: t,
+        addOns: form.addOns,
+        overrides: pricingOverrides.value
+      });
+      acc.base += r.base; acc.pets += r.pets; acc.duration += r.duration; acc.holiday += r.holiday; acc.rush += r.rush; acc.addOns += r.addOns; acc.total += r.total;
+    }
+  }
+  return acc;
 });
 
 const rawTotalPrice = computed(() => priceBreakdown.value.total);
@@ -1261,7 +1338,7 @@ const handleSubmit = async () => {
   // 表单验证
   if (!form.address) return uni.showToast({ title: '请选择地址', icon: 'none' });
   if (!form.date) return uni.showToast({ title: '请选择时间', icon: 'none' });
-  if (!form.time) return uni.showToast({ title: '请选择时间段', icon: 'none' });
+  if (!form.times.length) return uni.showToast({ title: '请选择时间段', icon: 'none' });
   
   // 验证用户信息
   if (!userStore.userInfo?.id) {
@@ -1304,7 +1381,15 @@ const handleSubmit = async () => {
     discountAmount: selectedCoupon.value ? selectedCoupon.value.value : 0,
     couponId: form.couponId,
     address: form.address,
-    time: `${form.date} ${form.time}`,
+    time: (() => {
+      const timeList = form.times.length ? form.times : ['12:00'];
+      const dateList = getSelectedDates().length ? getSelectedDates() : [getServiceDateForPricing()];
+      const combos = [] as string[];
+      for (const d of dateList) {
+        for (const t of timeList) combos.push(`${d} ${t}`);
+      }
+      return combos.join(',');
+    })(),
     petSize: selectedPets.length > 0 ? selectedPets[0].size : form.petSize,
     petIds: selectedPets.map(p => p.id),
     petSnapshots: selectedPets,

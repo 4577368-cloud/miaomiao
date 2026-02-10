@@ -353,13 +353,25 @@ export const useOrderStore = defineStore('order', () => {
     const userStore = useUserStore();
     
     // Prepare Data for DB
-    // Parse time string to ISO
-    let scheduledTime = new Date().toISOString();
-    if (order.time) {
-        // Handle "YYYY-MM-DD HH:mm" or similar
-        // Simple fallback
-        scheduledTime = new Date(order.time.replace(/-/g, '/')).toISOString();
-    }
+    // Robust parse: support "YYYY-MM-DD HH:mm" and "YYYY-MM-DD 至 YYYY-MM-DD HH:mm"
+    const buildScheduledISO = (text?: string) => {
+      const raw = (text || '').trim();
+      if (!raw) return new Date().toISOString();
+      const firstCombo = raw.split(',')[0] || raw;
+      // Split date and time parts
+      const segs = firstCombo.split(' ');
+      let datePart = segs[0] || '';
+      const timePart = segs[1] || '12:00';
+      // If date range, take start
+      if (datePart.includes('至')) {
+        datePart = datePart.split('至')[0].trim();
+      }
+      const full = `${datePart} ${timePart}`.trim();
+      const d = new Date(full.replace(/-/g, '/'));
+      if (isNaN(d.getTime())) return new Date().toISOString();
+      return d.toISOString();
+    };
+    const scheduledTime = buildScheduledISO(order.time);
 
     // 验证必要字段
     if (!order.creatorId) {
