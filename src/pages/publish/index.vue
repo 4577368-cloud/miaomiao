@@ -962,12 +962,13 @@ const selectCalendarDay = (day: { key: string; inMonth: boolean; disabled: boole
     const date = parseDateKey(day.key);
     calendarMonth.value = new Date(date.getFullYear(), date.getMonth(), 1);
   }
-  calendarRange.start = day.key;
-  calendarRange.end = '';
-  dateRange.start = day.key;
-  dateRange.end = '';
-  form.date = day.key;
-  showCalendar.value = false;
+  // Toggle selection without closing; allow multi-day by setting end on second click
+  if (!calendarRange.start || (calendarRange.start && calendarRange.end)) {
+    calendarRange.start = day.key;
+    calendarRange.end = '';
+  } else {
+    updateCalendarRangeFromDrag(calendarRange.start, day.key);
+  }
 };
 
 const updateCalendarRangeFromDrag = (startKey: string, endKey: string) => {
@@ -1000,12 +1001,7 @@ const handleDayTouchMove = (day: { key: string; disabled: boolean }) => {
 const handleDayTouchEnd = () => {
   if (!isDragSelecting) return;
   isDragSelecting = false;
-  if (calendarRange.start && calendarRange.end) {
-    dateRange.start = calendarRange.start;
-    dateRange.end = calendarRange.end;
-    form.date = `${dateRange.start} 至 ${dateRange.end}`;
-    showCalendar.value = false;
-  }
+  // Keep range selection; do not close. Confirm with button.
   setTimeout(() => {
     suppressCalendarClick = false;
   }, 50);
@@ -1026,12 +1022,7 @@ const handleDayMouseMove = (day: { key: string; disabled: boolean }) => {
 const handleDayMouseUp = () => {
   if (!isDragSelecting) return;
   isDragSelecting = false;
-  if (calendarRange.start && calendarRange.end) {
-    dateRange.start = calendarRange.start;
-    dateRange.end = calendarRange.end;
-    form.date = `${dateRange.start} 至 ${dateRange.end}`;
-    showCalendar.value = false;
-  }
+  // Keep range; do not auto-apply or close.
 };
 
 const clearCalendarRange = () => {
