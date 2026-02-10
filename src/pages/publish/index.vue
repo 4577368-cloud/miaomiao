@@ -1400,20 +1400,25 @@ const handleSubmit = async () => {
     uni.hideLoading();
     
     if (createdOrder) {
-      uni.showToast({ title: '发布成功', icon: 'success' });
-      
-      // 跳转到订单详情页或订单列表页
-      setTimeout(() => {
-        if (createdOrder.id) {
-          // 如果有订单ID，跳转到订单详情页
-          uni.navigateTo({
-            url: `/pages/orders/detail?id=${createdOrder.id}`
-          });
-        } else {
-          // 否则跳转到订单列表页
-          uni.switchTab({ url: '/pages/orders/index' });
+          uni.showToast({ title: '发布成功', icon: 'success', mask: true });
+          
+          // 设置高亮ID，以便在订单列表页高亮显示
+          const orderStore = useOrderStore();
+          orderStore.newlyCreatedOrderId = createdOrder.id;
+          
+          // 直接跳转到订单列表页（Tab页）
+      // 使用 switchTab 确保底部导航栏出现
+      uni.switchTab({
+        url: '/pages/orders/index',
+        success: () => {
+           console.log('跳转订单列表成功');
+        },
+        fail: (err) => {
+          console.error('switchTab跳转订单列表失败:', err);
+          // 降级尝试：reLaunch (既然 switchTab 失败，可能是非 tab 页面配置，但这里应该是 tab)
+          uni.reLaunch({ url: '/pages/orders/index' }); 
         }
-      }, 1500);
+      });
     } else {
       uni.showToast({ title: '发布失败：未获取到订单信息', icon: 'none' });
     }
@@ -2382,10 +2387,38 @@ onShow(async () => {
     .popup-close {
       position: absolute;
       right: 30rpx;
-      top: 30rpx;
+      top: 50%;
+      transform: translateY(-50%);
       font-size: 40rpx;
-      color: #999;
+      color: #ccc;
       line-height: 1;
+      padding: 10rpx;
+    }
+    
+    .popup-action {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 28rpx;
+      padding: 10rpx 20rpx;
+    }
+    
+    .popup-clear {
+      left: 20rpx;
+      color: #666;
+      background: #f5f5f5;
+      border-radius: 24rpx;
+      padding: 12rpx 32rpx;
+    }
+    
+    .popup-confirm {
+      right: 90rpx; /* Avoid overlap with close btn */
+      color: #fff;
+      font-weight: 600;
+      background: linear-gradient(135deg, #FFB07C 0%, #FF8E3C 100%);
+      border-radius: 24rpx;
+      padding: 12rpx 32rpx;
+      box-shadow: 0 4rpx 12rpx rgba(255, 142, 60, 0.3);
     }
   }
   

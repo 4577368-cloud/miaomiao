@@ -21,7 +21,7 @@
     <view class="section" v-if="isOwner">
       <view class="section-header">
         <text class="title">我的优惠券</text>
-        <text class="more" @click="showToast('查看全部')">{{ coupons.length }} 张可用 ></text>
+        <text class="more" @click="goToCouponCenter">{{ coupons.length }} 张可用 ></text>
       </view>
       <scroll-view scroll-x class="coupon-scroll" show-scrollbar="false">
         <view class="coupon-list">
@@ -145,6 +145,10 @@ const showTransactionDetail = (item: any) => {
 
 const showToast = (msg: string) => {
     uni.showToast({ title: msg, icon: 'none' });
+};
+
+const goToCouponCenter = () => {
+  uni.navigateTo({ url: '/pages/coupon/index' });
 };
 </script>
 

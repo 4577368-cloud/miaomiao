@@ -72,6 +72,7 @@ export interface Order {
 
 export const useOrderStore = defineStore('order', () => {
   const orders = ref<Order[]>([]);
+  const newlyCreatedOrderId = ref<string>('');
   let realtimeChannel: any = null;
 
   // Helper: Generate Order No
@@ -753,6 +754,7 @@ export const useOrderStore = defineStore('order', () => {
 
   return {
     orders,
+    newlyCreatedOrderId,
     loadOrders,
     createOrder,
     addOrder,

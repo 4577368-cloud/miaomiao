@@ -85,6 +85,13 @@
       }
     },
     {
+      "path": "pages/coupon/index",
+      "style": {
+        "navigationBarTitleText": "优惠中心",
+        "navigationStyle": "custom"
+      }
+    },
+    {
       "path": "pages/admin/index",
       "style": {
         "navigationBarTitleText": "管理后台"

@@ -110,7 +110,7 @@
       <view class="section-container">
         <view class="section-header">
           <text class="title">优惠专区</text>
-          <text class="more" @click="goWallet">我的优惠券 ></text>
+          <text class="more" @click="goToCouponCenter">更多好券 ></text>
         </view>
         <view class="coupon-grid">
           <view class="coupon-card" v-for="tpl in couponTemplates" :key="tpl.id">
@@ -403,8 +403,8 @@ const openLink = (link?: string) => {
   }
 };
 
-const goWallet = () => {
-  uni.switchTab({ url: '/pages/wallet/index' });
+const goToCouponCenter = () => {
+  uni.navigateTo({ url: '/pages/coupon/index' });
 };
 
 const handleBannerAction = async (b: any) => {

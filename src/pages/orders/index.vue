@@ -503,10 +503,41 @@ const currentTabs = computed(() => {
 });
 
 onShow(async () => {
-  orderStore.loadOrders();
+  await orderStore.loadOrders(); // Await loadOrders to ensure data is ready
   await userStore.syncNotifications();
   await userStore.syncAnnouncements();
   refreshBanner();
+  
+  // Check for newly created order to highlight
+  if (orderStore.newlyCreatedOrderId) {
+    viewMode.value = 'list';
+    currentTab.value = 0; // Ensure "ALL" tab or appropriate tab is selected
+    // If it's unpaid, maybe switch to PENDING? But user might want to see it in ALL.
+    // Actually, createOrder makes it UNPAID. If owner, UNPAID is in "ALL" or we don't have UNPAID tab?
+    // Current tabs: ALL, PENDING(待接单), ACCEPTED(待服务), IN_SERVICE(服务中), COMPLETED(待评价), REVIEWED(已评价)
+    // Wait, UNPAID is not in the tabs explicitly for Owner?
+    // Let's check filteredOrders logic.
+    // If tab is ALL, it returns all.
+    // UNPAID orders should be visible in ALL.
+    
+    highlightOrderId.value = orderStore.newlyCreatedOrderId;
+    const highlightId = highlightOrderId.value; // capture value
+    
+    // Clear the store value immediately
+    orderStore.newlyCreatedOrderId = '';
+    
+    await nextTick();
+    // Use a small delay to ensure rendering
+    setTimeout(() => {
+        uni.pageScrollTo({ selector: `#order-${highlightId}`, duration: 300 });
+    }, 100);
+
+    if (highlightTimer) clearTimeout(highlightTimer);
+    highlightTimer = setTimeout(() => {
+      highlightOrderId.value = '';
+    }, 2000);
+  }
+
   // Start countdown timer
   if (timer) clearInterval(timer);
   timer = setInterval(updateCountdowns, 1000);
