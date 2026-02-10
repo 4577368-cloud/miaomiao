@@ -5,6 +5,8 @@
 drop policy if exists "admin select profiles" on public.profiles;
 drop policy if exists "admin update profiles" on public.profiles;
 drop policy if exists "admin delete profiles" on public.profiles;
+drop policy if exists "user select own profiles" on public.profiles;
+drop policy if exists "user insert own profiles" on public.profiles;
 create policy "admin select profiles"
 on public.profiles for select to authenticated
 using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'));
@@ -15,6 +17,12 @@ with check (exists (select 1 from public.profiles p where p.id = auth.uid() and 
 create policy "admin delete profiles"
 on public.profiles for delete to authenticated
 using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'));
+create policy "user select own profiles"
+on public.profiles for select to authenticated
+using (id = auth.uid());
+create policy "user insert own profiles"
+on public.profiles for insert to authenticated
+with check (id = auth.uid());
 
 -- BANNERS
 drop policy if exists "admin select banners" on public.banners;
