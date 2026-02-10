@@ -20,6 +20,19 @@ onShow(() => {
 onHide(() => {
   console.log("App Hide");
 });
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('error', (e: any) => {
+    const msg = e?.message || 'Error';
+    const src = e?.filename || e?.target?.src || '';
+    const stack = e?.error?.stack || '';
+    console.error('[GlobalError]', msg, src, stack);
+  });
+  window.addEventListener('unhandledrejection', (e: any) => {
+    const reason = e?.reason;
+    console.error('[UnhandledRejection]', reason?.message || String(reason), reason?.stack || '');
+  });
+}
 </script>
 <style lang="scss">
 @import "@/styles/vars.scss";
