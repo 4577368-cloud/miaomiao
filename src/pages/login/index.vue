@@ -447,7 +447,7 @@ const handleAction = async () => {
         
         uni.showToast({ title: '登录成功', icon: 'success' });
         setTimeout(() => {
-          uni.switchTab({ url: '/pages/home/index' });
+          uni.reLaunch({ url: '/pages/publish/index' });
         }, 1500);
       }
     }
@@ -461,7 +461,7 @@ const handleAction = async () => {
 
 onShow(() => {
   if (userStore.isLoggedIn) {
-    uni.switchTab({ url: '/pages/home/index' });
+    uni.reLaunch({ url: '/pages/publish/index' });
   }
 });
 </script>
