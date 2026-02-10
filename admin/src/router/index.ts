@@ -32,6 +32,12 @@ const router = createRouter({
           meta: { title: '数据看板' }
         },
         {
+          path: 'orders',
+          name: 'Orders',
+          component: () => import('../views/OrdersList.vue'),
+          meta: { title: '订单管理' }
+        },
+        {
           path: 'services',
           name: 'Services',
           component: () => import('../views/ServiceList.vue'),

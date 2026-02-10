@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useUserStore } from '@/stores/user';
 import { AdminAPI } from '@/utils/admin-api';
+import { supabase } from '@/utils/supabase';
 
 const userStore = useUserStore();
 const adminInfo = computed(() => userStore.userInfo);
@@ -13,6 +14,7 @@ const menuItems = [
   { key: 'orders', label: '订单管理', icon: '📦' },
   { key: 'services', label: '服务管理', icon: '💰' },
   { key: 'announcements', label: '系统公告', icon: '📢' },
+  { key: 'marketing', label: '营销管理', icon: '🎟️' },
   { key: 'stats', label: '数据统计', icon: '📊' },
 ];
 
@@ -27,6 +29,9 @@ const editForm = ref({
   balance: 0,
   points: 0
 });
+const showSendCouponModal = ref(false);
+const couponTemplates = ref<any[]>([]);
+const selectedCouponId = ref('');
 
 // --- 订单管理状态 ---
 const orders = ref<any[]>([]);
@@ -76,6 +81,9 @@ const loadData = () => {
       break;
     case 'announcements':
       fetchAnnouncements();
+      break;
+    case 'marketing':
+      fetchCouponTemplates();
       break;
     case 'stats':
       // fetchStats();
@@ -147,6 +155,38 @@ const saveUserAssets = async () => {
   }
 };
 
+const openSendCoupon = async (user: any) => {
+  editingUser.value = user;
+  selectedCouponId.value = '';
+  showSendCouponModal.value = true;
+  const { data } = await supabase.from('coupon_templates').select('*').eq('is_active', true);
+  couponTemplates.value = data || [];
+};
+
+const submitSendCoupon = async () => {
+  if (!editingUser.value?.id || !selectedCouponId.value) {
+    return uni.showToast({ title: '请选择优惠券模板', icon: 'none' });
+  }
+  const tpl = couponTemplates.value.find(t => t.id === selectedCouponId.value);
+  if (!tpl) return uni.showToast({ title: '模板无效', icon: 'none' });
+  const { error } = await supabase.from('coupons').insert({
+    user_id: editingUser.value.id,
+    name: tpl.name,
+    type: tpl.type,
+    value: tpl.value,
+    threshold: tpl.min_spend || 0,
+    start_time: new Date().toISOString(),
+    expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    status: 'UNUSED'
+  });
+  if (error) {
+    uni.showToast({ title: '发放失败', icon: 'none' });
+  } else {
+    uni.showToast({ title: '发放成功', icon: 'success' });
+    showSendCouponModal.value = false;
+  }
+};
+
 // --- 订单管理逻辑 ---
 const fetchOrders = async () => {
   const result = await AdminAPI.getOrders();
@@ -183,6 +223,20 @@ const filteredOrders = computed(() => {
 
 const onOrderStatusChange = (e: any) => {
   orderStatusFilter.value = e.detail.value;
+};
+
+const cancelOrderAdmin = async (order: any) => {
+  const { error } = await supabase.from('orders').update({ status: 'CANCELLED', updated_at: new Date().toISOString() }).eq('id', order.id);
+  if (error) return uni.showToast({ title: '取消失败', icon: 'none' });
+  uni.showToast({ title: '已取消', icon: 'success' });
+  fetchOrders();
+};
+
+const completeOrderAdmin = async (order: any) => {
+  const { error } = await supabase.from('orders').update({ status: 'COMPLETED', updated_at: new Date().toISOString() }).eq('id', order.id);
+  if (error) return uni.showToast({ title: '置为完成失败', icon: 'none' });
+  uni.showToast({ title: '已置为完成', icon: 'success' });
+  fetchOrders();
 };
 
 const getServiceTypeName = (type: string) => {
@@ -331,6 +385,7 @@ const refreshData = () => {
       </view>
       <view class="header-right">
         <text class="admin-name">{{ adminInfo?.username || '管理员' }}</text>
+        <button class="action-btn" @click="refreshData">拉取云端数据</button>
         <button class="logout-btn" @click="handleLogout">退出</button>
       </view>
     </view>
@@ -362,7 +417,7 @@ const refreshData = () => {
                 placeholder="搜索用户..." 
                 class="search-input"
               />
-              <button class="action-btn" @click="fetchUsers">刷新</button>
+              <button class="action-btn primary" @click="fetchUsers">同步用户数据</button>
             </view>
           </view>
           
@@ -400,6 +455,7 @@ const refreshData = () => {
                 <text class="table-cell date-cell">{{ formatDate(user.created_at) }}</text>
                 <view class="table-cell actions">
                   <button class="btn-small btn-primary" @click="openEditUser(user)">编辑</button>
+                  <button class="btn-small btn-success" @click="openSendCoupon(user)">发券</button>
                   <button 
                     class="btn-small" 
                     @click="toggleUserStatus(user)"
@@ -472,6 +528,7 @@ const refreshData = () => {
             >
               <view class="picker-btn">{{ orderStatusOptions[orderStatusFilter] }} ▼</view>
             </picker>
+            <button class="action-btn" @click="fetchOrders">拉取历史订单</button>
           </view>
           
           <view class="stats-cards">
@@ -508,6 +565,10 @@ const refreshData = () => {
                   <text class="status-tag" :class="order.status">{{ getOrderStatusName(order.status) }}</text>
                 </text>
                 <text class="table-cell date-cell">{{ formatDate(order.created_at) }}</text>
+                  <view class="table-cell actions">
+                    <button class="btn-small btn-danger" @click="cancelOrderAdmin(order)">取消</button>
+                    <button class="btn-small btn-success" @click="completeOrderAdmin(order)">置为完成</button>
+                  </view>
               </view>
             </view>
           </view>
@@ -644,6 +705,28 @@ const refreshData = () => {
              <button class="btn confirm" @click="submitAnnouncement">发布</button>
           </view>
        </view>
+    </view>
+
+    <!-- 弹窗：发放优惠券 -->
+    <view class="modal-mask" v-if="showSendCouponModal">
+      <view class="modal-content">
+        <view class="modal-header">
+          <text class="modal-title">发放优惠券: {{ editingUser.nickname }}</text>
+          <text class="close-btn" @click="showSendCouponModal = false">×</text>
+        </view>
+        <view class="modal-body">
+          <view class="form-item">
+            <text class="label">选择模板</text>
+            <picker :range="couponTemplates.map(t => t.name)" @change="(e) => { selectedCouponId = couponTemplates[e.detail.value]?.id || '' }">
+              <view class="picker-btn">{{ (couponTemplates.find(t => t.id === selectedCouponId)?.name) || '请选择模板 ▼' }}</view>
+            </picker>
+          </view>
+        </view>
+        <view class="modal-footer">
+          <button class="btn cancel" @click="showSendCouponModal = false">取消</button>
+          <button class="btn confirm" @click="submitSendCoupon">发放</button>
+        </view>
+      </view>
     </view>
 
   </view>
