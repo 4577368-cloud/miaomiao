@@ -19,6 +19,42 @@
           <text v-if="status === 'pending' && submittedAtText">提交时间：{{ submittedAtText }}</text>
           <text v-else-if="reviewedAtText">审核时间：{{ reviewedAtText }}</text>
         </view>
+
+        <!-- 资料回显区域 (只读) -->
+        <view class="info-preview" v-if="status === 'pending' || status === 'verified'">
+          <view class="preview-header">
+            <text class="preview-title">认证资料</text>
+          </view>
+          
+          <view class="preview-list">
+            <view class="preview-item">
+              <text class="label">真实姓名</text>
+              <text class="value">{{ form.realName }}</text>
+            </view>
+            <view class="preview-item">
+              <text class="label">身份证号</text>
+              <text class="value">{{ maskedIdCard }}</text>
+            </view>
+            <view class="preview-photos">
+              <view class="photo-box" @click="previewImage(form.idCardFront)">
+                <image :src="form.idCardFront" mode="aspectFill" />
+                <text>人像面</text>
+              </view>
+              <view class="photo-box" @click="previewImage(form.idCardBack)">
+                <image :src="form.idCardBack" mode="aspectFill" />
+                <text>国徽面</text>
+              </view>
+            </view>
+            <view class="preview-item">
+              <text class="label">养宠经验</text>
+              <text class="value">{{ form.experienceYears }} 年</text>
+            </view>
+            <view class="preview-item vertical">
+              <text class="label">个人简介</text>
+              <text class="value">{{ form.bio }}</text>
+            </view>
+          </view>
+        </view>
         
         <button class="btn-primary" v-if="status === 'rejected'" @click="resetStatus">重新提交</button>
         <button class="btn-outline" v-if="status === 'verified'" @click="handleBack">返回个人中心</button>
@@ -115,7 +151,7 @@ const status = computed(() => {
 
 const statusText = computed(() => {
   switch (status.value) {
-    case 'verified': return '已通过认证';
+    case 'verified': return '已认证';
     case 'pending': return '审核中';
     case 'rejected': return '认证未通过';
     default: return '未认证';
@@ -156,6 +192,18 @@ const form = reactive({
   experienceYears: '',
   bio: ''
 });
+
+const maskedIdCard = computed(() => {
+  if (!form.idCard) return '';
+  return form.idCard.replace(/^(.{4}).+(.{4})$/, '$1**********$2');
+});
+
+const previewImage = (url: string) => {
+  if (!url) return;
+  uni.previewImage({
+    urls: [url]
+  });
+};
 
 const isAgreed = ref(false);
 
@@ -203,22 +251,40 @@ const handleBack = () => {
     uni.navigateBack();
 };
 
+const isFormInitialized = ref(false);
+
 const initForm = () => {
+  if (isFormInitialized.value) return;
+  
   const p = userStore.userInfo?.sitterProfile;
   if (p) {
-    if (!form.realName && p.realName) form.realName = p.realName;
-    if (!form.idCard && p.idCard) form.idCard = p.idCard;
-    if (!form.experienceYears && p.experienceYears) form.experienceYears = String(p.experienceYears);
-    if (!form.bio && p.bio) form.bio = p.bio;
+    // 只有在表单完全未初始化时才回填数据，避免覆盖用户修改
+    form.realName = p.realName || '';
+    form.idCard = p.idCard || '';
+    form.idCardFront = p.idCardFront || '';
+    form.idCardBack = p.idCardBack || '';
+    form.experienceYears = p.experienceYears ? String(p.experienceYears) : '';
+    form.bio = p.bio || '';
+    
+    // 只要尝试初始化过，就标记为已初始化，防止 onShow 反复覆盖
+    isFormInitialized.value = true;
   }
 };
 
 onShow(async () => {
+  // 如果正在加载中，不重复触发
+  if (isLoading.value && isFormInitialized.value) return;
+  
   isLoading.value = true;
   try {
     if (userStore.userInfo?.id) {
+       // 仅更新用户信息，不强制重置表单
        await userStore.fetchProfile(userStore.userInfo.id);
-       initForm();
+       
+       // 只有在未初始化的情况下才初始化表单
+       if (!isFormInitialized.value) {
+         initForm();
+       }
     }
   } finally {
     isLoading.value = false;
@@ -437,6 +503,91 @@ const handleSubmit = async () => {
     background: #fff;
     color: $color-text-main;
     border: 2rpx solid #ddd;
+  }
+
+  .info-preview {
+    width: 100%;
+    margin-top: 40rpx;
+    background: #F9FAFB;
+    border-radius: 16rpx;
+    padding: 30rpx;
+    box-sizing: border-box;
+
+    .preview-header {
+      margin-bottom: 24rpx;
+      border-bottom: 2rpx solid #EEE;
+      padding-bottom: 12rpx;
+      
+      .preview-title {
+        font-size: 28rpx;
+        font-weight: bold;
+        color: $color-text-main;
+      }
+    }
+
+    .preview-list {
+      .preview-item {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 20rpx;
+        font-size: 26rpx;
+
+        .label {
+          color: $color-text-secondary;
+          flex-shrink: 0;
+          width: 140rpx;
+        }
+
+        .value {
+          color: $color-text-main;
+          text-align: right;
+          word-break: break-all;
+        }
+
+        &.vertical {
+          flex-direction: column;
+          
+          .label {
+            width: 100%;
+            margin-bottom: 12rpx;
+          }
+          
+          .value {
+            text-align: left;
+            background: #fff;
+            padding: 16rpx;
+            border-radius: 8rpx;
+            font-size: 24rpx;
+          }
+        }
+      }
+
+      .preview-photos {
+        display: flex;
+        gap: 20rpx;
+        margin-bottom: 24rpx;
+
+        .photo-box {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+
+          image {
+            width: 100%;
+            height: 140rpx;
+            border-radius: 8rpx;
+            margin-bottom: 8rpx;
+            background: #eee;
+          }
+
+          text {
+            font-size: 22rpx;
+            color: $color-text-secondary;
+          }
+        }
+      }
+    }
   }
 }
 

@@ -349,6 +349,8 @@ export const useUserStore = defineStore('user', () => {
 
        if (sitterData) {
          return {
+           realName: sitterData.real_name,
+           idCard: sitterData.id_card,
            level: (sitterData.level as SitterLevel) || 'BRONZE',
            completedOrders: sitterData.completed_orders || 0,
            rating: sitterData.rating || 5.0,
