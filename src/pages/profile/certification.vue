@@ -21,12 +21,9 @@
         </view>
 
         <!-- 资料回显区域 (只读) -->
-        <view class="info-preview" v-if="status === 'pending' || status === 'verified'">
-          <view class="preview-header">
-            <text class="preview-title">认证资料</text>
-          </view>
-          
-          <view class="preview-list">
+        <view class="info-preview-container" v-if="status === 'pending' || status === 'verified'">
+          <view class="card preview-card">
+            <view class="section-title">身份信息</view>
             <view class="preview-item">
               <text class="label">真实姓名</text>
               <text class="value">{{ form.realName }}</text>
@@ -35,23 +32,30 @@
               <text class="label">身份证号</text>
               <text class="value">{{ maskedIdCard }}</text>
             </view>
-            <view class="preview-photos">
-              <view class="photo-box" @click="previewImage(form.idCardFront)">
-                <image :src="form.idCardFront" mode="aspectFill" />
-                <text>人像面</text>
-              </view>
-              <view class="photo-box" @click="previewImage(form.idCardBack)">
-                <image :src="form.idCardBack" mode="aspectFill" />
-                <text>国徽面</text>
+            <view class="preview-item vertical">
+              <text class="label">证件照片</text>
+              <view class="preview-photos">
+                <view class="photo-box" @click="previewImage(form.idCardFront)">
+                  <image :src="form.idCardFront" mode="aspectFill" />
+                  <text>人像面</text>
+                </view>
+                <view class="photo-box" @click="previewImage(form.idCardBack)">
+                  <image :src="form.idCardBack" mode="aspectFill" />
+                  <text>国徽面</text>
+                </view>
               </view>
             </view>
+          </view>
+
+          <view class="card preview-card">
+            <view class="section-title">服务信息</view>
             <view class="preview-item">
               <text class="label">养宠经验</text>
               <text class="value">{{ form.experienceYears }} 年</text>
             </view>
             <view class="preview-item vertical">
               <text class="label">个人简介</text>
-              <text class="value">{{ form.bio }}</text>
+              <text class="value bio-box">{{ form.bio }}</text>
             </view>
           </view>
         </view>
@@ -505,79 +509,89 @@ const handleSubmit = async () => {
     border: 2rpx solid #ddd;
   }
 
-  .info-preview {
+  .info-preview-container {
     width: 100%;
     margin-top: 40rpx;
-    background: #F9FAFB;
-    border-radius: 16rpx;
-    padding: 30rpx;
-    box-sizing: border-box;
 
-    .preview-header {
-      margin-bottom: 24rpx;
-      border-bottom: 2rpx solid #EEE;
-      padding-bottom: 12rpx;
+    .preview-card {
+      background: #F9FAFB;
+      box-shadow: none;
+      border: 2rpx solid #EEE;
+      padding: 30rpx;
       
-      .preview-title {
+      .section-title {
         font-size: 28rpx;
-        font-weight: bold;
-        color: $color-text-main;
+        margin-bottom: 24rpx;
+        border-left-width: 6rpx;
       }
     }
 
-    .preview-list {
-      .preview-item {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 20rpx;
-        font-size: 26rpx;
+    .preview-item {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 24rpx;
+      font-size: 28rpx;
+      line-height: 1.5;
 
+      &:last-child {
+        margin-bottom: 0;
+      }
+
+      .label {
+        color: $color-text-secondary;
+        flex-shrink: 0;
+        width: 160rpx;
+      }
+
+      .value {
+        color: $color-text-main;
+        text-align: right;
+        flex: 1;
+        word-break: break-all;
+      }
+
+      &.vertical {
+        flex-direction: column;
+        
         .label {
-          color: $color-text-secondary;
-          flex-shrink: 0;
-          width: 140rpx;
+          width: 100%;
+          margin-bottom: 16rpx;
         }
-
+        
         .value {
-          color: $color-text-main;
-          text-align: right;
-          word-break: break-all;
+          text-align: left;
         }
 
-        &.vertical {
-          flex-direction: column;
-          
-          .label {
-            width: 100%;
-            margin-bottom: 12rpx;
-          }
-          
-          .value {
-            text-align: left;
-            background: #fff;
-            padding: 16rpx;
-            border-radius: 8rpx;
-            font-size: 24rpx;
-          }
+        .bio-box {
+          background: #fff;
+          padding: 20rpx;
+          border-radius: 8rpx;
+          color: $color-text-main;
+          font-size: 26rpx;
+          line-height: 1.6;
+          border: 2rpx solid #EEE;
         }
       }
 
       .preview-photos {
         display: flex;
         gap: 20rpx;
-        margin-bottom: 24rpx;
-
+        
         .photo-box {
           flex: 1;
           display: flex;
           flex-direction: column;
           align-items: center;
+          background: #fff;
+          padding: 16rpx;
+          border-radius: 8rpx;
+          border: 2rpx solid #EEE;
 
           image {
             width: 100%;
-            height: 140rpx;
+            height: 160rpx;
             border-radius: 8rpx;
-            margin-bottom: 8rpx;
+            margin-bottom: 12rpx;
             background: #eee;
           }
 
