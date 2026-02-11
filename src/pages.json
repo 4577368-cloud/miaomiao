@@ -79,6 +79,12 @@
       }
     },
     {
+      "path": "pages/sitter-register/index",
+      "style": {
+        "navigationBarTitleText": "注册成为宠托师"
+      }
+    },
+    {
       "path": "pages/publish/sitter",
       "style": {
         "navigationBarTitleText": "发布接单意向"

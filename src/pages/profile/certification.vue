@@ -196,10 +196,21 @@ const resetStatus = async () => {
     userStore.userInfo.sitterProfile.certificationStatus = 'none';
     userStore.userInfo.sitterProfile.isCertified = false;
   }
+  initForm();
 };
 
 const handleBack = () => {
     uni.navigateBack();
+};
+
+const initForm = () => {
+  const p = userStore.userInfo?.sitterProfile;
+  if (p) {
+    if (!form.realName && p.realName) form.realName = p.realName;
+    if (!form.idCard && p.idCard) form.idCard = p.idCard;
+    if (!form.experienceYears && p.experienceYears) form.experienceYears = String(p.experienceYears);
+    if (!form.bio && p.bio) form.bio = p.bio;
+  }
 };
 
 onShow(async () => {
@@ -207,6 +218,7 @@ onShow(async () => {
   try {
     if (userStore.userInfo?.id) {
        await userStore.fetchProfile(userStore.userInfo.id);
+       initForm();
     }
   } finally {
     isLoading.value = false;
@@ -295,9 +307,10 @@ const handleSubmit = async () => {
     uni.hideLoading();
     uni.showToast({ title: '已提交，审核中', icon: 'success' });
     uni.navigateBack();
-  } catch (e) {
+  } catch (e: any) {
     uni.hideLoading();
-    uni.showToast({ title: '提交失败', icon: 'none' });
+    console.error('Certification submit failed:', e);
+    uni.showToast({ title: e.message || '提交失败', icon: 'none' });
   }
 };
 </script>

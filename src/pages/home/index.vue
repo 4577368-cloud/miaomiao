@@ -296,7 +296,10 @@ const getDistance = (orderId: string) => {
 }
 
 const processedOrders = computed(() => {
-  let orders = [...orderStore.orders.filter(order => order.status === 'PENDING')];
+  // Filter for PENDING orders that haven't been assigned a sitter yet
+  let orders = [...orderStore.orders.filter(order => 
+    order.status === 'PENDING' && !order.sitterId
+  )];
 
   // Filter
   if (currentFilter.value !== 'all') {

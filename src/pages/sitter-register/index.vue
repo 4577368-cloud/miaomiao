@@ -146,7 +146,7 @@ const toggleService = (svc: 'feeding' | 'walking') => {
   }
 };
 
-const handleSubmit = () => {
+const handleSubmit = async () => {
   if (!form.realName || !form.idCard) {
     uni.showToast({ title: '请完善实名信息', icon: 'none' });
     return;
@@ -158,20 +158,28 @@ const handleSubmit = () => {
   }
 
   // Register
-  userStore.registerAsSitter({
-    realName: form.realName,
-    idCard: form.idCard,
-    experienceYears: form.experienceYears,
-    tags: form.tags,
-    bio: form.bio,
-    availability: form.availability
-  });
+  try {
+    uni.showLoading({ title: '提交中...' });
+    await userStore.registerAsSitter({
+      realName: form.realName,
+      idCard: form.idCard,
+      experienceYears: form.experienceYears,
+      tags: form.tags,
+      bio: form.bio,
+      availability: form.availability
+    });
 
-  uni.showToast({ title: '资料已提交，请完成认证', icon: 'success' });
-  
-  setTimeout(() => {
-    uni.navigateTo({ url: '/pages/profile/certification' });
-  }, 1500);
+    uni.hideLoading();
+    uni.showToast({ title: '资料已提交，请完成认证', icon: 'success' });
+    
+    setTimeout(() => {
+      uni.navigateTo({ url: '/pages/profile/certification' });
+    }, 1500);
+  } catch (e: any) {
+    uni.hideLoading();
+    console.error('Submit failed:', e);
+    uni.showToast({ title: e.message || '提交失败，请重试', icon: 'none' });
+  }
 };
 </script>
 

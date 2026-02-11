@@ -220,10 +220,21 @@ const handleAvatarClick = () => {
 };
 
 const handleCertificationClick = () => {
+  if (!userStore.isLoggedIn) {
+    uni.navigateTo({ url: '/pages/login/index' });
+    return;
+  }
+  
   if (currentRole.value === 'sitter') {
     uni.navigateTo({ url: '/pages/profile/certification' });
   } else {
-    uni.navigateTo({ url: '/pages/sitter-register/index' });
+    uni.navigateTo({ 
+      url: '/pages/sitter-register/index',
+      fail: (err) => {
+        console.error('Navigate to register failed:', err);
+        uni.showToast({ title: '页面跳转失败', icon: 'none' });
+      }
+    });
   }
 };
 

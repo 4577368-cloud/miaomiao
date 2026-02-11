@@ -927,7 +927,7 @@ export const useUserStore = defineStore('user', () => {
     
     // Update DB
     try {
-       await supabase.from('sitter_profiles').upsert({
+       const { error } = await supabase.from('sitter_profiles').upsert({
          user_id: userInfo.value.id,
          real_name: data.realName,
          id_card: data.idCard,
@@ -939,9 +939,12 @@ export const useUserStore = defineStore('user', () => {
          availability: data.availability
        });
        
+       if (error) throw error;
+       
        await updateProfile({ role: 'sitter' });
     } catch (e) {
        console.error('Register sitter failed', e);
+       throw e;
     }
   };
 

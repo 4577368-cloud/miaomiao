@@ -29,7 +29,9 @@
       <view class="nav-header">
         <text class="cancel" @click="closeModal">取消</text>
         <text class="title">{{ isEditing ? '编辑宠物' : '添加宠物' }}</text>
-        <text class="save" @click="savePet">保存</text>
+        <view class="save-btn-wrapper" @click="savePet">
+          <text class="save-text">保存</text>
+        </view>
       </view>
       
       <scroll-view scroll-y class="form-scroll">
@@ -529,10 +531,19 @@ const deletePet = () => {
     color: #999;
   }
   
-  .save {
-    font-size: 14px;
-    color: #FF8E3C;
-    font-weight: bold;
+  .save-btn-wrapper {
+    background: #FF8E3C;
+    padding: 6px 16px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    .save-text {
+      font-size: 14px;
+      color: #fff;
+      font-weight: bold;
+    }
   }
 }
 
@@ -739,7 +750,7 @@ const deletePet = () => {
 
 .modal-content {
   width: 80%;
-  max-height: 70vh;
+  max-height: 80vh;
   background: #fff;
   border-radius: 16px;
   display: flex;
@@ -752,6 +763,7 @@ const deletePet = () => {
     justify-content: space-between;
     align-items: center;
     border-bottom: 1px solid #f5f5f5;
+    flex-shrink: 0;
     
     .title {
       font-size: 16px;
@@ -768,25 +780,26 @@ const deletePet = () => {
   
   .avatar-scroll {
     flex: 1;
-    min-height: 400px;
+    height: 0;
+    width: 100%;
   }
   
   .avatar-grid {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
     padding: 16px;
-    justify-content: space-between;
     
     .grid-item {
-      width: 48%;
-      margin-bottom: 16px;
+      width: 100%;
+      margin-bottom: 0;
       display: flex;
       flex-direction: column;
       align-items: center;
       
       image {
-        width: 100px;
-        height: 100px;
+        width: 80px;
+        height: 80px;
         border-radius: 50%;
         margin-bottom: 8px;
         border: 2px solid #f5f5f5;

@@ -333,7 +333,7 @@ export const useOrderStore = defineStore('order', () => {
         .from('orders')
         .select('*')
         // Allow seeing own orders (creator/sitter) OR public pending orders (Task Hall)
-        .or(`creator_id.eq.${userStore.userInfo.id},sitter_id.eq.${userStore.userInfo.id},and(status.eq.PENDING,sitter_id.is.null)`)
+        .or(`creator_id.eq.${userStore.userInfo.id},sitter_id.eq.${userStore.userInfo.id},status.eq.PENDING`)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
