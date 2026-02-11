@@ -239,13 +239,34 @@ const handleSubmit = async () => {
   try {
     const userId = userStore.userInfo.id;
     const readFile = (path: string) => {
-      return new Promise<ArrayBuffer>((resolve, reject) => {
+      return new Promise<ArrayBuffer | Blob>((resolve, reject) => {
+        // #ifdef MP-WEIXIN
         const fs = uni.getFileSystemManager();
         fs.readFile({
           filePath: path,
           success: (res: any) => resolve(res.data as ArrayBuffer),
           fail: reject
         });
+        // #endif
+
+        // #ifndef MP-WEIXIN
+        // For H5 and App
+        if (path.startsWith('blob:') || path.startsWith('http')) {
+           // H5 blob URL
+           fetch(path)
+             .then(res => res.blob())
+             .then(blob => resolve(blob))
+             .catch(reject);
+        } else {
+           // App path or other
+           uni.request({
+             url: path,
+             responseType: 'arraybuffer',
+             success: (res) => resolve(res.data as ArrayBuffer),
+             fail: reject
+           });
+        }
+        // #endif
       });
     };
     const uploadLocal = async (path: string, side: 'front' | 'back') => {
