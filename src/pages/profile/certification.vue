@@ -53,6 +53,12 @@
               <text class="label">养宠经验</text>
               <text class="value">{{ form.experienceYears }} 年</text>
             </view>
+            <view class="preview-item vertical" v-if="form.tags && form.tags.length">
+              <text class="label">擅长技能</text>
+              <view class="tags-group">
+                <view class="tag-item small" v-for="tag in form.tags" :key="tag">{{ tag }}</view>
+              </view>
+            </view>
             <view class="preview-item vertical">
               <text class="label">个人简介</text>
               <text class="value bio-box">{{ form.bio }}</text>
@@ -104,10 +110,35 @@
 
         <view class="card form-card">
           <view class="section-title">服务信息</view>
+          
           <view class="form-item">
-            <text class="label">养宠经验 (年)</text>
-            <input class="input" v-model="form.experienceYears" type="number" placeholder="请输入经验年限" />
+            <text class="label">养宠经验 ({{ form.experienceYears }}年)</text>
+            <slider 
+              :value="form.experienceYears" 
+              @change="handleExperienceChange" 
+              min="0" 
+              max="20" 
+              activeColor="#FF8E3C" 
+              block-size="20" 
+              show-value
+            />
           </view>
+
+          <view class="form-item">
+            <text class="label">擅长技能</text>
+            <view class="tags-group">
+              <view 
+                class="tag-item" 
+                v-for="tag in availableTags" 
+                :key="tag"
+                :class="{ active: form.tags.includes(tag) }"
+                @click="toggleTag(tag)"
+              >
+                {{ tag }}
+              </view>
+            </view>
+          </view>
+
           <view class="form-item">
             <text class="label">个人简介</text>
             <textarea 
@@ -188,14 +219,27 @@ const reviewedAtText = computed(() => {
   return new Date(ts).toLocaleString();
 });
 
+const availableTags = ['猫咪专家', '大型犬', '幼宠照顾', '老年宠护理', '口服药喂食', '注射服务', '行为训练', '多宠家庭'];
+
 const form = reactive({
   realName: '',
   idCard: '',
   idCardFront: '',
   idCardBack: '',
-  experienceYears: '',
-  bio: ''
+  experienceYears: 0,
+  bio: '',
+  tags: [] as string[]
 });
+
+const toggleTag = (tag: string) => {
+  const idx = form.tags.indexOf(tag);
+  if (idx > -1) form.tags.splice(idx, 1);
+  else form.tags.push(tag);
+};
+
+const handleExperienceChange = (e: any) => {
+  form.experienceYears = e.detail.value;
+};
 
 const maskedIdCard = computed(() => {
   if (!form.idCard) return '';
@@ -267,8 +311,9 @@ const initForm = () => {
     form.idCard = p.idCard || '';
     form.idCardFront = p.idCardFront || '';
     form.idCardBack = p.idCardBack || '';
-    form.experienceYears = p.experienceYears ? String(p.experienceYears) : '';
+    form.experienceYears = p.experienceYears || 0;
     form.bio = p.bio || '';
+    form.tags = p.tags ? [...p.tags] : [];
     
     // 只要尝试初始化过，就标记为已初始化，防止 onShow 反复覆盖
     isFormInitialized.value = true;
@@ -360,8 +405,9 @@ const handleSubmit = async () => {
         user_id: userId,
         real_name: form.realName,
         id_card: form.idCard,
-        experience_years: parseInt(form.experienceYears) || 0,
+        experience_years: Number(form.experienceYears) || 0,
         bio: form.bio,
+        tags: form.tags,
         is_certified: false,
         certification_status: 'pending',
         certification_reject_reason: '',
@@ -388,8 +434,9 @@ const handleSubmit = async () => {
     profile.idCard = form.idCard;
     profile.idCardFront = frontUrl;
     profile.idCardBack = backUrl;
-    profile.experienceYears = parseInt(form.experienceYears) || 0;
+    profile.experienceYears = Number(form.experienceYears) || 0;
     profile.bio = form.bio;
+    profile.tags = form.tags;
     profile.certificationStatus = 'pending';
     profile.certificationRejectReason = '';
     profile.certificationSubmittedAt = Date.now();
@@ -684,6 +731,35 @@ const handleSubmit = async () => {
     font-size: 22rpx;
     color: $color-text-placeholder;
     margin-top: 8rpx;
+  }
+
+  .tags-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    
+    .tag-item {
+      padding: 8px 16px;
+      background: #f5f5f5;
+      border-radius: 20px;
+      font-size: 14px;
+      color: #666;
+      border: 1px solid transparent;
+      transition: all 0.2s;
+      
+      &.small {
+        font-size: 12px;
+        padding: 4px 12px;
+        background: #f0f0f0;
+        color: #666;
+      }
+
+      &.active {
+        background: #FFF0E5;
+        color: #FF8E3C;
+        border-color: #FF8E3C;
+      }
+    }
   }
 }
 
