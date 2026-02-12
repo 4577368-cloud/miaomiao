@@ -382,6 +382,14 @@ const showAllAnnouncements = () => {
 
 // 显示公告详情
 const showAnnouncementDetail = (announcement: any) => {
+  // 特殊处理：宠托师认证通知点击后直接消失并跳转，不显示弹窗
+  if (announcement?.id && String(announcement.id).startsWith('cert_')) {
+    userStore.markNotificationRead(announcement.id);
+    refreshBanner();
+    uni.navigateTo({ url: '/pages/profile/certification' });
+    return;
+  }
+
   uni.showModal({
     title: announcement.title,
     content: announcement.content,
