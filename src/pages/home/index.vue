@@ -114,13 +114,29 @@
         </view>
         <view class="coupon-grid">
           <view class="coupon-card" v-for="tpl in couponTemplates" :key="tpl.id">
-            <view class="coupon-info">
-              <text class="coupon-name">{{ tpl.name }}</text>
-              <text class="coupon-desc">{{ tpl.type === 'FIXED' ? ('立减 ¥'+tpl.value) : (tpl.value*10+'折') }}</text>
+            <!-- 左侧金额区域 -->
+            <view class="coupon-left">
+              <view class="amount">
+                <text class="symbol" v-if="tpl.type === 'FIXED'">¥</text>
+                <text>{{ tpl.type === 'FIXED' ? tpl.value : tpl.value * 10 }}</text>
+                <text class="symbol" v-if="tpl.type === 'DISCOUNT'">折</text>
+              </view>
+              <text class="condition">满{{ tpl.min_spend || 0 }}可用</text>
             </view>
-            <button class="coupon-btn" @click="claimCouponTemplate(tpl)">领取</button>
+            
+            <!-- 右侧信息区域 -->
+            <view class="coupon-right">
+              <view class="info">
+                <text class="name">{{ tpl.name }}</text>
+                <text class="desc">领取后30天内有效</text>
+              </view>
+              <button class="btn-claim" @click="claimCouponTemplate(tpl)">立即领取</button>
+            </view>
           </view>
-          <view v-if="couponTemplates.length === 0" style="padding: 12rpx; color: #888;">暂无活动优惠</view>
+          
+          <view v-if="couponTemplates.length === 0" class="empty-coupon">
+            <text>暂无活动优惠</text>
+          </view>
         </view>
       </view>
 
@@ -1316,6 +1332,160 @@ const handleAcceptOrder = async (orderId: string) => {
         }
       }
     }
+  }
+}
+.coupon-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+  width: 100%;
+  box-sizing: border-box;
+
+  .coupon-card {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    background: #FFFFFF;
+    border-radius: 16rpx;
+    overflow: hidden;
+    height: 180rpx;
+    width: 100%;
+    box-sizing: border-box;
+    box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s;
+
+    &:active {
+      transform: scale(0.99);
+    }
+
+    // 锯齿效果装饰
+    &::before, &::after {
+      content: '';
+      position: absolute;
+      width: 32rpx;
+      height: 32rpx;
+      background-color: #F5F7FA; // 与页面背景色一致
+      border-radius: 50%;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 2;
+    }
+    
+    &::before { left: -16rpx; }
+    &::after { right: -16rpx; }
+
+    .coupon-left {
+      width: 220rpx;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%);
+      color: #FFF;
+      position: relative;
+      
+      .amount {
+        display: flex;
+        align-items: baseline;
+        justify-content: center;
+        font-size: 56rpx;
+        font-weight: 800;
+        line-height: 1;
+        margin-bottom: 8rpx;
+        text-shadow: 0 2rpx 4rpx rgba(0,0,0,0.1);
+        
+        .symbol { 
+          font-size: 28rpx; 
+          margin: 0 4rpx; 
+          font-weight: 600;
+        }
+      }
+      
+      .condition {
+        font-size: 22rpx;
+        opacity: 0.9;
+        background: rgba(255,255,255,0.2);
+        padding: 4rpx 12rpx;
+        border-radius: 20rpx;
+      }
+      
+      // 虚线分割
+      &::after {
+        content: '';
+        position: absolute;
+        right: 0;
+        top: 16rpx;
+        bottom: 16rpx;
+        border-right: 2rpx dashed rgba(255,255,255,0.4);
+      }
+    }
+
+    .coupon-right {
+      flex: 1;
+      padding: 24rpx 32rpx 24rpx 48rpx; // 左侧留出空间给锯齿
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #FFF;
+      
+      .info {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        flex: 1;
+        margin-right: 20rpx;
+        
+        .name {
+          font-size: 32rpx;
+          font-weight: bold;
+          color: #333;
+          margin-bottom: 12rpx;
+          @include text-ellipsis;
+        }
+        
+        .desc {
+          font-size: 22rpx;
+          color: #999;
+          background: #F8F8F8;
+          padding: 4rpx 12rpx;
+          border-radius: 8rpx;
+          align-self: flex-start;
+        }
+      }
+      
+      .btn-claim {
+        min-width: 140rpx;
+        height: 64rpx;
+        line-height: 64rpx;
+        text-align: center;
+        background: linear-gradient(90deg, #FF6B6B 0%, #FF8E3C 100%);
+        color: #FFF;
+        border-radius: 32rpx;
+        font-size: 26rpx;
+        font-weight: 600;
+        padding: 0;
+        margin: 0;
+        box-shadow: 0 4rpx 12rpx rgba(255, 107, 107, 0.3);
+        border: none;
+        
+        &::after { border: none; } // 去除uniapp button默认边框
+
+        &:active {
+          opacity: 0.9;
+          transform: translateY(2rpx);
+        }
+      }
+    }
+  }
+
+  .empty-coupon {
+    padding: 40rpx;
+    text-align: center;
+    color: #999;
+    font-size: 28rpx;
+    background: #FFF;
+    border-radius: 16rpx;
+    border: 2rpx dashed #EEE;
   }
 }
 </style>
