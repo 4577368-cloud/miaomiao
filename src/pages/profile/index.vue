@@ -104,6 +104,18 @@
     
     <view class="section-title">更多功能</view>
     <view class="menu-list">
+      <!-- 身份切换 -->
+      <view class="menu-item" @click="handleSwitchRole">
+        <view class="item-left">
+          <text class="icon">🔄</text>
+          <text class="label">切换身份</text>
+        </view>
+        <view class="item-right">
+          <text class="value">{{ currentRole === 'owner' ? '当前：铲屎官' : '当前：宠托师' }}</text>
+          <text class="arrow">></text>
+        </view>
+      </view>
+
       <!-- 宠托师认证入口 -->
       <view class="menu-item" @click="handleCertificationClick">
         <view class="item-left">
@@ -163,8 +175,10 @@
 import CustomTabBar from '@/components/custom-tab-bar/index.vue';
 import { computed } from 'vue';
 import { useUserStore } from '@/stores/user';
+import { useOrderStore } from '@/stores/order';
 
 const userStore = useUserStore();
+const orderStore = useOrderStore();
 const userInfo = computed(() => userStore.userInfo);
 
 const currentRole = computed(() => userInfo.value?.role || 'owner');
@@ -236,6 +250,56 @@ const handleCertificationClick = () => {
       }
     });
   }
+};
+
+const handleSwitchRole = () => {
+  const targetRole = currentRole.value === 'owner' ? 'sitter' : 'owner';
+  
+  // 1. Check Certification for Sitter
+  if (targetRole === 'sitter') {
+    if (!userInfo.value?.sitterProfile?.isCertified) {
+      uni.showModal({
+        title: '需要认证',
+        content: '切换为宠托师模式需要先完成实名认证',
+        confirmText: '去认证',
+        success: (res) => {
+          if (res.confirm) {
+            uni.navigateTo({ url: '/pages/profile/certification' });
+          }
+        }
+      });
+      return;
+    }
+  }
+
+  // 2. Check Active Orders (Guard)
+  const userId = userInfo.value?.id;
+  if (!userId) return;
+
+  // If switching FROM Sitter TO Owner
+  if (currentRole.value === 'sitter') {
+    const hasActiveJobs = orderStore.orders.some(o => 
+      o.sitterId === userId && 
+      ['ACCEPTED', 'IN_SERVICE'].includes(o.status)
+    );
+    
+    if (hasActiveJobs) {
+      uni.showModal({
+        title: '无法切换',
+        content: '您还有未完成的接单任务，请先完成服务后再切换身份。',
+        showCancel: false
+      });
+      return;
+    }
+  }
+  
+  // Perform Switch
+  uni.showLoading({ title: '切换中...' });
+  setTimeout(() => {
+    userStore.switchRole(targetRole);
+    uni.hideLoading();
+    uni.showToast({ title: `已切换为${targetRole === 'owner' ? '铲屎官' : '宠托师'}`, icon: 'success' });
+  }, 500);
 };
 
 const handleLogout = () => {

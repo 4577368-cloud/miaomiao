@@ -171,6 +171,35 @@
         </scroll-view>
       </view>
     </view>
+    <!-- 角色选择弹窗 (登录后显示) -->
+    <view class="role-select-mask" v-if="showRoleSelection">
+      <view class="role-select-card">
+        <view class="select-header">
+          <text class="select-title">请选择登录身份</text>
+          <text class="select-desc">您希望以什么身份进入？</text>
+        </view>
+        
+        <view class="role-options">
+          <view class="role-option" @click="selectLoginRole('owner')">
+            <view class="option-icon owner">🏠</view>
+            <view class="option-info">
+              <text class="option-title">我是铲屎官</text>
+              <text class="option-desc">发布需求，寻找服务</text>
+            </view>
+            <view class="check-icon" v-if="userStore.userInfo?.role === 'owner'">✓</view>
+          </view>
+          
+          <view class="role-option" @click="selectLoginRole('sitter')">
+            <view class="option-icon sitter">🎒</view>
+            <view class="option-info">
+              <text class="option-title">我是宠托师</text>
+              <text class="option-desc">接单赚钱，专业服务</text>
+            </view>
+            <view class="check-icon" v-if="userStore.userInfo?.role === 'sitter'">✓</view>
+          </view>
+        </view>
+      </view>
+    </view>
   </view>
   <view style="height: 100px;"></view>
   <CustomTabBar current-path="pages/login/index" />
@@ -188,6 +217,7 @@ import { sendSmsCode, verifySmsCode } from '@/utils/sms';
 const userStore = useUserStore();
 
 const isRegister = ref(false);
+const showRoleSelection = ref(false);
 const loginMethod = ref<'phone' | 'email'>('phone'); // 默认手机号
 const email = ref('');
 const phone = ref('');
@@ -446,9 +476,9 @@ const handleAction = async () => {
         await userStore.fetchProfile(data.user.id, data.user.email);
         
         uni.showToast({ title: '登录成功', icon: 'success' });
-        setTimeout(() => {
-          uni.reLaunch({ url: '/pages/home/index' });
-        }, 1500);
+        
+        // 登录成功后，弹出身份选择
+        showRoleSelection.value = true;
       }
     }
   } catch (e: any) {
@@ -459,8 +489,19 @@ const handleAction = async () => {
   }
 };
 
+const selectLoginRole = async (role: 'owner' | 'sitter') => {
+  // 如果选择的身份与当前不同，则切换
+  if (userStore.userInfo?.role !== role) {
+    await userStore.switchRole(role);
+  } else {
+    // 相同则直接跳转
+    uni.reLaunch({ url: '/pages/home/index' });
+  }
+  showRoleSelection.value = false;
+};
+
 onShow(() => {
-  if (userStore.isLoggedIn) {
+  if (userStore.isLoggedIn && !showRoleSelection.value) {
     uni.reLaunch({ url: '/pages/home/index' });
   }
 });
@@ -853,6 +894,119 @@ onShow(() => {
         border-color: $color-primary;
       }
     }
+  }
+}
+
+.role-select-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40rpx;
+}
+
+.role-select-card {
+  width: 100%;
+  max-width: 600rpx;
+  background: #fff;
+  border-radius: 40rpx;
+  padding: 60rpx 40rpx;
+  animation: slideUp 0.3s ease-out;
+
+  .select-header {
+    text-align: center;
+    margin-bottom: 50rpx;
+
+    .select-title {
+      font-size: 40rpx;
+      font-weight: 600;
+      color: #333;
+      display: block;
+      margin-bottom: 16rpx;
+    }
+
+    .select-desc {
+      font-size: 28rpx;
+      color: #999;
+    }
+  }
+
+  .role-options {
+    display: flex;
+    flex-direction: column;
+    gap: 30rpx;
+  }
+
+  .role-option {
+    display: flex;
+    align-items: center;
+    padding: 30rpx;
+    background: #f9f9f9;
+    border: 2rpx solid transparent;
+    border-radius: 24rpx;
+    transition: all 0.3s;
+
+    &:active {
+      transform: scale(0.98);
+      background: #fffbf5;
+      border-color: $color-primary;
+    }
+
+    .option-icon {
+      width: 100rpx;
+      height: 100rpx;
+      background: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 48rpx;
+      margin-right: 30rpx;
+      box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.05);
+
+      &.owner { background: #E3F2FD; }
+      &.sitter { background: #FFF3E0; }
+    }
+
+    .option-info {
+      flex: 1;
+      
+      .option-title {
+        font-size: 32rpx;
+        font-weight: 600;
+        color: #333;
+        display: block;
+        margin-bottom: 8rpx;
+      }
+      
+      .option-desc {
+        font-size: 24rpx;
+        color: #999;
+      }
+    }
+
+    .check-icon {
+      font-size: 32rpx;
+      color: $color-primary;
+      font-weight: bold;
+    }
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100rpx);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
   }
 }
 </style>
