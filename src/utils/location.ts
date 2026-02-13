@@ -14,30 +14,6 @@ export interface LocationResult {
  */
 export const requestLocationPermission = async (): Promise<boolean> => {
   return new Promise((resolve) => {
-    // #ifdef H5
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        () => resolve(true),
-        (error) => {
-          console.warn('H5定位权限申请失败:', error);
-          if (error.code === error.PERMISSION_DENIED) {
-            uni.showModal({
-              title: '定位权限',
-              content: '需要获取您的位置信息以提供更好的服务，请在浏览器设置中允许位置访问',
-              showCancel: false,
-              confirmText: '我知道了'
-            });
-          }
-          resolve(false);
-        },
-        { timeout: 10000, enableHighAccuracy: true }
-      );
-    } else {
-      uni.showToast({ title: '浏览器不支持定位', icon: 'none' });
-      resolve(false);
-    }
-    // #endif
-    
     // #ifdef MP-WEIXIN
     uni.authorize({
       scope: 'scope.userLocation',
@@ -63,7 +39,8 @@ export const requestLocationPermission = async (): Promise<boolean> => {
     });
     // #endif
     
-    // #ifndef H5 || MP-WEIXIN
+    // #ifndef MP-WEIXIN
+    // H5和其他端直接返回true，由后续API调用触发系统权限申请
     resolve(true);
     // #endif
   });

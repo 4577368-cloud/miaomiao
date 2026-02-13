@@ -61,4 +61,8 @@ body {
 .btn:hover {
   background: #f7f7f7;
 }
+/* Ensure date picker is above dialog mask/content */
+.high-z-index-popper {
+  z-index: 9999 !important;
+}
 </style>

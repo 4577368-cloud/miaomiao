@@ -502,7 +502,8 @@ const selectLoginRole = async (role: 'owner' | 'sitter') => {
 
 onShow(() => {
   if (userStore.isLoggedIn && !showRoleSelection.value) {
-    uni.reLaunch({ url: '/pages/home/index' });
+    // 已登录状态下进入登录页，直接显示身份选择，而不是自动跳转
+    showRoleSelection.value = true;
   }
 });
 </script>

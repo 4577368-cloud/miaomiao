@@ -67,13 +67,38 @@ const fetchOrders = async () => {
       { id: 'MOCK-2', service_type: 'WALKING', status: 'COMPLETED', total_price: 66, creator_name: '王五', sitter_name: '赵六', created_at: new Date(Date.now() - 86400000).toISOString() }
     ]
   } else {
-    const { data, error } = await supabase.rpc('get_admin_orders')
+    const { data: orderList, error } = await supabase
+      .from('orders')
+      .select('*')
+      .order('created_at', { ascending: false })
+
     if (error) {
       lastError.value = `拉取失败: ${error.message}`
       ElMessage.error('加载失败')
       orders.value = []
     } else {
-      orders.value = data || []
+      // Fetch user profiles to display names
+      const userIds = new Set<string>()
+      orderList.forEach((o: any) => {
+        if (o.creator_id) userIds.add(o.creator_id)
+        if (o.sitter_id) userIds.add(o.sitter_id)
+      })
+
+      let profileMap = new Map<string, string>()
+      if (userIds.size > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, nickname')
+          .in('id', Array.from(userIds))
+        
+        profiles?.forEach((p: any) => profileMap.set(p.id, p.nickname))
+      }
+
+      orders.value = orderList.map((o: any) => ({
+        ...o,
+        creator_name: profileMap.get(o.creator_id) || '未知用户',
+        sitter_name: profileMap.get(o.sitter_id) || (o.sitter_snapshot?.nickname || (o.sitter_id ? '未知宠托师' : '待接单'))
+      }))
     }
   }
   loading.value = false

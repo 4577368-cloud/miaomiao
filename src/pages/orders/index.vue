@@ -1017,16 +1017,30 @@ const handleCancel = (order: Order) => {
 };
 
 const handlePay = (order: Order) => {
-  uni.showLoading({ title: '支付中...' });
-  setTimeout(async () => {
-    uni.hideLoading();
-    if (await orderStore.payOrder(order.id)) {
-        uni.showToast({ title: '支付成功', icon: 'success' });
-        switchToTab('PENDING');
-    } else {
-        uni.showToast({ title: '支付失败', icon: 'none' });
+  uni.showActionSheet({
+    itemList: ['余额支付', '支付宝支付'],
+    success: async (res) => {
+      const method = res.tapIndex === 0 ? 'BALANCE' : 'ALIPAY';
+      
+      uni.showLoading({ title: '支付中...' });
+      
+      try {
+        const success = await orderStore.payOrder(order.id, method);
+        uni.hideLoading();
+        
+        if (success) {
+            uni.showToast({ title: '支付成功', icon: 'success' });
+            switchToTab('PENDING');
+        } else {
+            // Error toast is handled in store for Balance, but generic fail here
+            if (method === 'ALIPAY') uni.showToast({ title: '支付失败', icon: 'none' });
+        }
+      } catch (e) {
+        uni.hideLoading();
+        uni.showToast({ title: '支付出错', icon: 'none' });
+      }
     }
-  }, 1000);
+  });
 };
 
 const handleConfirmStart = async (order: Order) => {

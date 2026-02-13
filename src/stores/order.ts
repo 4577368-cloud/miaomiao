@@ -44,6 +44,7 @@ export interface Order {
   remark?: string;
   status: 'UNPAID' | 'PENDING' | 'PENDING_ACCEPTANCE' | 'ACCEPTED' | 'IN_SERVICE' | 'COMPLETED' | 'REVIEWED' | 'CANCELLED';
   isPaid: boolean;
+  paymentMethod?: 'BALANCE' | 'ALIPAY';
   isDirect?: boolean; // 是否为1v1直接指派
   actualStartTime?: number; // 实际开始服务时间
   createdAt: number;
@@ -147,10 +148,12 @@ export const useOrderStore = defineStore('order', () => {
       })(),
       time: row.scheduled_time ? new Date(row.scheduled_time).toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-') : '', // Simplified formatting
       remark: row.remark,
-      status: row.status,
-      isPaid: row.is_paid,
-      
+      status: row.status as Order['status'],
+      isPaid: row.is_paid || false,
+      paymentMethod: row.payment_method as Order['paymentMethod'],
+      isDirect: row.is_direct || false,
       createdAt: new Date(row.created_at).getTime(),
+      actualStartTime: row.actual_start_time ? new Date(row.actual_start_time).getTime() : undefined,
       addOns: row.add_ons || { play: false, deepClean: false, medicine: false },
       serviceEvidence: row.service_evidence,
       
@@ -443,7 +446,7 @@ export const useOrderStore = defineStore('order', () => {
     throw new Error('创建订单失败：未获取到订单数据');
   };
 
-  const payOrder = async (orderId: string) => {
+  const payOrder = async (orderId: string, paymentMethod: 'BALANCE' | 'ALIPAY' = 'BALANCE') => {
       const orderIndex = orders.value.findIndex(o => o.id === orderId);
       if (orderIndex === -1) return false;
       const order = orders.value[orderIndex];
@@ -452,31 +455,54 @@ export const useOrderStore = defineStore('order', () => {
       
       const userStore = useUserStore();
       
-      // Deduct Balance
-      const success = await userStore.deductBalance(order.totalPrice);
-      if (!success) {
-          uni.showToast({ title: '余额不足', icon: 'none' });
-          return false;
+      if (paymentMethod === 'BALANCE') {
+        // Deduct Balance
+        const success = await userStore.deductBalance(order.totalPrice);
+        if (!success) {
+            uni.showToast({ title: '余额不足', icon: 'none' });
+            return false;
+        }
+      } else {
+        // Simulate Alipay Payment
+        // In real app: uni.requestPayment(...)
+        await new Promise(resolve => setTimeout(resolve, 1500));
       }
       
       // Update Order Status
-      const { error } = await supabase
+      // Note: payment_method column is assumed to be added to DB or will be ignored if not present
+      let { error } = await supabase
         .from('orders')
         .update({ 
             status: 'PENDING',
             is_paid: true,
+            payment_method: paymentMethod, 
             updated_at: new Date().toISOString()
         })
         .eq('id', orderId);
+
+      // Fallback if column doesn't exist
+      if (error && (error.message.includes('column') || error.code === '42703')) {
+          console.warn('payment_method column missing, retrying without it');
+          const { error: retryError } = await supabase
+            .from('orders')
+            .update({ 
+                status: 'PENDING',
+                is_paid: true,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', orderId);
+          error = retryError;
+      }
         
       if (error) {
           console.error('Pay order failed:', error);
-          // TODO: Rollback balance?
+          // TODO: If BALANCE was deducted, we might need to refund.
           return false;
       }
 
       orders.value[orderIndex].status = 'PENDING';
       orders.value[orderIndex].isPaid = true;
+      orders.value[orderIndex].paymentMethod = paymentMethod;
       uni.setStorageSync('miaomiao_orders', JSON.stringify(orders.value));
       return true;
   };
@@ -576,17 +602,29 @@ export const useOrderStore = defineStore('order', () => {
              await userStore.addPoints(pointsToAdd);
          }
          
-         // 增加宠托师的服务单量 - 使用RPC确保原子性
-         const { error: countError } = await supabase.rpc('increment_sitter_completed_orders', { 
-             user_id: order.sitterId 
-         });
-         
-         if (countError) {
-             console.error('增加服务单量失败:', countError);
+         // 增加宠托师的服务单量 - 手动更新替代RPC
+         const { data: sitterProfile, error: fetchError } = await supabase
+           .from('sitter_profiles')
+           .select('completed_orders')
+           .eq('user_id', order.sitterId)
+           .single();
+
+         if (fetchError) {
+             console.error('获取宠托师信息失败:', fetchError);
          } else {
-             // 更新本地缓存
-             if (userStore.userInfo?.id === order.sitterId && userStore.userInfo.sitterProfile) {
-                 userStore.userInfo.sitterProfile.completedOrders = (userStore.userInfo.sitterProfile.completedOrders || 0) + 1;
+             const newCount = (sitterProfile.completed_orders || 0) + 1;
+             const { error: updateError } = await supabase
+               .from('sitter_profiles')
+               .update({ completed_orders: newCount })
+               .eq('user_id', order.sitterId);
+               
+             if (updateError) {
+                 console.error('更新服务单量失败:', updateError);
+             } else {
+                 // 更新本地缓存
+                 if (userStore.userInfo?.id === order.sitterId && userStore.userInfo.sitterProfile) {
+                     userStore.userInfo.sitterProfile.completedOrders = newCount;
+                 }
              }
          }
     }

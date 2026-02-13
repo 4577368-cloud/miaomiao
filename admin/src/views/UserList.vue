@@ -223,18 +223,70 @@ const selectedCouponId = ref('')
 
 const fetchUsers = async () => {
   loading.value = true
-  const { data, error } = await supabase.rpc('get_admin_users')
-  if (error) {
-    ElMessage.error('加载失败: ' + error.message)
-  } else {
-    users.value = (data || []).map((u: any) => ({
-      ...u,
-      initiatedOrderCount: 0,
-      completedOrderCount: 0,
-      totalSpent: 0,
-      pets: []
-    }))
+  
+  // 1. Fetch Profiles
+  const { data: profiles, error: profileError } = await supabase
+    .from('profiles')
+    .select('*')
+    .order('created_at', { ascending: false })
+    
+  if (profileError) {
+    ElMessage.error('加载失败: ' + profileError.message)
+    loading.value = false
+    return
   }
+  
+  // 2. Fetch Sitter Profiles for extra info
+  const { data: sitterProfiles } = await supabase
+    .from('sitter_profiles')
+    .select('user_id, completed_orders, total_income, status')
+    
+  const sitterMap = new Map()
+  sitterProfiles?.forEach((s: any) => sitterMap.set(s.user_id, s))
+  
+  // 3. Fetch Order Stats (Aggregation manually)
+  const { data: orders } = await supabase
+    .from('orders')
+    .select('creator_id, sitter_id, status, total_price')
+    
+  const userStats = new Map<string, { initiated: number, spent: number, completed: number }>()
+  
+  orders?.forEach((o: any) => {
+      // Initiator stats
+      if (o.creator_id) {
+          if (!userStats.has(o.creator_id)) userStats.set(o.creator_id, { initiated: 0, spent: 0, completed: 0 })
+          const s = userStats.get(o.creator_id)!
+          s.initiated++
+          if (['COMPLETED', 'REVIEWED'].includes(o.status)) {
+              s.spent += Number(o.total_price || 0)
+          }
+      }
+      
+      // Sitter stats (completed count is also in sitter_profiles but we can calc here too)
+      if (o.sitter_id) {
+           if (!userStats.has(o.sitter_id)) userStats.set(o.sitter_id, { initiated: 0, spent: 0, completed: 0 })
+           const s = userStats.get(o.sitter_id)!
+           if (['COMPLETED', 'REVIEWED'].includes(o.status)) {
+               s.completed++
+           }
+      }
+  })
+
+  users.value = (profiles || []).map((u: any) => {
+      const sProfile = sitterMap.get(u.id)
+      const stats = userStats.get(u.id) || { initiated: 0, spent: 0, completed: 0 }
+      
+      return {
+        ...u,
+        role: sProfile ? 'sitter' : 'owner', // Determine role by existence of sitter profile
+        labor_balance: 0, // Not stored in profile currently, maybe skip or fetch from elsewhere if exists
+        initiatedOrderCount: stats.initiated,
+        completedOrderCount: sProfile?.completed_orders || stats.completed, // Prefer sitter profile count if avail
+        totalSpent: stats.spent,
+        pets: [] // Fetching pets would require another query, skipping for list view performance or adding if critical
+      }
+  })
+  
   loading.value = false
 }
 
@@ -244,15 +296,18 @@ const handleEdit = (row: UserProfile) => {
 }
 
 const handleEditSubmit = async () => {
-  const { error } = await supabase.rpc('admin_update_profile', {
-    p_id: editForm.value.id,
-    p_nickname: editForm.value.nickname,
-    p_avatar: editForm.value.avatar,
-    p_gender: editForm.value.gender,
-    p_role: editForm.value.role,
-    p_phone: editForm.value.phone,
-    p_email: editForm.value.email
-  })
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      nickname: editForm.value.nickname,
+      avatar: editForm.value.avatar,
+      gender: editForm.value.gender,
+      phone: editForm.value.phone,
+      email: editForm.value.email
+      // role is derived, not directly editable in profiles table usually unless specific column exists
+    })
+    .eq('id', editForm.value.id)
+
   if (error) {
     ElMessage.error('更新失败: ' + error.message)
   } else {
@@ -264,7 +319,12 @@ const handleEditSubmit = async () => {
 
 const handleDelete = (row: UserProfile) => {
   ElMessageBox.confirm('确定删除该用户吗？此操作不可恢复！', '警告', { type: 'error' }).then(async () => {
-    const { error } = await supabase.rpc('admin_delete_profile', { p_id: row.id })
+    // Delete from profiles (Cascade should handle related data if set up, otherwise might error)
+    const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', row.id)
+        
     if (error) ElMessage.error('删除失败: ' + error.message)
     else {
       ElMessage.success('删除成功')
@@ -284,14 +344,23 @@ const handleRechargeSubmit = async () => {
   if (!currentUser.value) return
   rechargeLoading.value = true
   try {
-    // Call RPC function
-    const { error } = await supabase.rpc('admin_recharge_balance', {
-      target_user_id: currentUser.value.id,
-      amount: rechargeForm.value.amount,
-      remark: rechargeForm.value.remark
-    })
+    // Manual Recharge: Get current balance -> Add -> Update
+    const { data: profile, error: fetchError } = await supabase
+        .from('profiles')
+        .select('balance')
+        .eq('id', currentUser.value.id)
+        .single()
+        
+    if (fetchError) throw fetchError
     
-    if (error) throw error
+    const newBalance = (profile.balance || 0) + rechargeForm.value.amount
+    
+    const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ balance: newBalance })
+        .eq('id', currentUser.value.id)
+    
+    if (updateError) throw updateError
     
     ElMessage.success('充值成功')
     rechargeDialogVisible.value = false

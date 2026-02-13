@@ -182,6 +182,10 @@
         <text class="label">服务地址</text>
         <text class="value">{{ order.address }}</text>
       </view>
+      <view class="info-row" v-if="order.isPaid && order.paymentMethod">
+        <text class="label">支付方式</text>
+        <text class="value">{{ order.paymentMethod === 'BALANCE' ? '余额支付' : '支付宝支付' }}</text>
+      </view>
       <view class="info-row price-row">
         <text class="label">订单金额</text>
         <text class="price">¥{{ order.totalPrice.toFixed(2) }}</text>
@@ -193,6 +197,11 @@
     <view class="footer-bar" v-if="order.status !== 'CANCELLED'">
       <!-- Owner Actions -->
       <block v-if="isOwner">
+        <button 
+          v-if="order.status === 'UNPAID'" 
+          class="btn btn-primary" 
+          @click="handlePay"
+        >立即支付</button>
         <button 
           v-if="order.status === 'PENDING' || order.status === 'PENDING_ACCEPTANCE'" 
           class="btn btn-outline" 
@@ -489,6 +498,31 @@ const handleAccept = () => {
                 } else {
                     uni.showToast({ title: '抢单失败', icon: 'none' });
                 }
+            }
+        }
+    });
+};
+
+const handlePay = () => {
+    if (!order.value) return;
+    uni.showActionSheet({
+        itemList: ['余额支付', '支付宝支付'],
+        success: async (res) => {
+            const method = res.tapIndex === 0 ? 'BALANCE' : 'ALIPAY';
+            uni.showLoading({ title: '支付中...' });
+            
+            try {
+                const success = await orderStore.payOrder(order.value!.id, method);
+                uni.hideLoading();
+                
+                if (success) {
+                    uni.showToast({ title: '支付成功', icon: 'success' });
+                } else {
+                    if (method === 'ALIPAY') uni.showToast({ title: '支付失败', icon: 'none' });
+                }
+            } catch (e) {
+                uni.hideLoading();
+                uni.showToast({ title: '支付出错', icon: 'none' });
             }
         }
     });

@@ -71,6 +71,7 @@
             start-placeholder="开始日期"
             end-placeholder="结束日期"
             style="width: 100%"
+            popper-class="high-z-index-popper"
           />
         </el-form-item>
       </el-form>

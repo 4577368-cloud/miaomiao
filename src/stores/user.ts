@@ -247,7 +247,7 @@ export const useUserStore = defineStore('user', () => {
               ? '您的实名认证已通过审核，可以开始接单了'
               : `很遗憾，您的认证未通过${sitterProfile?.certificationRejectReason ? '，原因：' + sitterProfile.certificationRejectReason : ''}`;
             addNotification({
-              id: `cert_${currentStatus}_${data.id}_${Date.now()}`,
+              id: `cert_${currentStatus}_${data.id}`,
               type: 'system',
               title,
               content,
@@ -1222,10 +1222,65 @@ export const useUserStore = defineStore('user', () => {
     const list = getNotifications(uid);
     const idx = list.findIndex(n => n.id === id);
     if (idx > -1) {
+      // Logic for System Announcements: Once a day
+      if (list[idx].type === 'announcement') {
+        const dailyKey = `miaomiao_daily_read_${uid}`;
+        const dailyReads = uni.getStorageSync(dailyKey) || {};
+        dailyReads[id] = Date.now();
+        uni.setStorageSync(dailyKey, dailyReads);
+        
+        // Do NOT mark as 'read' in the permanent list, so it can reappear tomorrow
+        // Just trigger a UI refresh by returning (the caller usually refreshes)
+        return; 
+      }
+
+      // Logic for others: Permanent read
       list[idx].read = true;
       setNotifications(uid, list);
+      void supabase.from('notifications').update({ is_read: true }).eq('user_id', uid).eq('id', id);
     }
-    void supabase.from('notifications').update({ is_read: true }).eq('user_id', uid).eq('id', id);
+  };
+
+  const getUnreadNotifications = (userId?: string) => {
+    const uid = userId || userInfo.value?.id;
+    if (!uid) return [];
+    
+    // Clean up expired announcements (older than 7 days from creation)
+    const expirationTime = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const allNotifications = getNotifications(uid);
+    
+    // Check daily reads for announcements
+    const dailyKey = `miaomiao_daily_read_${uid}`;
+    const dailyReads = uni.getStorageSync(dailyKey) || {};
+    const today = new Date().toDateString();
+
+    const validNotifications = allNotifications.filter(n => {
+      // 1. Expired check
+      if (n.type === 'announcement') {
+        const notificationTime = new Date(n.time).getTime();
+        if (notificationTime < expirationTime) return false;
+
+        // 2. Daily Read check
+        const lastRead = dailyReads[n.id];
+        if (lastRead) {
+            const lastReadDate = new Date(lastRead).toDateString();
+            if (lastReadDate === today) return false; // Read today, hide it
+        }
+        
+        return true; // Keep it if not expired and not read today
+      }
+      return true;
+    });
+    
+    if (validNotifications.length < allNotifications.length) {
+      setNotifications(uid, validNotifications);
+    }
+    
+    return validNotifications.filter(n => {
+       // For announcements, we ignore the 'read' property since we manage it via dailyReads
+       if (n.type === 'announcement') return true;
+       return !n.read;
+    });
   };
 
   const markNotificationsRead = (ids: string[]) => {
@@ -1275,30 +1330,6 @@ export const useUserStore = defineStore('user', () => {
     setNotifications(uid, list);
   };
 
-  const getUnreadNotifications = (userId?: string) => {
-    const uid = userId || userInfo.value?.id;
-    if (!uid) return [];
-    
-    // 清理过期的公告通知（超过1天）
-    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
-    const allNotifications = getNotifications(uid);
-    const validNotifications = allNotifications.filter(n => {
-      // 如果是公告类型，检查是否过期
-      if (n.type === 'announcement') {
-        const notificationTime = new Date(n.time).getTime();
-        return notificationTime > oneDayAgo;
-      }
-      return true; // 其他类型不过期
-    });
-    
-    // 如果有过期通知被清理，更新存储
-    if (validNotifications.length < allNotifications.length) {
-      setNotifications(uid, validNotifications);
-    }
-    
-    return validNotifications.filter(n => !n.read);
-  };
-
   const clearNotifications = (userId?: string) => {
     const uid = userId || userInfo.value?.id;
     if (!uid) return;
@@ -1335,13 +1366,13 @@ export const useUserStore = defineStore('user', () => {
     const uid = userInfo.value?.id;
     if (!uid) return;
     
-    // 获取当前时间，计算1天前的边界时间
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    // Get announcements from last 7 days
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     
     const { data, error } = await supabase
       .from('announcements')
       .select('*')
-      .gte('created_at', oneDayAgo.toISOString()) // 只获取1天内的公告
+      .gte('created_at', sevenDaysAgo.toISOString())
       .order('created_at', { ascending: false });
     
     if (error) {
@@ -1371,6 +1402,8 @@ export const useUserStore = defineStore('user', () => {
     
     if (added.length > 0) {
       setNotifications(uid, [...added, ...existing]);
+      // For announcements, we don't necessarily need to sync to 'notifications' table if they are ephemeral
+      // But keeping them consistent with other notifs is fine.
       void supabase.from('notifications').insert(added.map(item => ({
         id: item.id,
         user_id: uid,

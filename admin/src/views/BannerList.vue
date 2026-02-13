@@ -62,7 +62,13 @@
           <el-input-number v-model="form.sort_order" :min="0" />
         </el-form-item>
         <el-form-item label="有效期">
-          <el-date-picker v-model="dateRange" type="datetimerange" start-placeholder="开始时间" end-placeholder="结束时间" />
+          <el-date-picker 
+            v-model="dateRange" 
+            type="datetimerange" 
+            start-placeholder="开始时间" 
+            end-placeholder="结束时间" 
+            popper-class="high-z-index-popper"
+          />
         </el-form-item>
         <el-form-item label="状态">
           <el-switch v-model="form.is_active" />

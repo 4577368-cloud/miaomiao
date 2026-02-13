@@ -8,6 +8,10 @@
       <view class="header-row">
         <view class="user-welcome">
           <text class="username">{{ userStore.userInfo?.nickname || '铲屎官' }}</text>
+          <view class="role-switch-badge" v-if="!isOwner" @click="handleQuickSwitch">
+            <text class="icon">🔄</text>
+            <text>切换雇主</text>
+          </view>
         </view>
         <view class="location-badge" @click="handleLocationClick">
           <text class="icon">📍</text>
@@ -335,6 +339,18 @@ const processedOrders = computed(() => {
   });
 });
 
+const handleQuickSwitch = async () => {
+  uni.showLoading({ title: '切换中...' });
+  try {
+    await userStore.switchRole('owner');
+    uni.showToast({ title: '已切换为铲屎官', icon: 'success' });
+  } catch (e) {
+    // switchRole handles errors internally usually
+  } finally {
+    uni.hideLoading();
+  }
+};
+
 const setSort = (type: SortType) => {
     currentSort.value = type;
 }
@@ -398,23 +414,35 @@ const showAllAnnouncements = () => {
 
 // 显示公告详情
 const showAnnouncementDetail = (announcement: any) => {
-  // 特殊处理：宠托师认证通知点击后直接消失并跳转，不显示弹窗
-  if (announcement?.id && String(announcement.id).startsWith('cert_')) {
+  if (!announcement?.id) return;
+
+  // 1. 认证通知：直接跳转认证页
+  if (String(announcement.id).startsWith('cert_')) {
     userStore.markNotificationRead(announcement.id);
     refreshBanner();
     uni.navigateTo({ url: '/pages/profile/certification' });
     return;
   }
 
+  // 2. 订单通知：直接跳转订单详情
+  if (announcement.type === 'order' && announcement.orderId) {
+    userStore.markNotificationRead(announcement.id);
+    refreshBanner();
+    uni.navigateTo({ url: `/pages/order-detail/index?id=${announcement.orderId}` });
+    return;
+  }
+
+  // 3. 系统公告：弹窗显示，点击确认后标记已读（当天不再显示）
   uni.showModal({
     title: announcement.title,
     content: announcement.content,
     showCancel: false,
     confirmText: '知道了',
     success: () => {
-      if (announcement?.id) {
-        userStore.markNotificationRead(announcement.id);
-        refreshBanner();
+      userStore.markNotificationRead(announcement.id);
+      refreshBanner();
+      if (announcement.link) {
+        openLink(announcement.link);
       }
     }
   });
@@ -542,6 +570,36 @@ onUnload(() => {
 });
 
 const handleLocationClick = () => {
+  uni.showActionSheet({
+    itemList: ['重新定位', '地图选点'],
+    success: (res) => {
+      if (res.tapIndex === 0) {
+        // 重新定位
+        uni.showLoading({ title: '定位中...' });
+        getCurrentLocation()
+          .then(loc => {
+            uni.hideLoading();
+            if (loc.name) {
+              locationName.value = loc.name;
+              uni.showToast({ title: '定位成功', icon: 'success' });
+            }
+          })
+          .catch(err => {
+            uni.hideLoading();
+            console.error('Manual location failed:', err);
+            // getCurrentLocation internally handles some errors and might return mock, 
+            // but if it rejects:
+            uni.showToast({ title: '定位失败，请检查权限', icon: 'none' });
+          });
+      } else {
+        // 地图选点
+        openMapSelection();
+      }
+    }
+  });
+};
+
+const openMapSelection = () => {
     uni.chooseLocation({
       success: (res) => {
         console.log('Location chosen:', res);
@@ -550,22 +608,13 @@ const handleLocationClick = () => {
       fail: (err) => {
         console.error('Choose location failed:', err.errMsg || err);
         // #ifdef H5
-        // H5平台特殊处理
-        if (err.errMsg && (err.errMsg.includes('auth denied') || err.errMsg.includes('denied'))) {
-            uni.showModal({
-                title: '定位权限受限',
-                content: '请在浏览器地址栏左侧点击锁图标，允许获取位置信息，或者检查系统定位开关。',
-                showCancel: false
-            });
-        } else if (err.errMsg && err.errMsg.includes('cancel')) {
-            // 用户取消，不做处理
-        } else {
-            // 其他错误（如Key配置问题）
-            uni.showToast({
-                title: '打开地图失败，请检查网络或配置',
-                icon: 'none'
-            });
-        }
+        if (err.errMsg && (err.errMsg.includes('cancel'))) return;
+        
+        uni.showModal({
+            title: '无法打开地图',
+            content: '请确保已授予定位权限。若多次失败，可能是地图服务配置问题。',
+            showCancel: false
+        });
         // #endif
 
         // #ifndef H5
@@ -585,7 +634,7 @@ const handleLocationClick = () => {
         // #endif
       }
     });
-  };
+};
 
 const handlePublishAvailability = () => {
   if (!userStore.userInfo?.sitterProfile?.isCertified) {
@@ -708,6 +757,33 @@ const handleAcceptOrder = async (orderId: string) => {
       @include text-ellipsis;
       display: block;
     }
+
+    .role-switch-badge {
+      display: inline-flex;
+      align-items: center;
+      margin-top: 12rpx;
+      background: rgba(255, 255, 255, 0.6);
+      padding: 8rpx 20rpx;
+      border-radius: 30rpx;
+      align-self: flex-start;
+      border: 1rpx solid rgba(0,0,0,0.05);
+      
+      .icon {
+        font-size: 24rpx;
+        margin-right: 8rpx;
+      }
+      
+      text {
+        font-size: 24rpx;
+        color: #666;
+        font-weight: 500;
+      }
+      
+      &:active {
+        opacity: 0.7;
+        background: rgba(0, 0, 0, 0.1);
+      }
+    }
   }
 
   .location-badge {
@@ -824,58 +900,74 @@ const handleAcceptOrder = async (orderId: string) => {
 }
 
 .notice-banner {
-  margin: 20rpx $spacing-lg 10rpx;
-  background: #fff7e6;
-  border: 1px solid #ffe7ba;
-  border-radius: 12rpx;
-  padding: 16rpx 20rpx;
+  margin: 24rpx $spacing-lg;
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 20rpx;
   display: flex;
   align-items: center;
-  gap: 16rpx;
-  cursor: pointer;
-  transition: all 0.3s ease;
+  gap: 20rpx;
+  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.05);
   
   &:active {
-    transform: scale(0.98);
-    opacity: 0.9;
+    transform: scale(0.99);
+    background: #fafafa;
   }
   
+  .banner-left {
+    width: 72rpx;
+    height: 72rpx;
+    background: linear-gradient(135deg, #FFF6E5 0%, #FFF0D6 100%);
+    border-radius: 16rpx;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    
+    .icon {
+      font-size: 36rpx;
+    }
+  }
+
   .banner-content-wrapper {
     flex: 1;
     overflow: hidden;
-    position: relative;
+    height: 72rpx;
+    display: flex;
+    align-items: center;
   }
-}
-
-.banner-left {
-  width: 40rpx;
-}
-
-.banner-swiper-vertical {
-  flex: 1;
-  height: 56rpx;
-}
-
-.notice-banner-item {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.notice-banner-title {
-  font-size: 28rpx;
-  color: #8d6b00;
-  font-weight: 600;
-  white-space: nowrap;
-  display: inline-block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
   
-  &.scroll-title {
-    animation: scrollText 12s linear infinite;
-    padding-right: 100%;
-    max-width: none;
+  .banner-swiper-vertical {
+    width: 100%;
+    height: 40rpx;
+  }
+  
+  .notice-banner-item {
+    height: 40rpx;
+    display: flex;
+    align-items: center;
+  }
+  
+  .notice-banner-title {
+    font-size: 28rpx;
+    color: #333;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+  }
+  
+  .banner-right {
+    width: 32rpx;
+    display: flex;
+    justify-content: flex-end;
+    
+    .banner-arrow {
+      color: #ccc;
+      font-size: 32rpx;
+      font-weight: 300;
+    }
   }
 }
 
